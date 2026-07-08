@@ -4,227 +4,110 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#c8402a" />
-  <meta name="description" content="Informativa sul trattamento dei dati personali per le prenotazioni." />
-  <title>Informativa Privacy — {{NOME_LOCALE}}</title>
+  <meta name="description" content="Privacy Policy per il sistema di prenotazione online del ristorante." />
+  <meta property="og:title" content="Privacy Policy - {{NOME_LOCALE}}" />
+  <meta property="og:description" content="Informativa sul trattamento dei dati personali raccolti per le prenotazioni online." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="/privacy-policy.html" />
+  <link rel="canonical" href="/privacy-policy.html" />
+  <title>Privacy Policy - {{NOME_LOCALE}}</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-
-  <!-- =====================================================================
-       TEMPLATE INFORMATIVA PRIVACY (art. 13 GDPR)
-       Per pubblicarla per un locale, sostituisci i placeholder:
-         {{NOME_LOCALE}}     — ragione sociale / nome del locale
-         {{INDIRIZZO}}       — indirizzo completo del locale
-         {{EMAIL_LOCALE}}    — email di contatto per i diritti privacy
-         {{MESI_RETENTION}}  — mesi di conservazione dati (default: 24)
-       Stessa estetica del widget: colori in variabili CSS :root qui sotto.
-       ===================================================================== -->
-  <style>
-    :root {
-      --paper:        #efe4c9;
-      --surface:      #fffdf6;
-      --surface-soft: #f7efdb;
-      --ink:          #3a2b23;
-      --ink-soft:     #7a6a5d;
-      --tomato:       #c8402a;
-      --tomato-dark:  #a5321f;
-      --line:         #e3d6ba;
-      --radius:    18px;
-      --radius-sm: 12px;
-      --shadow:    0 10px 40px rgba(58, 43, 35, 0.12);
-      --font-title: "Bricolage Grotesque", system-ui, sans-serif;
-      --font-body:  "Inter", system-ui, -apple-system, sans-serif;
-    }
-    * { box-sizing: border-box; }
-    html, body {
-      margin: 0; background: var(--paper); color: var(--ink);
-      font-family: var(--font-body); line-height: 1.6;
-      -webkit-font-smoothing: antialiased;
-    }
-    .wrap {
-      max-width: 660px; margin: 0 auto;
-      padding: env(safe-area-inset-top) 16px calc(40px + env(safe-area-inset-bottom));
-    }
-    @media (min-width: 560px) { .wrap { margin: 28px auto; } }
-
-    .card {
-      background: var(--surface); border: 1px solid var(--line);
-      border-radius: var(--radius); box-shadow: var(--shadow);
-      padding: 30px 26px;
-    }
-
-    .kicker {
-      font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase;
-      color: var(--tomato); font-weight: 600; margin: 0 0 6px;
-    }
-    h1 {
-      font-family: var(--font-title); font-weight: 700; font-size: 1.7rem;
-      line-height: 1.1; margin: 0 0 8px; letter-spacing: -0.015em;
-    }
-    .lead { color: var(--ink-soft); margin: 0 0 6px; font-size: 0.95rem; }
-    .updated { color: var(--ink-soft); font-size: 0.82rem; margin: 0 0 26px; }
-
-    h2 {
-      font-family: var(--font-title); font-weight: 600; font-size: 1.12rem;
-      margin: 26px 0 8px; padding-top: 18px; border-top: 1px solid var(--line);
-    }
-    h2:first-of-type { border-top: none; padding-top: 0; }
-    p { margin: 0 0 12px; }
-    ul { margin: 0 0 12px; padding-left: 20px; }
-    li { margin-bottom: 6px; }
-    strong { font-weight: 600; }
-    a { color: var(--tomato-dark); }
-
-    .box {
-      background: var(--surface-soft); border: 1px solid var(--line);
-      border-radius: var(--radius-sm); padding: 14px 16px; margin: 0 0 12px;
-    }
-    .box p:last-child { margin-bottom: 0; }
-
-    .back {
-      display: inline-block; margin-top: 26px; color: var(--tomato-dark);
-      font-weight: 600; text-decoration: none;
-    }
-    .footer { text-align: center; color: var(--ink-soft); font-size: 0.72rem; padding: 16px 4px 0; }
-  </style>
+  <link rel="stylesheet" href="assets/css/legal.css" />
 </head>
 <body>
   <div class="wrap">
-    <div class="card">
-      <p class="kicker">Informativa Privacy</p>
+    <main class="card">
+      <p class="kicker">Privacy Policy</p>
       <h1>Come trattiamo i tuoi dati</h1>
       <p class="lead">
-        Quando prenoti un tavolo da <strong>{{NOME_LOCALE}}</strong> ci lasci alcuni
-        dati. Qui ti spieghiamo in modo chiaro quali usiamo, perché e per quanto
-        tempo — come previsto dall'art. 13 del Regolamento UE 2016/679 (GDPR).
+        Questa informativa spiega quali dati personali vengono raccolti quando prenoti un tavolo da
+        <strong>{{NOME_LOCALE}}</strong>, per quali finalita' e con quali garanzie, ai sensi del Regolamento UE 2016/679 (GDPR).
       </p>
-      <p class="updated">Ultimo aggiornamento: la data di pubblicazione di questa pagina.</p>
+      <p class="updated">Ultimo aggiornamento: {{ULTIMO_AGGIORNAMENTO}}</p>
 
-      <h2>Chi tratta i tuoi dati (Titolare)</h2>
+      <h2>Titolare del trattamento</h2>
       <div class="box">
         <p>
-          <strong>{{NOME_LOCALE}}</strong><br />
-          {{INDIRIZZO}}<br />
-          Email: <a href="mailto:{{EMAIL_LOCALE}}">{{EMAIL_LOCALE}}</a>
+          <strong>{{RAGIONE_SOCIALE}}</strong><br />
+          Nome locale: {{NOME_LOCALE}}<br />
+          Indirizzo: {{INDIRIZZO}}<br />
+          Partita IVA/Codice fiscale: {{PARTITA_IVA}}<br />
+          Email privacy: <a data-mailto href="mailto:{{EMAIL_LOCALE}}">{{EMAIL_LOCALE}}</a><br />
+          Telefono: {{TELEFONO_LOCALE}}
         </p>
       </div>
       <p>
-        Il Titolare del trattamento è il locale stesso, che decide come e perché i
-        tuoi dati vengono usati. Per qualsiasi richiesta puoi scrivere all'indirizzo
-        email qui sopra.
+        I dati del titolare sono gestiti tramite placeholder e, quando configurato, tramite i dati del locale presenti in Supabase.
       </p>
 
-      <h2>Quali dati raccogliamo</h2>
+      <h2>Tipologie di dati raccolti</h2>
       <ul>
-        <li><strong>Nome</strong> e <strong>cognome</strong></li>
-        <li><strong>Numero di telefono</strong></li>
-        <li><strong>Eventuali note</strong> che scrivi tu (es. seggiolone, allergie, preferenza dehors)</li>
+        <li>Nome e cognome.</li>
+        <li>Numero di telefono.</li>
+        <li>Data, turno scelto, numero di persone e stato della prenotazione.</li>
+        <li>Eventuali note inserite volontariamente, ad esempio allergie, preferenze o richieste specifiche.</li>
+        <li>Consenso marketing, solo se espresso tramite checkbox facoltativa.</li>
+        <li>Dati tecnici necessari al funzionamento del sito, come preferenze cookie salvate nel browser.</li>
       </ul>
-      <p>
-        Raccogliamo solo ciò che serve a gestire la prenotazione: nessun dato in più.
-      </p>
 
-      <h2>Perché li usiamo (finalità)</h2>
-      <p>
-        Usiamo i tuoi dati per un unico scopo: <strong>gestire la tua prenotazione
-        del tavolo</strong> — registrarla, confermarla, ricontattarti se serve e
-        organizzare il servizio in sala.
-      </p>
-
-      <h2>Su quale base giuridica</h2>
-      <p>
-        Il trattamento si fonda sull'<strong>esecuzione di un contratto</strong> di
-        cui sei parte (art. 6.1.b GDPR): la prenotazione stessa. Senza questi dati
-        non potremmo tenerti il tavolo.
-      </p>
-      <p>
-        Se in futuro ti chiederemo di ricevere comunicazioni promozionali (offerte,
-        eventi), lo faremo <strong>solo con il tuo consenso</strong> esplicito
-        (art. 6.1.a GDPR), che potrai <strong>revocare in qualsiasi momento</strong>
-        scrivendo a <a href="mailto:{{EMAIL_LOCALE}}">{{EMAIL_LOCALE}}</a>, senza
-        che questo influisca sulla tua prenotazione.
-      </p>
-
-      <h2>Per quanto tempo li conserviamo</h2>
-      <p>
-        Conserviamo i dati della prenotazione per <strong>{{MESI_RETENTION}} mesi</strong>,
-        il tempo utile a gestire il servizio e i normali obblighi amministrativi.
-        Trascorso questo periodo, i dati vengono <strong>cancellati</strong>.
-      </p>
-
-      <h2>Chi ci aiuta a gestirli (fornitori tecnici)</h2>
-      <p>
-        Per far funzionare il sistema di prenotazione ci appoggiamo a fornitori
-        tecnici che trattano i dati per nostro conto, con adeguate garanzie:
-      </p>
+      <h2>Finalita'</h2>
       <ul>
-        <li><strong>Supabase</strong> — database e archiviazione, su server nell'Unione Europea</li>
-        <li><strong>Cloudflare</strong> — distribuzione e sicurezza del sito</li>
+        <li>Gestire la prenotazione, la lista d'attesa e le comunicazioni operative col cliente.</li>
+        <li>Organizzare il servizio in sala e assegnare o suggerire un tavolo.</li>
+        <li>Rispondere a richieste, cancellazioni o modifiche della prenotazione.</li>
+        <li>Inviare comunicazioni promozionali solo a chi ha espresso consenso specifico.</li>
+        <li>Garantire sicurezza, manutenzione e corretto funzionamento del servizio online.</li>
       </ul>
+
+      <h2>Base giuridica</h2>
       <p>
-        Non vendiamo né cediamo i tuoi dati a terzi per scopi commerciali.
+        I dati necessari alla prenotazione sono trattati per eseguire misure precontrattuali o contrattuali richieste dall'interessato
+        (art. 6.1.b GDPR). Le comunicazioni promozionali si basano esclusivamente sul consenso libero e revocabile
+        (art. 6.1.a GDPR). I dati tecnici necessari al funzionamento del sito sono trattati per legittimo interesse
+        alla sicurezza e continuita' del servizio (art. 6.1.f GDPR).
       </p>
 
-      <h2>I tuoi diritti</h2>
-      <p>In qualsiasi momento puoi chiederci di:</p>
-      <ul>
-        <li><strong>Accedere</strong> ai tuoi dati e sapere quali abbiamo</li>
-        <li><strong>Correggerli</strong> se sono sbagliati o incompleti</li>
-        <li><strong>Cancellarli</strong></li>
-        <li><strong>Riceverli</strong> in un formato leggibile (portabilità)</li>
-      </ul>
+      <h2>Conservazione dati</h2>
       <p>
-        Ti basta scrivere a <a href="mailto:{{EMAIL_LOCALE}}">{{EMAIL_LOCALE}}</a>:
-        ti risponderemo nel più breve tempo possibile.
+        I dati delle prenotazioni sono conservati per <strong>{{MESI_RETENTION}} mesi</strong>, salvo obblighi di legge,
+        esigenze di tutela dei diritti o richiesta di cancellazione applicabile. Il consenso marketing resta valido fino a revoca.
       </p>
 
-      <h2>Reclamo all'autorità</h2>
+      <h2>Destinatari</h2>
       <p>
-        Se ritieni che i tuoi dati non siano trattati correttamente, hai diritto di
-        proporre reclamo al <strong>Garante per la protezione dei dati personali</strong>
-        (<a href="https://www.garanteprivacy.it" target="_blank" rel="noopener">garanteprivacy.it</a>).
+        I dati sono accessibili solo al personale autorizzato del locale e ai fornitori tecnici necessari al servizio.
+        Il sistema utilizza Supabase per database e autenticazione e puo' essere distribuito tramite Cloudflare Pages.
+        I fornitori trattano i dati secondo istruzioni del titolare e adeguate misure di sicurezza.
+      </p>
+      <p>Non vendiamo i dati personali e non li cediamo a terzi per finalita' commerciali autonome.</p>
+
+      <h2>Diritti GDPR</h2>
+      <p>Puoi chiedere in qualsiasi momento accesso, rettifica, cancellazione, limitazione, opposizione e portabilita' dei dati.</p>
+      <p>
+        Puoi inoltre revocare il consenso marketing in qualsiasi momento scrivendo a
+        <a data-mailto href="mailto:{{EMAIL_LOCALE}}">{{EMAIL_LOCALE}}</a>. La revoca non pregiudica la liceita' dei trattamenti gia' effettuati.
       </p>
 
-      <a class="back" href="index.html">← Torna alla prenotazione</a>
-    </div>
-    <p class="footer">{{NOME_LOCALE}} · Informativa resa ai sensi dell'art. 13 GDPR</p>
+      <h2>Contatti</h2>
+      <p>
+        Per richieste privacy o per esercitare i tuoi diritti scrivi a
+        <a data-mailto href="mailto:{{EMAIL_LOCALE}}">{{EMAIL_LOCALE}}</a>.
+      </p>
+      <p>
+        Se ritieni che il trattamento violi la normativa, puoi proporre reclamo al
+        <a href="https://www.garanteprivacy.it" target="_blank" rel="noopener">Garante per la protezione dei dati personali</a>.
+      </p>
+
+      <a class="back" href="index.html">Torna alla prenotazione</a>
+    </main>
+    <p class="footer">{{NOME_LOCALE}} - Informativa resa ai sensi dell'art. 13 GDPR</p>
   </div>
 
   <script src="assets/js/config.js"></script>
-  <script type="module">
-    // Compilazione dinamica: se l'URL ha ?locale=<slug>, la pagina riempie i
-    // placeholder {{...}} con i dati del locale (name, address, contact_email,
-    // data_retention_months). Un dato mancante resta come placeholder, così è
-    // evidente cosa completare. Senza ?locale la pagina resta un template.
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-
-    const CONFIG = window.APP_CONFIG || {};
-    const slug = new URLSearchParams(location.search).get('locale') || CONFIG.DEFAULT_VENUE_SLUG;
-    if (slug && CONFIG.SUPABASE_URL) {
-      try {
-        const supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, { auth: { persistSession: false } });
-        const { data: v } = await supabase.from('venues').select('*').eq('slug', slug).maybeSingle();
-        if (v) {
-          fill({
-            NOME_LOCALE: v.name,
-            INDIRIZZO: v.address,
-            EMAIL_LOCALE: v.contact_email,
-            MESI_RETENTION: v.data_retention_months,
-          });
-        }
-      } catch (e) { console.warn('[privacy] dati locale non caricati:', e); }
-    }
-
-    function fill(map) {
-      const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
-        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-      const sub = (html) => html.replace(/\{\{(\w+)\}\}/g, (m, k) =>
-        (map[k] === null || map[k] === undefined || map[k] === '') ? m : esc(map[k]));
-      for (const el of document.querySelectorAll('.card, .footer')) el.innerHTML = sub(el.innerHTML);
-      document.title = document.title.replace(/\{\{(\w+)\}\}/g, (m, k) =>
-        (map[k] == null || map[k] === '') ? m : map[k]);
-    }
-  </script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/js/legal.js"></script>
 </body>
 </html>

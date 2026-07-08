@@ -9,18 +9,24 @@
 //
 // Per rilasciare un aggiornamento degli asset, incrementa CACHE_VERSION.
 
-const CACHE_VERSION = 'v5';
+const CACHE_VERSION = 'v6';
 const CACHE = 'prenotazioni-' + CACHE_VERSION;
 
 // App shell: file che (quando presenti) precarichiamo all'installazione.
 // Precache resiliente: un file mancante non fa fallire l'installazione.
 const CORE = [
   './index.html',
+  './privacy.html',
   './privacy-policy.html',
+  './cookie-policy.html',
+  './booking-terms.html',
   './manifest.json',
+  './assets/css/legal.css',
   './assets/css/theme.css',
   './assets/css/panel.css',
   './assets/icons/icon.svg',
+  './assets/js/cookie-consent.js',
+  './assets/js/legal.js',
   './assets/js/pwa.js',
   './admin/index.html',
   './admin/dashboard.html',

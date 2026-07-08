@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#c8402a" />
+  <meta name="description" content="Condizioni di prenotazione del ristorante." />
+  <meta property="og:title" content="Condizioni di Prenotazione - {{NOME_LOCALE}}" />
+  <meta property="og:description" content="Regole su conferma, ritardo, cancellazione e responsabilita' della prenotazione." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="/booking-terms.html" />
+  <link rel="canonical" href="/booking-terms.html" />
+  <title>Condizioni di Prenotazione - {{NOME_LOCALE}}</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/legal.css" />
+</head>
+<body>
+  <div class="wrap">
+    <main class="card">
+      <p class="kicker">Condizioni</p>
+      <h1>Condizioni di prenotazione</h1>
+      <p class="lead">
+        Queste condizioni regolano le prenotazioni online presso <strong>{{NOME_LOCALE}}</strong>.
+      </p>
+      <p class="updated">Ultimo aggiornamento: {{ULTIMO_AGGIORNAMENTO}}</p>
+
+      <h2>Modalita' di prenotazione</h2>
+      <p>
+        La prenotazione viene richiesta scegliendo numero di persone, data, turno e inserendo i dati di contatto necessari.
+        Le informazioni devono essere corrette e aggiornate.
+      </p>
+
+      <h2>Conferma</h2>
+      <p>
+        L'invio del modulo non garantisce automaticamente la disponibilita' definitiva del tavolo. La prenotazione puo'
+        risultare in attesa di conferma del locale, che potra' contattarti al numero indicato.
+      </p>
+
+      <h2>Ritardo massimo</h2>
+      <p>
+        In caso di ritardo, il tavolo potra' essere mantenuto per un tempo ragionevole secondo l'organizzazione del locale.
+        Oltre tale limite il ristorante potra' liberare il tavolo o riassegnarlo.
+      </p>
+
+      <h2>Cancellazione</h2>
+      <p>
+        Se non puoi presentarti, avvisa il locale il prima possibile usando i contatti indicati. La cancellazione tempestiva
+        aiuta il ristorante a gestire correttamente la sala e l'eventuale lista d'attesa.
+      </p>
+
+      <h2>Responsabilita' cliente</h2>
+      <ul>
+        <li>Fornire dati di contatto corretti.</li>
+        <li>Comunicare allergie, esigenze particolari o variazioni del numero di persone.</li>
+        <li>Presentarsi all'orario selezionato o avvisare in caso di ritardo o cancellazione.</li>
+      </ul>
+
+      <h2>Responsabilita' ristorante</h2>
+      <p>
+        Il ristorante si impegna a gestire le richieste con cura, ma puo' modificare, rifiutare o annullare una prenotazione
+        per esigenze organizzative, indisponibilita', errori tecnici o cause di forza maggiore.
+      </p>
+
+      <h2>Contatti</h2>
+      <p>
+        Per modifiche, cancellazioni o informazioni contatta <strong>{{NOME_LOCALE}}</strong> al numero {{TELEFONO_LOCALE}}
+        oppure via email a <a data-mailto href="mailto:{{EMAIL_LOCALE}}">{{EMAIL_LOCALE}}</a>.
+      </p>
+
+      <a class="back" href="index.html">Torna alla prenotazione</a>
+    </main>
+    <p class="footer">{{NOME_LOCALE}} - Condizioni di prenotazione</p>
+  </div>
+
+  <script src="assets/js/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/js/legal.js"></script>
+</body>
+</html>

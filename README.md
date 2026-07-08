@@ -5,8 +5,8 @@ proprie zone/tavoli/turni). Stack: HTML/CSS/JS vanilla + Supabase (EU) +
 Cloudflare Pages.
 
 Stato attuale: **backend completo** + **widget cliente** + **pannello
-gestionale**. Restano da fare: lista d'attesa, CRM, statistiche, privacy
-policy, PWA.
+gestionale** + **pagine privacy/cookie/termini** + **PWA**. Restano da fare:
+CRM e statistiche avanzate.
 
 ## Struttura del progetto
 
@@ -17,7 +17,9 @@ supabase/
   seed.sql               dati di esempio per sviluppo locale
 public/                  frontend statico (deploy su Cloudflare Pages)
   index.html             widget prenotazione (pagina standalone: CSS+JS inline)
-  privacy.html           placeholder informativa (sostituito nello step dedicato)
+  privacy-policy.html    informativa GDPR per il widget pubblico
+  cookie-policy.html     cookie policy
+  booking-terms.html     condizioni di prenotazione
   admin/                 pannello gestionale (dietro Supabase Auth)
     index.html            login (email/password)
     dashboard.html/.js    KPI, tab turni, lista+azioni, mappa tavoli, realtime

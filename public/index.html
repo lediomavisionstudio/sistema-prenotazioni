@@ -246,10 +246,20 @@
       background: var(--surface);
     }
     .field input:focus, .field textarea:focus { outline: none; border-color: var(--tomato); box-shadow: 0 0 0 3px var(--tomato-soft); }
+    .field input[aria-invalid="true"] { border-color: var(--tomato-dark); background: #fff9f7; }
     .field textarea { resize: vertical; min-height: 64px; }
 
-    .privacy { font-size: 0.8rem; color: var(--ink-soft); margin: 2px 0 0; }
-    .privacy a { color: var(--tomato-dark); }
+    .consents { display: grid; gap: 10px; margin: 2px 0 0; }
+    .check {
+      display: flex; align-items: flex-start; gap: 10px;
+      color: var(--ink-soft); font-size: 0.82rem; line-height: 1.35;
+    }
+    .check input {
+      width: 18px; height: 18px; margin: 1px 0 0; flex: none;
+      accent-color: var(--tomato);
+    }
+    .check a { color: var(--tomato-dark); font-weight: 600; }
+    .check input:focus-visible { outline: 3px solid var(--tomato-soft); outline-offset: 2px; }
 
     .error {
       background: #fbeae7; color: var(--tomato-dark);
@@ -298,6 +308,17 @@
     .recap__v.cap { text-transform: capitalize; }
 
     .footer { text-align: center; color: var(--ink-soft); font-size: 0.72rem; padding: 14px 4px 4px; }
+    .footer__links {
+      display: flex; justify-content: center; flex-wrap: wrap; gap: 8px 12px;
+      margin-top: 8px;
+    }
+    .footer a, .footer button {
+      color: var(--tomato-dark); font: inherit; font-weight: 600;
+      background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline;
+    }
+    .footer button:focus-visible, .footer a:focus-visible {
+      outline: 3px solid var(--tomato-soft); outline-offset: 3px; border-radius: 4px;
+    }
   </style>
 </head>
 <body>
@@ -378,17 +399,23 @@
             </div>
             <div class="field">
               <label for="notes">Note <span>(seggiolone, allergie, preferenza dehors…)</span></label>
-              <textarea id="notes" name="notes" rows="3" maxlength="500"></textarea>
+              <textarea id="notes" name="notes" rows="3" maxlength="500" aria-label="Note per il locale"></textarea>
             </div>
 
             <p class="error" id="formError" hidden></p>
 
-            <button class="btn btn--primary" type="submit" id="submitBtn" disabled>Prenota</button>
+            <div class="consents">
+              <label class="check" for="privacyConsent">
+                <input id="privacyConsent" name="privacyConsent" type="checkbox" required />
+                <span>Ho letto e accetto la <a id="privacyLink" href="privacy-policy.html" target="_blank" rel="noopener">Privacy Policy</a>.</span>
+              </label>
+              <label class="check" for="marketingConsent">
+                <input id="marketingConsent" name="marketingConsent" type="checkbox" />
+                <span>Acconsento a ricevere comunicazioni promozionali.</span>
+              </label>
+            </div>
 
-            <p class="privacy">
-              Prenotando accetti il trattamento dei dati secondo la
-              <a id="privacyLink" href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.
-            </p>
+            <button class="btn btn--primary" type="submit" id="submitBtn" disabled>Prenota</button>
           </form>
         </section>
       </div>
@@ -406,11 +433,20 @@
       </div>
 
     </main>
-    <p class="footer">Prenotazione soggetta a conferma del locale.</p>
+    <footer class="footer">
+      <span>Prenotazione soggetta a conferma del locale.</span>
+      <nav class="footer__links" aria-label="Link legali">
+        <a id="footerPrivacyLink" href="privacy-policy.html">Privacy Policy</a>
+        <a href="cookie-policy.html">Cookie Policy</a>
+        <a href="booking-terms.html">Condizioni di Prenotazione</a>
+        <button type="button" id="cookiePrefs">Preferenze Cookie</button>
+      </nav>
+    </footer>
   </div>
 
   <script src="assets/js/config.js"></script>
   <script src="assets/js/pwa.js"></script>
+  <script src="assets/js/cookie-consent.js"></script>
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -419,7 +455,7 @@
     // -------------------------------------------------------------------
     const CONFIG = Object.assign({
       SUPABASE_URL: '', SUPABASE_ANON_KEY: '',
-      DEFAULT_VENUE_SLUG: '', PRIVACY_URL: 'privacy.html',
+      DEFAULT_VENUE_SLUG: '', PRIVACY_URL: 'privacy-policy.html',
     }, window.APP_CONFIG || {});
 
     const params = new URLSearchParams(location.search);
@@ -435,6 +471,7 @@
       LOCALE_CHIUSO: 'Il locale è chiuso nella data selezionata.',
       COPERTI_NON_VALIDI: 'Numero di coperti non valido.',
       DATI_CLIENTE_INCOMPLETI: 'Compila nome, cognome e telefono.',
+      PRIVACY_NON_ACCETTATA: 'Per prenotare devi accettare la Privacy Policy.',
       NESSUNA_DISPONIBILITA: 'Non c\'è più posto per questa scelta. Prova un altro orario o data.',
     };
 
@@ -477,6 +514,11 @@
     const todayLocal = () => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate(), 12); };
     const hhmm = (t) => (t || '').slice(0, 5);
     const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+    const withLocale = (path) => {
+      if (!venueSlug) return path;
+      const sep = path.includes('?') ? '&' : '?';
+      return `${path}${sep}locale=${encodeURIComponent(venueSlug)}`;
+    };
 
     function showState(which) {
       ['Loading','Fatal','Form','Confirm'].forEach((s) =>
@@ -540,7 +582,16 @@
     // Avvio
     // -------------------------------------------------------------------
     async function init() {
-      $('privacyLink').href = CONFIG.PRIVACY_URL || 'privacy.html';
+      const privacyUrl = withLocale(CONFIG.PRIVACY_URL || 'privacy-policy.html');
+      $('privacyLink').href = privacyUrl;
+      $('footerPrivacyLink').href = privacyUrl;
+      document.querySelectorAll('.footer__links a').forEach((link) => {
+        if (link.id === 'footerPrivacyLink') return;
+        link.href = withLocale(link.getAttribute('href'));
+      });
+      $('cookiePrefs').addEventListener('click', () => {
+        if (window.CookieConsent) window.CookieConsent.openPreferences();
+      });
 
       if (!venueSlug) return fatal('Link non valido: manca l\'identificativo del locale.');
 
@@ -775,7 +826,7 @@
 
     function updateSubmit() {
       const btn = $('submitBtn');
-      btn.disabled = !(state.selDate && state.selShift);
+      btn.disabled = !(state.selDate && state.selShift && $('privacyConsent').checked);
       btn.textContent = isWaitlist() ? 'Mettiti in lista d\'attesa' : 'Prenota';
     }
 
@@ -789,9 +840,16 @@
       const lastName = form.lastName.value.trim();
       const phone = form.phone.value.trim();
       const notes = form.notes.value.trim();
+      const marketingConsent = form.marketingConsent.checked;
 
-      if (!firstName || !lastName || !phone) return showFormError('Compila nome, cognome e telefono.');
-      if (!state.selDate || !state.selShift) return showFormError('Scegli data e orario.');
+      clearFieldErrors(form);
+      if (!firstName) return showFormError('Inserisci il nome.', form.firstName);
+      if (!lastName) return showFormError('Inserisci il cognome.', form.lastName);
+      if (!phone) return showFormError('Inserisci il numero di telefono.', form.phone);
+      if (state.coperti < MIN_PARTY) return showFormError('Il numero di persone deve essere almeno 1.');
+      if (!state.selDate || isoToDate(state.selDate) < todayLocal()) return showFormError('Scegli una data futura.');
+      if (!state.selShift) return showFormError('Scegli un orario.');
+      if (!form.privacyConsent.checked) return showFormError('Per prenotare devi accettare la Privacy Policy.', form.privacyConsent);
 
       const waitlist = isWaitlist();
       const btn = $('submitBtn');
@@ -807,6 +865,8 @@
           p_last_name: lastName,
           p_phone: phone,
           p_notes: notes || null,
+          p_privacy_policy_accepted: true,
+          p_marketing_consent: marketingConsent,
         });
         if (error) throw error;
         showConfirm(Array.isArray(data) ? data[0] : data, waitlist);
@@ -822,9 +882,17 @@
       }
     }
 
-    function showFormError(msg) {
+    function clearFieldErrors(form) {
+      form.querySelectorAll('[aria-invalid="true"]').forEach((el) => el.removeAttribute('aria-invalid'));
+    }
+
+    function showFormError(msg, field) {
       const box = $('formError');
       box.textContent = msg; box.hidden = false;
+      if (field) {
+        field.setAttribute('aria-invalid', 'true');
+        field.focus({ preventScroll: true });
+      }
       box.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
 
@@ -866,6 +934,8 @@
     function reset() {
       state.selShift = null;
       $('bookingForm').reset();
+      $('formError').hidden = true;
+      clearFieldErrors($('bookingForm'));
       showState('Form');
       renderCalendar();
       loadDayAvailability().then(() => { renderTimes(); updateSubmit(); }).catch((e) => fatal(mapError(e)));
@@ -880,6 +950,7 @@
     $('calPrev').addEventListener('click', () => shiftMonth(-1));
     $('calNext').addEventListener('click', () => shiftMonth(+1));
     $('bookingForm').addEventListener('submit', onSubmit);
+    $('privacyConsent').addEventListener('change', updateSubmit);
     $('newBtn').addEventListener('click', reset);
 
     init();

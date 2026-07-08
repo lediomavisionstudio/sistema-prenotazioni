@@ -44,7 +44,7 @@ Il pannello gestionale è unico per tutti: `https://tuo-dominio.pages.dev/admin/
 6. **Consegna i link** al cliente:
    - Prenotazioni clienti: `.../?locale=pub-da-luigi`
    - Pannello gestionale: `.../admin/`
-   - Privacy: compila i placeholder di `privacy-policy.html` con i dati del locale.
+   - Privacy: valorizza su `venues` i dati legali (`legal_name`, `vat_number`, `contact_email`, `data_retention_months`), oppure completa i placeholder visibili nelle pagine legali.
 
 ## Cosa NON serve fare
 

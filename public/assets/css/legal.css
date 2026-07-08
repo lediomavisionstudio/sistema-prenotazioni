@@ -1,0 +1,124 @@
+:root {
+  --paper: #efe4c9;
+  --surface: #fffdf6;
+  --surface-soft: #f7efdb;
+  --ink: #3a2b23;
+  --ink-soft: #7a6a5d;
+  --tomato: #c8402a;
+  --tomato-dark: #a5321f;
+  --line: #e3d6ba;
+  --radius: 18px;
+  --radius-sm: 12px;
+  --shadow: 0 10px 40px rgba(58, 43, 35, 0.12);
+  --font-title: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html,
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: env(safe-area-inset-top) 16px calc(40px + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 560px) {
+  .wrap { margin: 28px auto; }
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 30px 26px;
+}
+
+.kicker {
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--tomato);
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+
+h1 {
+  font-family: var(--font-title);
+  font-weight: 700;
+  font-size: 1.75rem;
+  line-height: 1.1;
+  margin: 0 0 8px;
+}
+
+h2 {
+  font-family: var(--font-title);
+  font-weight: 600;
+  font-size: 1.12rem;
+  margin: 26px 0 8px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+h2:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+p { margin: 0 0 12px; }
+ul { margin: 0 0 12px; padding-left: 20px; }
+li { margin-bottom: 6px; }
+strong { font-weight: 600; }
+a { color: var(--tomato-dark); }
+
+.lead {
+  color: var(--ink-soft);
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+}
+
+.updated {
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  margin: 0 0 26px;
+}
+
+.box {
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin: 0 0 12px;
+}
+
+.box p:last-child { margin-bottom: 0; }
+
+.back {
+  display: inline-block;
+  margin-top: 26px;
+  color: var(--tomato-dark);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.footer {
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  padding: 16px 4px 0;
+}
+
+@media (max-width: 420px) {
+  .card { padding: 26px 20px; }
+  h1 { font-size: 1.55rem; }
+}
