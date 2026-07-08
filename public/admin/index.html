@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#c8402a" />
+  <title>Accedi — Pannello gestionale</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/theme.css" />
+  <link rel="stylesheet" href="../assets/css/panel.css" />
+
+  <!-- PWA: gestionale installabile -->
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="../assets/icons/icon.svg" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Gestionale" />
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      <h1>Pannello gestionale</h1>
+      <p class="sub">Accedi per gestire le prenotazioni.</p>
+      <form class="login-form" id="loginForm" novalidate>
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" type="email" autocomplete="username" required />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" type="password" autocomplete="current-password" required />
+        </div>
+        <p class="form-error" id="loginError" hidden></p>
+        <button class="btn btn--primary btn--block" type="submit" id="loginBtn">Accedi</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/pwa.js"></script>
+  <script type="module">
+    import { supabase } from './app.js';
+
+    // Se già autenticato, vai diretto alla dashboard.
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) location.replace('dashboard.html');
+    })();
+
+    const form = document.getElementById('loginForm');
+    const errBox = document.getElementById('loginError');
+    const btn = document.getElementById('loginBtn');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errBox.hidden = true;
+      const email = form.email.value.trim();
+      const password = form.password.value;
+      if (!email || !password) { show('Inserisci email e password.'); return; }
+
+      btn.disabled = true; btn.textContent = 'Accesso…';
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        show(error.message?.includes('Invalid') ? 'Email o password non corretti.' : 'Accesso non riuscito. Riprova.');
+        btn.disabled = false; btn.textContent = 'Accedi';
+        return;
+      }
+      location.replace('dashboard.html');
+    });
+
+    function show(msg) { errBox.textContent = msg; errBox.hidden = false; }
+  </script>
+</body>
+</html>

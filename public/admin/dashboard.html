@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#c8402a" />
+  <title>Dashboard — Pannello gestionale</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/theme.css" />
+  <link rel="stylesheet" href="../assets/css/panel.css" />
+
+  <!-- PWA: gestionale installabile -->
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="../assets/icons/icon.svg" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Gestionale" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar__inner">
+      <div class="topbar__brand">
+        <span class="topbar__venue" id="venueName">—</span>
+        <span class="topbar__role" id="userRole"></span>
+      </div>
+      <nav class="topbar__nav">
+        <a class="topbar__link is-active" href="dashboard.html">Dashboard</a>
+        <a class="topbar__link" href="upcoming.html">In arrivo</a>
+        <a class="topbar__link" href="stats.html">Statistiche</a>
+        <a class="topbar__link" href="settings.html">Impostazioni</a>
+        <button class="btn btn--ghost btn--sm" id="logoutBtn" type="button">Esci</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="page" id="page" hidden>
+
+    <!-- Selettore data -->
+    <div class="datebar">
+      <button class="datebar__nav" id="prevDay" type="button" aria-label="Giorno precedente">‹</button>
+      <div class="datebar__label">
+        <div class="datebar__date" id="dateLabel">—</div>
+        <div class="datebar__today"><a id="goToday">Oggi</a></div>
+      </div>
+      <button class="datebar__nav" id="nextDay" type="button" aria-label="Giorno successivo">›</button>
+    </div>
+
+    <!-- KPI -->
+    <div class="kpis">
+      <div class="kpi"><div class="kpi__val" id="kpiCovers">0</div><div class="kpi__label">Coperti (confermati)</div></div>
+      <div class="kpi"><div class="kpi__val" id="kpiCount">0</div><div class="kpi__label">Prenotazioni attive</div></div>
+      <div class="kpi"><div class="kpi__val" id="kpiOcc">0%</div><div class="kpi__label">Occupazione</div></div>
+    </div>
+
+    <!-- Tab turni -->
+    <div class="tabs" id="shiftTabs"></div>
+
+    <!-- Lista prenotazioni -->
+    <section class="section">
+      <div class="section__head">
+        <h2 class="section__title">Prenotazioni</h2>
+        <button class="btn btn--primary btn--sm" id="addBtn" type="button">+ Prenotazione manuale</button>
+      </div>
+
+      <!-- Mini form inline -->
+      <div class="card" id="manualForm" hidden style="margin-bottom:14px">
+        <form id="mForm">
+          <div class="form-grid">
+            <div class="field"><label for="mFirst">Nome</label><input id="mFirst" required maxlength="80" /></div>
+            <div class="field"><label for="mLast">Cognome</label><input id="mLast" required maxlength="80" /></div>
+            <div class="field"><label for="mPhone">Telefono</label><input id="mPhone" type="tel" required maxlength="30" /></div>
+            <div class="field"><label for="mParty">Coperti</label><input id="mParty" type="number" min="1" max="40" value="2" required /></div>
+            <div class="field"><label for="mShift">Turno</label><select id="mShift"></select></div>
+            <div class="field"><label for="mTable">Tavolo <span style="font-weight:400;color:var(--ink-soft)">(auto)</span></label><select id="mTable"></select></div>
+            <div class="field field--full"><label for="mNotes">Note</label><textarea id="mNotes" rows="2" maxlength="500"></textarea></div>
+          </div>
+          <p class="form-error" id="mError" hidden style="margin-top:10px"></p>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="btn btn--primary" type="submit" id="mSubmit">Salva prenotazione</button>
+            <button class="btn btn--ghost" type="button" id="mCancel">Annulla</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="res-list" id="resList"></div>
+    </section>
+
+    <!-- Lista d'attesa -->
+    <section class="section">
+      <div class="section__head">
+        <h2 class="section__title">Lista d'attesa <span class="pill" id="wlCount">0</span></h2>
+      </div>
+      <div class="res-list" id="wlList"></div>
+    </section>
+
+    <!-- Mappa tavoli -->
+    <section class="section">
+      <div class="section__head"><h2 class="section__title">Mappa tavoli — <span id="mapShiftName"></span></h2></div>
+      <div class="legend">
+        <span><i class="l-libero"></i> Libero</span>
+        <span><i class="l-attesa"></i> In attesa</span>
+        <span><i class="l-occupato"></i> Confermato</span>
+        <span><i class="l-arrivato"></i> Arrivato</span>
+      </div>
+      <div id="tableMap"></div>
+    </section>
+
+  </main>
+
+  <div class="spinner" id="pageSpinner"></div>
+
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/pwa.js"></script>
+  <script type="module" src="./dashboard.js"></script>
+</body>
+</html>

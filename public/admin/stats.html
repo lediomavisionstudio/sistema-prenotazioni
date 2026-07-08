@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#c8402a" />
+  <title>Statistiche — Pannello gestionale</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/theme.css" />
+  <link rel="stylesheet" href="../assets/css/panel.css" />
+
+  <!-- PWA: gestionale installabile -->
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="../assets/icons/icon.svg" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Gestionale" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar__inner">
+      <div class="topbar__brand">
+        <span class="topbar__venue" id="venueName">—</span>
+        <span class="topbar__role" id="userRole"></span>
+      </div>
+      <nav class="topbar__nav">
+        <a class="topbar__link" href="dashboard.html">Dashboard</a>
+        <a class="topbar__link" href="upcoming.html">In arrivo</a>
+        <a class="topbar__link is-active" href="stats.html">Statistiche</a>
+        <a class="topbar__link" href="settings.html">Impostazioni</a>
+        <button class="btn btn--ghost btn--sm" id="logoutBtn" type="button">Esci</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="page" id="page" hidden>
+
+    <!-- Selettore periodo -->
+    <div class="tabs" id="periodTabs" style="margin-bottom:18px">
+      <button class="tab is-active" data-period="7"><span class="tab__name">Ultimi 7 giorni</span></button>
+      <button class="tab" data-period="30"><span class="tab__name">Ultimi 30 giorni</span></button>
+      <button class="tab" data-period="this_month"><span class="tab__name">Questo mese</span></button>
+      <button class="tab" data-period="last_month"><span class="tab__name">Mese scorso</span></button>
+    </div>
+    <p class="datebar__today" id="rangeLabel" style="text-align:center;margin:-8px 0 18px"></p>
+
+    <!-- KPI sintetici -->
+    <div class="kpis kpis--4">
+      <div class="kpi"><div class="kpi__val" id="kpiRes">0</div><div class="kpi__label">Prenotazioni</div></div>
+      <div class="kpi"><div class="kpi__val" id="kpiCovers">0</div><div class="kpi__label">Coperti serviti</div></div>
+      <div class="kpi"><div class="kpi__val" id="kpiNoShow">0%</div><div class="kpi__label">Tasso no-show <span id="kpiNoShowTrend" class="trend"></span></div></div>
+      <div class="kpi"><div class="kpi__val" id="kpiWidget">0%</div><div class="kpi__label">Da widget</div></div>
+    </div>
+
+    <!-- Coperti per giorno -->
+    <section class="section">
+      <div class="section__head"><h2 class="section__title">Coperti per giorno</h2></div>
+      <div class="card"><div class="chart-box"><canvas id="chartCovers"></canvas></div></div>
+    </section>
+
+    <div class="stats-grid">
+      <!-- Occupazione per turno -->
+      <section class="section">
+        <div class="section__head"><h2 class="section__title">Occupazione per turno</h2></div>
+        <div class="card"><div class="chart-box"><canvas id="chartShifts"></canvas></div></div>
+      </section>
+
+      <!-- Widget vs manuali -->
+      <section class="section">
+        <div class="section__head"><h2 class="section__title">Origine prenotazioni</h2></div>
+        <div class="card"><div class="chart-box"><canvas id="chartSource"></canvas></div></div>
+      </section>
+    </div>
+
+    <!-- Giorno della settimana più forte -->
+    <section class="section">
+      <div class="section__head">
+        <h2 class="section__title">Media coperti per giorno della settimana</h2>
+        <span class="pill" id="bestDay"></span>
+      </div>
+      <div class="card"><div class="chart-box"><canvas id="chartWeekday"></canvas></div></div>
+    </section>
+
+    <!-- Top 10 clienti -->
+    <section class="section">
+      <div class="section__head"><h2 class="section__title">Top 10 clienti</h2></div>
+      <div class="card" id="topCustomers"></div>
+    </section>
+
+  </main>
+
+  <div class="spinner" id="pageSpinner"></div>
+
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/pwa.js"></script>
+  <!-- Chart.js (libreria leggera per i grafici) via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <script type="module" src="./stats.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Prenotazioni">
+  <!-- Icona placeholder: sostituibile con il logo del locale.
+       Sfondo "rosso pomodoro" + piatto e posate stilizzati. -->
+  <rect width="512" height="512" rx="112" fill="#c8402a"/>
+  <circle cx="256" cy="256" r="120" fill="none" stroke="#fffdf6" stroke-width="20"/>
+  <circle cx="256" cy="256" r="70" fill="none" stroke="#fffdf6" stroke-width="14"/>
+  <!-- Forchetta -->
+  <g fill="#fffdf6">
+    <rect x="150" y="120" width="14" height="90" rx="7"/>
+    <rect x="176" y="120" width="14" height="90" rx="7"/>
+    <rect x="202" y="120" width="14" height="90" rx="7"/>
+    <rect x="176" y="196" width="14" height="196" rx="7"/>
+  </g>
+  <!-- Coltello -->
+  <g fill="#fffdf6">
+    <path d="M348 120c26 0 30 60 22 120-3 22-16 30-22 30s-6-8-6-24V120z"/>
+    <rect x="356" y="250" width="14" height="142" rx="7"/>
+  </g>
+</svg>

@@ -1,0 +1,19 @@
+{
+  "name": "Gestionale Prenotazioni",
+  "short_name": "Gestionale",
+  "description": "Pannello di gestione prenotazioni del locale.",
+  "lang": "it",
+  "start_url": "./dashboard.html",
+  "scope": "/admin/",
+  "display": "standalone",
+  "background_color": "#efe4c9",
+  "theme_color": "#c8402a",
+  "icons": [
+    {
+      "src": "../assets/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

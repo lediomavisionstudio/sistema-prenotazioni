@@ -1,0 +1,20 @@
+{
+  "name": "Prenota un tavolo",
+  "short_name": "Prenota",
+  "description": "Prenota il tuo tavolo online in pochi tocchi.",
+  "lang": "it",
+  "start_url": "./index.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#efe4c9",
+  "theme_color": "#c8402a",
+  "icons": [
+    {
+      "src": "assets/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

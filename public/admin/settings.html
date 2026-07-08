@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#c8402a" />
+  <title>Impostazioni — Pannello gestionale</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/theme.css" />
+  <link rel="stylesheet" href="../assets/css/panel.css" />
+
+  <!-- PWA: gestionale installabile -->
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="../assets/icons/icon.svg" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Gestionale" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar__inner">
+      <div class="topbar__brand">
+        <span class="topbar__venue" id="venueName">—</span>
+        <span class="topbar__role" id="userRole"></span>
+      </div>
+      <nav class="topbar__nav">
+        <a class="topbar__link" href="dashboard.html">Dashboard</a>
+        <a class="topbar__link" href="upcoming.html">In arrivo</a>
+        <a class="topbar__link" href="stats.html">Statistiche</a>
+        <a class="topbar__link is-active" href="settings.html">Impostazioni</a>
+        <button class="btn btn--ghost btn--sm" id="logoutBtn" type="button">Esci</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="page" id="page" hidden>
+    <p class="form-error" id="readonlyBanner" hidden style="margin-bottom:18px">
+      Solo il titolare può modificare la configurazione. Puoi consultarla in sola lettura.
+    </p>
+
+    <!-- Dati locale -->
+    <section class="section">
+      <div class="section__head"><h2 class="section__title">Dati locale</h2></div>
+      <div class="card">
+        <div class="form-grid">
+          <div class="field"><label>Nome locale</label><input id="vName" maxlength="120" required /></div>
+          <div class="field"><label>Telefono</label><input id="vPhone" maxlength="40" placeholder="+39 ..." /></div>
+          <div class="field"><label>Indirizzo</label><input id="vAddress" maxlength="200" /></div>
+          <div class="field"><label>Email (per privacy)</label><input id="vEmail" type="email" maxlength="120" placeholder="info@esempio.it" /></div>
+          <div class="field">
+            <label>Colore widget</label>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="color" id="vBrandPick" style="width:44px;height:38px;padding:2px;border-radius:8px;flex:none" />
+              <input id="vBrand" maxlength="7" placeholder="#c8402a — vuoto = predefinito" style="flex:1" />
+            </div>
+          </div>
+          <div class="field"><label>Logo (URL immagine)</label><input id="vLogo" maxlength="500" placeholder="https://..." /></div>
+          <div class="field"><label>Conservazione dati (mesi)</label><input id="vRetention" type="number" min="1" max="120" placeholder="24" /></div>
+        </div>
+        <button class="btn btn--primary btn--sm" id="saveVenue" type="button" style="margin-top:14px">Salva dati locale</button>
+      </div>
+    </section>
+
+    <!-- Zone -->
+    <section class="section">
+      <div class="section__head"><h2 class="section__title">Zone</h2></div>
+      <div class="rows" id="zoneRows"></div>
+      <form class="row-item" id="zoneAdd" style="margin-top:10px">
+        <input class="row-item__grow" id="zoneName" placeholder="Nome zona (es. Dehors)" maxlength="60" required />
+        <button class="btn btn--primary btn--sm" type="submit">+ Aggiungi zona</button>
+      </form>
+    </section>
+
+    <!-- Tavoli -->
+    <section class="section">
+      <div class="section__head"><h2 class="section__title">Tavoli</h2></div>
+      <div class="rows" id="tableRows"></div>
+      <form class="card" id="tableAdd" style="margin-top:10px">
+        <div class="form-grid">
+          <div class="field"><label>Codice</label><input id="tCode" placeholder="es. S7" maxlength="20" required /></div>
+          <div class="field"><label>Zona</label><select id="tZone"></select></div>
+          <div class="field"><label>Posti min</label><input id="tMin" type="number" min="1" value="1" required /></div>
+          <div class="field"><label>Posti max</label><input id="tMax" type="number" min="1" value="4" required /></div>
+        </div>
+        <button class="btn btn--primary btn--sm" type="submit" style="margin-top:12px">+ Aggiungi tavolo</button>
+      </form>
+    </section>
+
+    <!-- Turni -->
+    <section class="section">
+      <div class="section__head"><h2 class="section__title">Orari turni</h2></div>
+      <div class="rows" id="shiftRows"></div>
+      <form class="card" id="shiftAdd" style="margin-top:10px">
+        <div class="form-grid">
+          <div class="field"><label>Nome</label><input id="sName" placeholder="es. Turno III" maxlength="40" required /></div>
+          <div class="field"><label>Codice</label><input id="sCode" placeholder="es. turno_3" maxlength="30" required /></div>
+          <div class="field"><label>Inizio</label><input id="sStart" type="time" value="19:00" required /></div>
+          <div class="field"><label>Fine</label><input id="sEnd" type="time" value="21:00" required /></div>
+        </div>
+        <button class="btn btn--primary btn--sm" type="submit" style="margin-top:12px">+ Aggiungi turno</button>
+      </form>
+    </section>
+
+    <!-- Chiusura settimanale -->
+    <section class="section">
+      <div class="section__head"><h2 class="section__title">Chiusura settimanale</h2></div>
+      <div class="card">
+        <p style="margin:0 0 12px;color:var(--ink-soft);font-size:.88rem">Seleziona i giorni in cui il locale è sempre chiuso: non compariranno nel widget di prenotazione.</p>
+        <div id="weekdayBoxes" style="display:flex;flex-wrap:wrap;gap:10px"></div>
+        <button class="btn btn--primary btn--sm" id="saveClosure" type="button" style="margin-top:14px">Salva chiusure</button>
+      </div>
+    </section>
+  </main>
+
+  <div class="spinner" id="pageSpinner"></div>
+
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/pwa.js"></script>
+  <script type="module" src="./settings.js"></script>
+</body>
+</html>

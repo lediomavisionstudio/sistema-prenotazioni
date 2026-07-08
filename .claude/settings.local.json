@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s \"https://prenotazioni-7u9.pages.dev/sw.js\")",
+      "Bash(curl -s \"https://prenotazioni-7u9.pages.dev/index.html\")",
+      "Bash(curl -s \"https://prenotazioni-7u9.pages.dev/?cb=$\\(date +%s\\)\")",
+      "Bash(curl -s \"https://7c52ca4c.prenotazioni-7u9.pages.dev/\")",
+      "Bash(curl -s \"https://prenotazioni-7u9.pages.dev/sw.js?cb=$\\(date +%s\\)\")",
+      "Bash(curl -s \"https://prenotazioni-7u9.pages.dev/admin/settings.html?cb=$\\(date +%s\\)\")",
+      "Bash(curl -s \"https://prenotazioni-7u9.pages.dev/admin/settings.js?cb=$\\(date +%s\\)\")",
+      "Bash(curl -s https://prenotazioni-7u9.pages.dev/admin/settings.html?z=__TRACKED_VAR__)",
+      "Bash(curl -s -o /dev/null -w 'status=%{http_code} type=%{content_type} size=%{size_download}\\\\n' https://prenotazioni-7u9.pages.dev/admin/settings.html?z=__TRACKED_VAR__)",
+      "Bash(curl -sL https://prenotazioni-7u9.pages.dev/admin/settings?z=__TRACKED_VAR__)"
+    ]
+  }
+}

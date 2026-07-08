@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#c8402a" />
+  <meta name="description" content="Prenota il tuo tavolo online." />
+  <title>Prenota un tavolo</title>
+
+  <!-- PWA: installabile e utilizzabile offline -->
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="assets/icons/icon.svg" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Prenota" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* =====================================================================
+       PERSONALIZZAZIONE PER LOCALE
+       Cambia questi valori per ribrandizzare il widget: colori (variabili
+       CSS) e nome mostrato prima del caricamento dei dati.
+       ===================================================================== */
+    :root {
+      /* Palette calda: carta paglia, marrone inchiostro, rosso pomodoro */
+      --paper:        #efe4c9;   /* sfondo pagina — carta paglia */
+      --surface:      #fffdf6;   /* card */
+      --surface-soft: #f7efdb;   /* riquadri interni, recap */
+      --ink:          #3a2b23;   /* testo principale — marrone inchiostro */
+      --ink-soft:     #7a6a5d;   /* testo secondario */
+      --tomato:       #c8402a;   /* accento — rosso pomodoro */
+      --tomato-dark:  #a5321f;
+      --tomato-soft:  #f7ddd5;   /* riempimento selezione */
+      --line:         #e3d6ba;   /* bordi */
+      --disabled-bg:  #ece4d3;
+      --ok:           #2f7d55;
+
+      --radius:    18px;
+      --radius-sm: 12px;
+      --shadow:    0 10px 40px rgba(58, 43, 35, 0.12);
+      --font-title: "Bricolage Grotesque", system-ui, sans-serif;
+      --font-body:  "Inter", system-ui, -apple-system, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    button { font-family: inherit; } /* i button non ereditano il font: forziamo Inter */
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--font-body);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Card ---------------------------------------------------------------- */
+    .wrap {
+      max-width: 480px;
+      margin: 0 auto;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      padding: env(safe-area-inset-top) 14px calc(20px + env(safe-area-inset-bottom));
+    }
+    @media (min-width: 520px) {
+      .wrap { min-height: auto; margin: 28px auto; }
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      flex: 1;
+    }
+
+    /* Header -------------------------------------------------------------- */
+    .header {
+      padding: 26px 22px 20px;
+      background:
+        radial-gradient(120% 100% at 50% 0%, rgba(200,64,42,0.10), transparent 60%),
+        var(--surface);
+      border-bottom: 1px solid var(--line);
+      text-align: center;
+    }
+    .header__kicker {
+      font-size: 0.72rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--tomato);
+      font-weight: 600;
+      margin: 0 0 6px;
+    }
+    .header__logo {
+      display: block;
+      max-height: 60px;
+      max-width: 70%;
+      margin: 0 auto 12px;
+      object-fit: contain;
+    }
+    .header__name {
+      font-family: var(--font-title);
+      font-weight: 700;
+      font-size: 1.9rem;
+      line-height: 1.05;
+      margin: 0;
+      letter-spacing: -0.015em;
+    }
+    .header__sub { margin: 8px 0 0; color: var(--ink-soft); font-size: 0.88rem; }
+
+    .body { padding: 20px 18px 8px; }
+
+    section.block { margin-bottom: 24px; }
+
+    .block__label {
+      font-family: var(--font-title);
+      font-weight: 600;
+      font-size: 1.02rem;
+      margin: 0 0 10px;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .block__label small { font-family: var(--font-body); font-weight: 400; color: var(--ink-soft); font-size: 0.8rem; }
+
+    /* Stepper coperti ----------------------------------------------------- */
+    .stepper {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      background: var(--surface-soft);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+    }
+    .stepper__btn {
+      width: 46px; height: 46px;
+      flex: none;
+      border: none;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 1.5px solid var(--line);
+      color: var(--tomato-dark);
+      font-size: 1.6rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: grid; place-items: center;
+      transition: background .15s, border-color .15s, transform .05s;
+      line-height: 1;
+    }
+    .stepper__btn:hover:not(:disabled) { border-color: var(--tomato); background: var(--tomato-soft); }
+    .stepper__btn:active:not(:disabled) { transform: scale(.92); }
+    .stepper__btn:disabled { opacity: .4; cursor: not-allowed; }
+    .stepper__value { text-align: center; }
+    .stepper__num { font-family: var(--font-title); font-weight: 700; font-size: 1.7rem; line-height: 1; }
+    .stepper__unit { display: block; font-size: 0.75rem; color: var(--ink-soft); margin-top: 2px; }
+
+    /* Calendario mensile -------------------------------------------------- */
+    .cal { user-select: none; }
+    .cal__head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin: 0 2px 12px;
+    }
+    .cal__title {
+      font-family: var(--font-title); font-weight: 700; font-size: 1.1rem;
+      text-transform: capitalize; text-align: center; flex: 1;
+    }
+    .cal__nav {
+      width: 42px; height: 42px; flex: none;
+      border: 1.5px solid var(--line); border-radius: 50%;
+      background: var(--surface); color: var(--tomato-dark);
+      font-size: 1.3rem; line-height: 1; cursor: pointer;
+      display: grid; place-items: center;
+      transition: background .15s, border-color .15s, transform .05s;
+    }
+    .cal__nav:hover:not(:disabled) { border-color: var(--tomato); background: var(--tomato-soft); }
+    .cal__nav:active:not(:disabled) { transform: scale(.92); }
+    .cal__nav:disabled { opacity: .3; cursor: not-allowed; }
+    .cal__dow {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;
+      margin-bottom: 8px;
+    }
+    .cal__dow span {
+      text-align: center; font-size: 0.7rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: .04em; color: var(--ink-soft);
+    }
+    .cal__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+    .cal__cell {
+      aspect-ratio: 1 / 1;
+      border: 1.5px solid transparent; border-radius: var(--radius-sm);
+      background: transparent; font: inherit; font-weight: 600; font-size: 1rem;
+      color: var(--ink); cursor: pointer;
+      display: grid; place-items: center;
+      transition: border-color .15s, background .15s;
+    }
+    .cal__cell:hover:not(:disabled) { border-color: var(--tomato); }
+    .cal__cell.is-empty { visibility: hidden; cursor: default; }
+    .cal__cell.is-disabled { color: var(--ink-soft); opacity: .35; cursor: not-allowed; }
+    .cal__cell.is-today { border-color: var(--tomato); color: var(--tomato-dark); }
+    .cal__cell.is-selected { background: var(--tomato); border-color: var(--tomato); color: #fff; }
+
+    /* Time slots ---------------------------------------------------------- */
+    .times { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .time-slot {
+      border: 1.5px solid var(--line);
+      background: var(--surface);
+      border-radius: var(--radius-sm);
+      padding: 12px 10px;
+      cursor: pointer;
+      text-align: left;
+      transition: border-color .15s, background .15s;
+    }
+    .time-slot:hover:not(:disabled) { border-color: var(--tomato); }
+    .time-slot.is-selected { border-color: var(--tomato); background: var(--tomato-soft); }
+    .time-slot:disabled { opacity: .5; cursor: not-allowed; background: var(--disabled-bg); }
+    /* Turno pieno: non disabilitato, ma selezionabile per la lista d'attesa */
+    .time-slot--wait { background: var(--surface-soft); border-style: dashed; }
+    .time-slot--wait.is-selected { border-style: solid; }
+    .time-slot__name { font-weight: 700; font-size: 0.95rem; }
+    .time-slot__range { font-size: 0.8rem; color: var(--ink-soft); }
+    .time-slot__full { font-size: 0.72rem; color: var(--tomato-dark); font-weight: 600; margin-top: 2px; }
+
+    .empty-hint { color: var(--ink-soft); font-size: 0.88rem; padding: 4px 2px; }
+
+    /* Form ---------------------------------------------------------------- */
+    .form { display: flex; flex-direction: column; gap: 14px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label { font-size: 0.85rem; font-weight: 600; }
+    .field label span { font-weight: 400; color: var(--ink-soft); }
+    .field input, .field textarea {
+      width: 100%;
+      padding: 12px 13px;
+      border: 1.5px solid var(--line);
+      border-radius: var(--radius-sm);
+      font: inherit;
+      color: var(--ink);
+      background: var(--surface);
+    }
+    .field input:focus, .field textarea:focus { outline: none; border-color: var(--tomato); box-shadow: 0 0 0 3px var(--tomato-soft); }
+    .field textarea { resize: vertical; min-height: 64px; }
+
+    .privacy { font-size: 0.8rem; color: var(--ink-soft); margin: 2px 0 0; }
+    .privacy a { color: var(--tomato-dark); }
+
+    .error {
+      background: #fbeae7; color: var(--tomato-dark);
+      border: 1px solid #f1cabf; border-radius: var(--radius-sm);
+      padding: 11px 13px; font-size: 0.86rem;
+    }
+    [hidden] { display: none !important; }
+
+    .btn {
+      appearance: none; border: none; cursor: pointer; font: inherit;
+      border-radius: var(--radius-sm); font-weight: 700;
+      padding: 15px 18px; transition: background .15s, transform .05s;
+    }
+    .btn:active { transform: scale(.985); }
+    .btn--primary { background: var(--tomato); color: #fff; font-size: 1.02rem; width: 100%; }
+    .btn--primary:hover:not(:disabled) { background: var(--tomato-dark); }
+    .btn--primary:disabled { background: #cbb9a6; cursor: not-allowed; }
+    .btn--ghost { background: transparent; color: var(--tomato-dark); border: 1.5px solid var(--line); }
+
+    /* States: loading / error / confirm ----------------------------------- */
+    .state { padding: 48px 22px; text-align: center; }
+    .spinner {
+      width: 34px; height: 34px; margin: 0 auto 14px;
+      border: 4px solid var(--line); border-top-color: var(--tomato);
+      border-radius: 50%; animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .confirm { padding: 34px 22px; text-align: center; }
+    .confirm__badge {
+      width: 66px; height: 66px; margin: 0 auto 16px;
+      border-radius: 50%; background: var(--ok); color: #fff;
+      font-size: 2rem; display: grid; place-items: center;
+    }
+    .confirm__title { font-family: var(--font-title); font-weight: 700; font-size: 1.5rem; margin: 0 0 8px; }
+    .confirm__lead { color: var(--ink-soft); font-size: 0.94rem; margin: 0 0 20px; }
+    .recap {
+      text-align: left; background: var(--surface-soft);
+      border: 1px solid var(--line); border-radius: var(--radius-sm);
+      padding: 6px 16px; margin: 0 0 20px;
+    }
+    .recap__row { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+    .recap__row:last-child { border-bottom: none; }
+    .recap__k { color: var(--ink-soft); font-size: 0.9rem; }
+    .recap__v { font-weight: 700; text-align: right; }
+    .recap__v.cap { text-transform: capitalize; }
+
+    .footer { text-align: center; color: var(--ink-soft); font-size: 0.72rem; padding: 14px 4px 4px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <main class="card" aria-live="polite">
+
+      <header class="header">
+        <img class="header__logo" id="venueLogo" alt="" hidden />
+        <p class="header__kicker">Prenotazione tavolo</p>
+        <h1 class="header__name" id="venueName">—</h1>
+        <p class="header__sub" id="venueSub"></p>
+      </header>
+
+      <!-- Caricamento iniziale -->
+      <div class="state" id="stateLoading">
+        <div class="spinner" role="status" aria-label="Caricamento"></div>
+        <p class="empty-hint">Carico le disponibilità…</p>
+      </div>
+
+      <!-- Errore bloccante -->
+      <div class="state" id="stateFatal" hidden>
+        <p class="error" id="fatalMsg" style="text-align:left"></p>
+      </div>
+
+      <!-- Widget -->
+      <div class="body" id="stateForm" hidden>
+
+        <section class="block">
+          <h2 class="block__label">Coperti <small>quante persone</small></h2>
+          <div class="stepper">
+            <button class="stepper__btn" type="button" id="coMinus" aria-label="Diminuisci coperti">−</button>
+            <div class="stepper__value">
+              <div class="stepper__num" id="coValue" aria-live="polite">2</div>
+              <span class="stepper__unit" id="coUnit">persone</span>
+            </div>
+            <button class="stepper__btn" type="button" id="coPlus" aria-label="Aumenta coperti">+</button>
+          </div>
+        </section>
+
+        <section class="block">
+          <h2 class="block__label">Data <small>scegli il giorno</small></h2>
+          <div class="cal" id="calendar">
+            <div class="cal__head">
+              <button class="cal__nav" type="button" id="calPrev" aria-label="Mese precedente">‹</button>
+              <div class="cal__title" id="calTitle">—</div>
+              <button class="cal__nav" type="button" id="calNext" aria-label="Mese successivo">›</button>
+            </div>
+            <div class="cal__dow" aria-hidden="true">
+              <span>lun</span><span>mar</span><span>mer</span><span>gio</span><span>ven</span><span>sab</span><span>dom</span>
+            </div>
+            <div class="cal__grid" id="calGrid" role="grid" aria-label="Scegli la data"></div>
+          </div>
+          <p class="empty-hint" id="dateEmpty" hidden>Nessuna data disponibile al momento.</p>
+        </section>
+
+        <section class="block">
+          <h2 class="block__label">Orario</h2>
+          <div class="times" id="timeRow" role="group" aria-label="Scegli l'orario"></div>
+          <p class="empty-hint" id="timeEmpty" hidden>Seleziona prima una data.</p>
+        </section>
+
+        <section class="block">
+          <h2 class="block__label">I tuoi dati</h2>
+          <form class="form" id="bookingForm" novalidate>
+            <div class="grid-2">
+              <div class="field">
+                <label for="firstName">Nome</label>
+                <input id="firstName" name="firstName" type="text" autocomplete="given-name" maxlength="80" required />
+              </div>
+              <div class="field">
+                <label for="lastName">Cognome</label>
+                <input id="lastName" name="lastName" type="text" autocomplete="family-name" maxlength="80" required />
+              </div>
+            </div>
+            <div class="field">
+              <label for="phone">Telefono</label>
+              <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="30" required />
+            </div>
+            <div class="field">
+              <label for="notes">Note <span>(seggiolone, allergie, preferenza dehors…)</span></label>
+              <textarea id="notes" name="notes" rows="3" maxlength="500"></textarea>
+            </div>
+
+            <p class="error" id="formError" hidden></p>
+
+            <button class="btn btn--primary" type="submit" id="submitBtn" disabled>Prenota</button>
+
+            <p class="privacy">
+              Prenotando accetti il trattamento dei dati secondo la
+              <a id="privacyLink" href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.
+            </p>
+          </form>
+        </section>
+      </div>
+
+      <!-- Conferma -->
+      <div class="confirm" id="stateConfirm" hidden>
+        <div class="confirm__badge" id="confirmBadge" aria-hidden="true">✓</div>
+        <h2 class="confirm__title" id="confirmTitle">Richiesta inviata!</h2>
+        <p class="confirm__lead" id="confirmLead">
+          La tua prenotazione è <strong>in attesa di conferma</strong> del locale.
+          Ti contatteremo al numero indicato.
+        </p>
+        <div class="recap" id="confirmRecap"></div>
+        <button class="btn btn--ghost" type="button" id="newBtn">Fai un'altra prenotazione</button>
+      </div>
+
+    </main>
+    <p class="footer">Prenotazione soggetta a conferma del locale.</p>
+  </div>
+
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/pwa.js"></script>
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+    // -------------------------------------------------------------------
+    // Config
+    // -------------------------------------------------------------------
+    const CONFIG = Object.assign({
+      SUPABASE_URL: '', SUPABASE_ANON_KEY: '',
+      DEFAULT_VENUE_SLUG: '', PRIVACY_URL: 'privacy.html',
+    }, window.APP_CONFIG || {});
+
+    const params = new URLSearchParams(location.search);
+    const venueSlug = params.get('locale') || CONFIG.DEFAULT_VENUE_SLUG;
+
+    const MAX_PARTY = 12, MIN_PARTY = 1;
+
+    const ERRORS = {
+      LOCALE_NON_TROVATO: 'Locale non trovato o non più attivo.',
+      TURNO_NON_VALIDO: 'Il turno selezionato non è più valido. Riprova.',
+      TURNO_NON_DISPONIBILE_IN_QUESTO_GIORNO: 'Questo turno non è disponibile nel giorno scelto.',
+      DATA_FUORI_FINESTRA: 'La data selezionata non è più prenotabile.',
+      LOCALE_CHIUSO: 'Il locale è chiuso nella data selezionata.',
+      COPERTI_NON_VALIDI: 'Numero di coperti non valido.',
+      DATI_CLIENTE_INCOMPLETI: 'Compila nome, cognome e telefono.',
+      NESSUNA_DISPONIBILITA: 'Non c\'è più posto per questa scelta. Prova un altro orario o data.',
+    };
+
+    if (!CONFIG.SUPABASE_URL || CONFIG.SUPABASE_URL.includes('xxxx')) {
+      console.warn('[config] Supabase non configurato: copia assets/js/config.example.js in config.js.');
+    }
+
+    const supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
+      auth: { persistSession: false },
+    });
+
+    // -------------------------------------------------------------------
+    // Stato
+    // -------------------------------------------------------------------
+    const state = {
+      venue: null,
+      coperti: 2,
+      closures: new Set(),        // ISO date chiusure straordinarie
+      closedWeekdays: new Set(),  // ISO dow (1=lun..7=dom) di chiusura settimanale
+      shifts: [],                 // turni attivi: {id, code, name, start_time, end_time, days:Set(dow), sort_order}
+      openWeekdays: new Set(),    // dow con almeno un turno e non in chiusura settimanale
+      calYear: 0, calMonth: 0,    // mese mostrato dal calendario
+      selDate: null,              // ISO data scelta
+      dayShifts: [],              // turni della data scelta: [{shift_id, shift_name, start_time, end_time, available}]
+      selShift: null,             // turno scelto
+    };
+
+    // -------------------------------------------------------------------
+    // Utility
+    // -------------------------------------------------------------------
+    const $ = (id) => document.getElementById(id);
+    const dfFull = new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+    const dfMonthYear = new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric' });
+
+    const pad2 = (n) => String(n).padStart(2, '0');
+    const isoToDate = (iso) => { const [y,m,d] = iso.split('-').map(Number); return new Date(y, m-1, d, 12); };
+    const isoOf = (d) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+    // getDay(): 0=dom..6=sab  ->  ISO: 1=lun..7=dom
+    const isoDow = (d) => (d.getDay() === 0 ? 7 : d.getDay());
+    const todayLocal = () => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate(), 12); };
+    const hhmm = (t) => (t || '').slice(0, 5);
+    const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+    function showState(which) {
+      ['Loading','Fatal','Form','Confirm'].forEach((s) =>
+        $('state' + s).hidden = (s !== which));
+    }
+
+    function fatal(msg) { $('fatalMsg').textContent = msg; showState('Fatal'); }
+
+    function mapError(err) {
+      const raw = (err && (err.message || err.hint || err.details || '')) || '';
+      for (const code in ERRORS) if (raw.includes(code)) return ERRORS[code];
+      return 'Si è verificato un errore. Riprova tra poco.';
+    }
+
+    // -------------------------------------------------------------------
+    // Branding per locale: applica colore accento e logo presi dai dati
+    // (venues.brand_primary / brand_primary_dark / logo_url). Se i campi sono
+    // vuoti resta il tema di default. Così ogni attività si personalizza senza
+    // toccare il codice.
+    // -------------------------------------------------------------------
+    function applyBranding(v) {
+      const root = document.documentElement.style;
+      if (v.brand_primary) {
+        const primary = v.brand_primary;
+        root.setProperty('--tomato', primary);
+        root.setProperty('--tomato-dark', v.brand_primary_dark || shade(primary, -0.18));
+        root.setProperty('--tomato-soft', rgba(primary, 0.14));
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', primary);
+      }
+      if (v.logo_url) {
+        const img = $('venueLogo');
+        img.src = v.logo_url;
+        img.alt = v.name || '';
+        img.hidden = false;
+      }
+    }
+
+    // Parsing hex (#rgb o #rrggbb) -> {r,g,b}. Null se non valido.
+    function hexToRgb(hex) {
+      let h = String(hex || '').trim().replace('#', '');
+      if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+      if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
+      return { r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16) };
+    }
+    // Schiarisce/scurisce un hex di una frazione (-1..1). Ritorna hex.
+    function shade(hex, amount) {
+      const c = hexToRgb(hex);
+      if (!c) return hex;
+      const adj = (x) => Math.max(0, Math.min(255, Math.round(x + 255 * amount)));
+      const to2 = (x) => x.toString(16).padStart(2, '0');
+      return '#' + to2(adj(c.r)) + to2(adj(c.g)) + to2(adj(c.b));
+    }
+    // Hex -> rgba(...) con alpha; se non valido ritorna l'hex originale.
+    function rgba(hex, alpha) {
+      const c = hexToRgb(hex);
+      return c ? `rgba(${c.r}, ${c.g}, ${c.b}, ${alpha})` : hex;
+    }
+
+    // -------------------------------------------------------------------
+    // Avvio
+    // -------------------------------------------------------------------
+    async function init() {
+      $('privacyLink').href = CONFIG.PRIVACY_URL || 'privacy.html';
+
+      if (!venueSlug) return fatal('Link non valido: manca l\'identificativo del locale.');
+
+      try {
+        // select('*') così il widget non si rompe se la migration del branding
+        // (colonne brand_*) non è ancora applicata: i campi mancanti restano
+        // undefined e applyBranding lascia il tema di default.
+        const { data: venue, error } = await supabase
+          .from('venues')
+          .select('*')
+          .eq('slug', venueSlug)
+          .maybeSingle();
+        if (error) throw error;
+        if (!venue || !venue.active) return fatal('Locale non trovato o non disponibile per le prenotazioni online.');
+
+        state.venue = venue;
+        applyBranding(venue);
+        $('venueName').textContent = venue.name;
+        $('venueSub').textContent = [venue.address, venue.phone].filter(Boolean).join(' · ');
+        document.title = 'Prenota — ' + venue.name;
+
+        // Chiusure straordinarie (per disabilitare quei giorni nel calendario)
+        const { data: closures } = await supabase
+          .from('venue_closures')
+          .select('closed_date')
+          .eq('venue_id', venue.id);
+        state.closures = new Set((closures || []).map((c) => c.closed_date));
+
+        // Turni attivi (leggibili pubblicamente): danno i giorni aperti e gli orari.
+        const { data: shifts, error: shErr } = await supabase
+          .from('service_shifts')
+          .select('id, code, name, start_time, end_time, days_of_week, sort_order')
+          .eq('venue_id', venue.id)
+          .eq('active', true)
+          .order('sort_order');
+        if (shErr) throw shErr;
+
+        state.shifts = (shifts || []).map((s) => ({ ...s, days: new Set((s.days_of_week || []).map(Number)) }));
+        state.closedWeekdays = new Set((venue.closed_weekdays || []).map(Number));
+        state.openWeekdays = new Set();
+        for (const s of state.shifts)
+          for (const dow of s.days)
+            if (!state.closedWeekdays.has(dow)) state.openWeekdays.add(dow);
+
+        const t = todayLocal();
+        state.calYear = t.getFullYear();
+        state.calMonth = t.getMonth();
+        state.selDate = firstSelectable();
+
+        renderCalendar();
+        showState('Form');
+        if (state.selDate) { try { await loadDayAvailability(); } catch (_) {} }
+        renderTimes();
+        updateSubmit();
+      } catch (err) {
+        console.error(err);
+        fatal('Impossibile contattare il servizio prenotazioni. Riprova più tardi.');
+      }
+    }
+
+    // -------------------------------------------------------------------
+    // Giorni prenotabili (calendario)
+    // -------------------------------------------------------------------
+    // Una data è selezionabile se: non è passata, il locale è aperto in quel
+    // giorno della settimana (c'è almeno un turno e non è chiusura settimanale)
+    // e non è una chiusura straordinaria. Nessun limite di finestra in avanti.
+    function isSelectable(d) {
+      if (d < todayLocal()) return false;
+      if (!state.openWeekdays.has(isoDow(d))) return false;
+      if (state.closures.has(isoOf(d))) return false;
+      return true;
+    }
+
+    // Prima data prenotabile a partire da oggi (cerca fino a ~13 mesi avanti).
+    function firstSelectable() {
+      const base = todayLocal();
+      for (let i = 0; i < 400; i++) {
+        const d = new Date(base); d.setDate(base.getDate() + i);
+        if (isSelectable(d)) return isoOf(d);
+      }
+      return null;
+    }
+
+    // -------------------------------------------------------------------
+    // Disponibilità della sola data scelta (turni pieni -> lista d'attesa)
+    // -------------------------------------------------------------------
+    async function loadDayAvailability() {
+      state.dayShifts = [];
+      if (!state.selDate) return;
+      const { data, error } = await supabase.rpc('get_widget_day_availability', {
+        p_venue_slug: venueSlug,
+        p_party_size: state.coperti,
+        p_date: state.selDate,
+      });
+      if (error) throw error;
+      state.dayShifts = data || [];
+      // Mantieni il turno selezionato se ancora presente (dati aggiornati).
+      if (state.selShift) {
+        state.selShift = state.dayShifts.find((s) => s.shift_id === state.selShift.shift_id) || null;
+      }
+    }
+
+    // -------------------------------------------------------------------
+    // Coperti
+    // -------------------------------------------------------------------
+    async function changeCoperti(delta) {
+      const next = Math.min(MAX_PARTY, Math.max(MIN_PARTY, state.coperti + delta));
+      if (next === state.coperti) return;
+      state.coperti = next;
+      $('coValue').textContent = next;
+      $('coUnit').textContent = next === 1 ? 'persona' : 'persone';
+      $('coMinus').disabled = next <= MIN_PARTY;
+      $('coPlus').disabled = next >= MAX_PARTY;
+      state.selShift = null;
+      try {
+        await loadDayAvailability();
+        renderTimes();
+        updateSubmit();
+      } catch (err) { console.error(err); fatal(mapError(err)); }
+    }
+
+    // -------------------------------------------------------------------
+    // Render calendario mensile
+    // -------------------------------------------------------------------
+    function renderCalendar() {
+      const grid = $('calGrid');
+      grid.innerHTML = '';
+
+      const first = new Date(state.calYear, state.calMonth, 1, 12);
+      $('calTitle').textContent = cap(dfMonthYear.format(first));
+
+      const t = todayLocal();
+      // Non si torna prima del mese corrente.
+      $('calPrev').disabled =
+        state.calYear < t.getFullYear() ||
+        (state.calYear === t.getFullYear() && state.calMonth <= t.getMonth());
+
+      // Celle vuote iniziali fino al primo giorno (griglia parte da lunedì).
+      const lead = isoDow(first) - 1;
+      for (let i = 0; i < lead; i++) {
+        const c = document.createElement('div');
+        c.className = 'cal__cell is-empty';
+        grid.appendChild(c);
+      }
+
+      const todayIso = isoOf(t);
+      const daysInMonth = new Date(state.calYear, state.calMonth + 1, 0).getDate();
+      for (let day = 1; day <= daysInMonth; day++) {
+        const d = new Date(state.calYear, state.calMonth, day, 12);
+        const iso = isoOf(d);
+        const sel = isSelectable(d);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        let cls = 'cal__cell';
+        if (!sel) cls += ' is-disabled';
+        if (iso === todayIso) cls += ' is-today';
+        if (iso === state.selDate) cls += ' is-selected';
+        btn.className = cls;
+        btn.textContent = day;
+        if (sel) btn.addEventListener('click', () => selectDate(iso));
+        else btn.disabled = true;
+        grid.appendChild(btn);
+      }
+
+      $('dateEmpty').hidden = state.openWeekdays.size > 0;
+    }
+
+    async function selectDate(iso) {
+      state.selDate = iso;
+      state.selShift = null;
+      renderCalendar();
+      $('timeRow').innerHTML = '';
+      $('timeEmpty').textContent = 'Carico gli orari…';
+      $('timeEmpty').hidden = false;
+      try {
+        await loadDayAvailability();
+      } catch (err) { console.error(err); fatal(mapError(err)); return; }
+      renderTimes();
+      updateSubmit();
+    }
+
+    function shiftMonth(delta) {
+      let m = state.calMonth + delta, y = state.calYear;
+      if (m < 0) { m = 11; y--; }
+      if (m > 11) { m = 0; y++; }
+      const t = todayLocal();
+      if (y < t.getFullYear() || (y === t.getFullYear() && m < t.getMonth())) return;
+      state.calMonth = m; state.calYear = y;
+      renderCalendar();
+    }
+
+    // -------------------------------------------------------------------
+    // Render orari
+    // -------------------------------------------------------------------
+    function renderTimes() {
+      const row = $('timeRow');
+      row.innerHTML = '';
+      if (!state.selDate) {
+        $('timeEmpty').textContent = 'Seleziona prima una data.';
+        $('timeEmpty').hidden = false;
+        return;
+      }
+      const shifts = state.dayShifts;
+      $('timeEmpty').hidden = shifts.length > 0;
+      if (shifts.length === 0) $('timeEmpty').textContent = 'Nessun turno disponibile in questa data.';
+
+      for (const s of shifts) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        // Un turno pieno (available=false) non è più disabilitato: resta
+        // selezionabile per mettersi in lista d'attesa.
+        const selected = state.selShift && state.selShift.shift_id === s.shift_id;
+        btn.className = 'time-slot' + (selected ? ' is-selected' : '') + (s.available ? '' : ' time-slot--wait');
+        btn.innerHTML =
+          `<div class="time-slot__name">${s.shift_name}</div>` +
+          `<div class="time-slot__range">${hhmm(s.start_time)}–${hhmm(s.end_time)}</div>` +
+          (s.available ? '' : `<div class="time-slot__full">Completo · lista d'attesa</div>`);
+        btn.addEventListener('click', () => {
+          state.selShift = s;
+          renderTimes();
+          updateSubmit();
+        });
+        row.appendChild(btn);
+      }
+    }
+
+    // -------------------------------------------------------------------
+    // Submit
+    // -------------------------------------------------------------------
+    // Il turno selezionato è pieno? (available=false → lista d'attesa)
+    function isWaitlist() { return !!(state.selShift && !state.selShift.available); }
+
+    function updateSubmit() {
+      const btn = $('submitBtn');
+      btn.disabled = !(state.selDate && state.selShift);
+      btn.textContent = isWaitlist() ? 'Mettiti in lista d\'attesa' : 'Prenota';
+    }
+
+    async function onSubmit(e) {
+      e.preventDefault();
+      const form = e.currentTarget;
+      const errBox = $('formError');
+      errBox.hidden = true;
+
+      const firstName = form.firstName.value.trim();
+      const lastName = form.lastName.value.trim();
+      const phone = form.phone.value.trim();
+      const notes = form.notes.value.trim();
+
+      if (!firstName || !lastName || !phone) return showFormError('Compila nome, cognome e telefono.');
+      if (!state.selDate || !state.selShift) return showFormError('Scegli data e orario.');
+
+      const waitlist = isWaitlist();
+      const btn = $('submitBtn');
+      btn.disabled = true; btn.textContent = 'Invio…';
+      try {
+        const rpc = waitlist ? 'join_waitlist' : 'create_public_reservation';
+        const { data, error } = await supabase.rpc(rpc, {
+          p_venue_slug: venueSlug,
+          p_reservation_date: state.selDate,
+          p_shift_id: state.selShift.shift_id,
+          p_party_size: state.coperti,
+          p_first_name: firstName,
+          p_last_name: lastName,
+          p_phone: phone,
+          p_notes: notes || null,
+        });
+        if (error) throw error;
+        showConfirm(Array.isArray(data) ? data[0] : data, waitlist);
+      } catch (err) {
+        console.error(err);
+        showFormError(mapError(err));
+        // Disponibilità cambiata sotto i piedi: ricarica per riflettere lo stato reale.
+        if ((err.message || '').includes('NESSUNA_DISPONIBILITA')) {
+          try { await loadDayAvailability(); renderTimes(); } catch (_) {}
+        }
+      } finally {
+        btn.disabled = false; updateSubmit();
+      }
+    }
+
+    function showFormError(msg) {
+      const box = $('formError');
+      box.textContent = msg; box.hidden = false;
+      box.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+
+    // -------------------------------------------------------------------
+    // Conferma
+    // -------------------------------------------------------------------
+    function showConfirm(res, waitlist = false) {
+      const d = isoToDate(state.selDate);
+      const rows = [
+        ['Locale', state.venue.name],
+        ['Data', cap(dfFull.format(d)), true],
+        ['Orario', `${state.selShift.shift_name} · ${hhmm(state.selShift.start_time)}–${hhmm(state.selShift.end_time)}`],
+        ['Coperti', String(state.coperti)],
+      ];
+
+      if (waitlist) {
+        $('confirmBadge').textContent = '⏳';
+        $('confirmTitle').textContent = 'Sei in lista d\'attesa';
+        $('confirmLead').innerHTML =
+          'Il turno è al completo: ti abbiamo messo in <strong>lista d\'attesa</strong>. ' +
+          'Se si libera un tavolo ti contatteremo al numero indicato.';
+        if (res && res.queue_position != null) rows.push(['Posizione in coda', '#' + res.queue_position]);
+      } else {
+        $('confirmBadge').textContent = '✓';
+        $('confirmTitle').textContent = 'Richiesta inviata!';
+        $('confirmLead').innerHTML =
+          'La tua prenotazione è <strong>in attesa di conferma</strong> del locale. ' +
+          'Ti contatteremo al numero indicato.';
+        if (res && res.table_code) rows.push(['Tavolo', res.table_code]);
+      }
+
+      $('confirmRecap').innerHTML = rows.map(([k, v, isCap]) =>
+        `<div class="recap__row"><span class="recap__k">${k}</span>` +
+        `<span class="recap__v${isCap ? ' cap' : ''}">${v}</span></div>`).join('');
+
+      showState('Confirm');
+    }
+
+    function reset() {
+      state.selShift = null;
+      $('bookingForm').reset();
+      showState('Form');
+      renderCalendar();
+      loadDayAvailability().then(() => { renderTimes(); updateSubmit(); }).catch((e) => fatal(mapError(e)));
+    }
+
+    // -------------------------------------------------------------------
+    // Wiring
+    // -------------------------------------------------------------------
+    $('coMinus').addEventListener('click', () => changeCoperti(-1));
+    $('coPlus').addEventListener('click', () => changeCoperti(+1));
+    $('coMinus').disabled = state.coperti <= MIN_PARTY;
+    $('calPrev').addEventListener('click', () => shiftMonth(-1));
+    $('calNext').addEventListener('click', () => shiftMonth(+1));
+    $('bookingForm').addEventListener('submit', onSubmit);
+    $('newBtn').addEventListener('click', reset);
+
+    init();
+  </script>
+</body>
+</html>

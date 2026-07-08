@@ -1,0 +1,8 @@
+.env
+.env.local
+node_modules/
+.supabase/
+supabase/.temp/
+
+# Config con i valori del progetto Supabase (generato da config.example.js)
+public/assets/js/config.js
