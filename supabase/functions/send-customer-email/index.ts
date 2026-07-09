@@ -50,6 +50,9 @@ Deno.serve(async (req) => {
     const booking = await loadReservation(reservationId);
     venueId = booking.venue.id;
     recipient = booking.customer_email || body.fallback_email || null;
+    if (!booking.customer_email && body.fallback_email) {
+      await backfillCustomerEmail(reservationId, body.fallback_email);
+    }
 
     if (!recipient) {
       await writeLog(venueId, reservationId, kind, null, "skipped", "CUSTOMER_EMAIL_MISSING");
@@ -90,7 +93,7 @@ Deno.serve(async (req) => {
     }).eq("id", reservationId);
     await writeLog(venueId, reservationId, kind, recipient, "sent", null);
 
-    return json({ sent: true });
+    return json({ sent: true, recipient, template: kind });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("[send-customer-email]", message);
@@ -231,6 +234,14 @@ async function writeFailure(reservationId: string, venueId: string, kind: string
   await supabase.from("reservations").update({ customer_email_error: message }).eq("id", reservationId)
     .then(({ error }) => { if (error) console.warn("[send-customer-email] customer_email_error non aggiornato:", error.message); });
   await writeLog(venueId, reservationId, kind, recipient, "failed", message);
+}
+
+async function backfillCustomerEmail(reservationId: string, email: string) {
+  const { error } = await supabase
+    .from("reservations")
+    .update({ customer_email: email.toLowerCase().trim() })
+    .eq("id", reservationId);
+  if (error) console.warn("[send-customer-email] customer_email non aggiornato:", error.message);
 }
 
 async function writeLog(

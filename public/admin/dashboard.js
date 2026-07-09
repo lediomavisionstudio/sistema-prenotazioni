@@ -198,7 +198,7 @@ async function changeStatus(id, to) {
   const { error } = await supabase.from('reservations').update({ status: to }).eq('id', id);
   if (error) { console.error(error); toast('Impossibile aggiornare lo stato.', true); return; }
   toast('Stato aggiornato: ' + STATUS_LABEL[to]);
-  notifyCustomerStatusEmail(id, to);
+  if (res) await notifyCustomerStatusEmail(res, to);
 
   // Turno liberato: promuovi automaticamente il primo in lista d'attesa.
   if ((to === 'annullata' || to === 'no_show') && res) {
@@ -214,19 +214,33 @@ async function changeStatus(id, to) {
   await loadDay(); // realtime aggiornerà anche gli altri dispositivi
 }
 
-function notifyCustomerStatusEmail(id, status) {
+async function notifyCustomerStatusEmail(reservation, status) {
   const template = status === 'confermata'
     ? 'booking-confirmation'
     : status === 'annullata'
       ? 'booking-cancelled'
       : null;
   if (!template || !supabase.functions) return;
-  supabase.functions.invoke('send-customer-email', {
-    body: { reservation_id: id, template },
-  }).catch((err) => {
+  try {
+    const { data, error } = await supabase.functions.invoke('send-customer-email', {
+      body: {
+        reservation_id: reservation.id,
+        template,
+        fallback_email: reservation.customer_email || null,
+        fallback_customer_name: `${reservation.customer_first_name || ''} ${reservation.customer_last_name || ''}`.trim(),
+        fallback_notes: reservation.notes || null,
+      },
+    });
+    if (error || data?.error || data?.sent === false) {
+      console.warn('[notifications] email cliente non inviata:', error || data);
+      toast('Stato aggiornato, ma email cliente non inviata.', true);
+      return;
+    }
+    console.info('[notifications] email cliente inviata:', { reservation_id: reservation.id, template, recipient: reservation.customer_email || data?.recipient });
+  } catch (err) {
     console.warn('[notifications] email cliente non inviata:', err);
     toast('Stato aggiornato, ma email cliente non inviata.', true);
-  });
+  }
 }
 
 // ---------------------------------------------------------------------------
