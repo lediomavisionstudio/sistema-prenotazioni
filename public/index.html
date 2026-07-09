@@ -80,6 +80,7 @@
       overflow: hidden;
       flex: 1;
     }
+    .card.is-loading .header { display: none; }
 
     /* Header -------------------------------------------------------------- */
     .header {
@@ -116,9 +117,21 @@
     .header__sub { margin: 8px 0 0; color: var(--ink-soft); font-size: 0.88rem; }
 
     .body { padding: 20px 18px 8px; }
+    .body.is-entering { animation: contentIn 240ms ease both; }
 
     section.block { margin-bottom: 24px; }
     section.block { scroll-margin-top: 18px; }
+    .wizard-step {
+      display: none;
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    .wizard-step.is-active {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+      animation: stepIn 230ms ease both;
+    }
 
     .block__label {
       font-family: var(--font-title);
@@ -136,21 +149,23 @@
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
       width: calc(100% + 20px);
-      min-height: 54px;
+      min-height: 60px;
       margin: 0 -10px 22px;
-      padding: 3px;
+      padding: 4px;
       border: 1px solid rgba(227, 214, 186, 0.95);
-      border-radius: 16px;
-      background: linear-gradient(180deg, rgba(255,253,246,0.96), rgba(247,239,219,0.84));
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), 0 8px 22px rgba(58, 43, 35, 0.07);
+      border-radius: 17px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.58), rgba(255,255,255,0)),
+        rgba(247,239,219,0.9);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.76), 0 10px 26px rgba(58, 43, 35, 0.09);
       overflow: hidden;
     }
     .progress-nav__item {
       position: relative;
       min-width: 0;
-      min-height: 48px;
+      min-height: 52px;
       border: 1px solid transparent;
-      border-radius: 13px;
+      border-radius: 14px;
       background: transparent;
       color: var(--ink-soft);
       font: inherit;
@@ -161,8 +176,8 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-      padding: 0 6px;
+      gap: 7px;
+      padding: 0 7px;
       transition: background 230ms ease, color 230ms ease, box-shadow 230ms ease, opacity 230ms ease, transform 230ms ease, border-color 230ms ease;
     }
     .progress-nav__item + .progress-nav__item::before {
@@ -212,6 +227,7 @@
       color: var(--tomato-dark);
       opacity: 1;
       cursor: pointer;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
     }
     .progress-nav__item.is-complete:hover {
       background: var(--tomato-soft);
@@ -235,9 +251,32 @@
       outline-offset: -2px;
     }
     @media (max-width: 380px) {
-      .progress-nav { min-height: 50px; border-radius: 14px; }
-      .progress-nav__item { min-height: 44px; gap: 4px; font-size: 0.7rem; padding: 0 4px; }
+      .progress-nav { min-height: 60px; border-radius: 15px; }
+      .progress-nav__item { min-height: 52px; gap: 4px; font-size: 0.7rem; padding: 0 4px; }
       .progress-nav__icon { width: 19px; height: 19px; font-size: 0.78rem; }
+    }
+
+    .progress-copy {
+      margin: -8px 0 18px;
+      padding: 0 2px;
+      transition: opacity 220ms ease, transform 220ms ease;
+    }
+    .progress-copy.is-changing {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    .progress-copy__count {
+      margin: 0 0 2px;
+      color: var(--tomato-dark);
+      font-size: 0.74rem;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .progress-copy__desc {
+      margin: 0;
+      color: var(--ink-soft);
+      font-size: 0.88rem;
     }
 
     /* Stepper coperti ----------------------------------------------------- */
@@ -321,15 +360,18 @@
     .times { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .time-slot {
       border: 1.5px solid var(--line);
-      background: var(--surface);
-      border-radius: var(--radius-sm);
-      padding: 12px 10px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.58), rgba(255,255,255,0)),
+        var(--surface);
+      border-radius: 14px;
+      padding: 14px 12px;
       cursor: pointer;
       text-align: left;
-      transition: border-color .15s, background .15s;
+      box-shadow: 0 8px 20px rgba(58,43,35,.06);
+      transition: border-color 220ms ease, background 220ms ease, box-shadow 220ms ease, transform 220ms ease;
     }
-    .time-slot:hover:not(:disabled) { border-color: var(--tomato); }
-    .time-slot.is-selected { border-color: var(--tomato); background: var(--tomato-soft); }
+    .time-slot:hover:not(:disabled) { border-color: var(--tomato); transform: translateY(-1px); }
+    .time-slot.is-selected { border-color: var(--tomato); background: var(--tomato-soft); box-shadow: 0 10px 26px rgba(200,64,42,.16); }
     .time-slot:disabled { opacity: .5; cursor: not-allowed; background: var(--disabled-bg); }
     /* Turno pieno: non disabilitato, ma selezionabile per la lista d'attesa */
     .time-slot--wait { background: var(--surface-soft); border-style: dashed; }
@@ -356,8 +398,51 @@
       background: var(--surface);
     }
     .field input:focus, .field textarea:focus { outline: none; border-color: var(--tomato); box-shadow: 0 0 0 3px var(--tomato-soft); }
-    .field input[aria-invalid="true"] { border-color: var(--tomato-dark); background: #fff9f7; }
+    .field input[aria-invalid="true"], .field textarea[aria-invalid="true"], .phone-field:has(input[aria-invalid="true"]) {
+      border-color: var(--tomato-dark);
+      background: #fff9f7;
+    }
     .field textarea { resize: vertical; min-height: 64px; }
+    .field-error {
+      min-height: 18px;
+      color: var(--tomato-dark);
+      font-size: 0.78rem;
+      line-height: 1.3;
+    }
+    .phone-field {
+      display: grid;
+      grid-template-columns: minmax(106px, .45fr) 1fr;
+      gap: 8px;
+      padding: 4px;
+      border: 1.5px solid var(--line);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      transition: border-color .15s, box-shadow .15s, background .15s;
+    }
+    .phone-field:focus-within { border-color: var(--tomato); box-shadow: 0 0 0 3px var(--tomato-soft); }
+    .phone-field select,
+    .phone-field input {
+      border: 0;
+      box-shadow: none;
+      background: transparent;
+      padding: 10px 8px;
+      min-width: 0;
+    }
+    .phone-field select:focus,
+    .phone-field input:focus { outline: none; box-shadow: none; }
+    .phone-preview {
+      color: var(--ink-soft);
+      font-size: 0.78rem;
+      min-height: 18px;
+    }
+    .legal-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+      color: var(--ink-soft);
+      font-size: 0.82rem;
+    }
+    .legal-links a { color: var(--tomato-dark); font-weight: 700; }
 
     .consents { display: grid; gap: 10px; margin: 2px 0 0; }
     .check {
@@ -386,17 +471,63 @@
     .btn:active { transform: scale(.985); }
     .btn--primary { background: var(--tomato); color: #fff; font-size: 1.02rem; width: 100%; }
     .btn--primary:hover:not(:disabled) { background: var(--tomato-dark); }
+    .btn--primary:not(:disabled) { animation: buttonReady 230ms ease both; }
     .btn--primary:disabled { background: #cbb9a6; cursor: not-allowed; }
     .btn--ghost { background: transparent; color: var(--tomato-dark); border: 1.5px solid var(--line); }
+    .wizard-actions {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .wizard-actions--split { grid-template-columns: 1fr 1fr; }
+    .wizard-actions .btn { min-height: 50px; }
 
     /* States: loading / error / confirm ----------------------------------- */
     .state { padding: 48px 22px; text-align: center; }
+    .state--loading {
+      min-height: 330px;
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      gap: 16px;
+    }
+    .loading-logo {
+      display: block;
+      max-width: 170px;
+      max-height: 76px;
+      object-fit: contain;
+      margin: 0 auto 8px;
+      filter: drop-shadow(0 8px 18px rgba(58,43,35,.12));
+    }
+    .loading-logo[hidden] { display: none; }
     .spinner {
-      width: 34px; height: 34px; margin: 0 auto 14px;
-      border: 4px solid var(--line); border-top-color: var(--tomato);
-      border-radius: 50%; animation: spin .8s linear infinite;
+      width: 42px; height: 42px; margin: 0 auto;
+      border: 4px solid rgba(227, 214, 186, .72);
+      border-top-color: var(--tomato);
+      border-right-color: rgba(200,64,42,.42);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      box-shadow: 0 0 0 7px rgba(200,64,42,.06);
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes contentIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes stepIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes buttonReady {
+      from { transform: translateY(2px); box-shadow: 0 0 0 rgba(200,64,42,0); }
+      to { transform: translateY(0); box-shadow: 0 10px 22px rgba(200,64,42,.18); }
+    }
+
+    @media (max-width: 420px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      .phone-field { grid-template-columns: 104px 1fr; }
+    }
 
     .confirm { padding: 34px 22px; text-align: center; }
     .confirm__badge {
@@ -433,7 +564,7 @@
 </head>
 <body>
   <div class="wrap">
-    <main class="card" aria-live="polite">
+    <main class="card is-loading" id="bookingCard" aria-live="polite">
 
       <header class="header">
         <img class="header__logo" id="venueLogo" alt="" hidden />
@@ -443,9 +574,10 @@
       </header>
 
       <!-- Caricamento iniziale -->
-      <div class="state" id="stateLoading">
+      <div class="state state--loading" id="stateLoading">
+        <img class="loading-logo" id="loadingLogo" alt="" hidden />
         <div class="spinner" role="status" aria-label="Caricamento"></div>
-        <p class="empty-hint">Carico le disponibilità…</p>
+        <p class="empty-hint">Sto preparando la tua prenotazione...</p>
       </div>
 
       <!-- Errore bloccante -->
@@ -473,8 +605,12 @@
             <span class="progress-nav__label">Dati</span>
           </button>
         </nav>
+        <div class="progress-copy" id="progressCopy" aria-live="polite">
+          <p class="progress-copy__count" id="progressCount">Step 1 di 4</p>
+          <p class="progress-copy__desc" id="progressDesc">Scegli il giorno in cui vuoi prenotare.</p>
+        </div>
 
-        <section class="block" id="dateStep">
+        <section class="block wizard-step" id="dateStep" data-step="date">
           <h2 class="block__label">Data <small>scegli il giorno</small></h2>
           <div class="cal" id="calendar">
             <div class="cal__head">
@@ -488,9 +624,12 @@
             <div class="cal__grid" id="calGrid" role="grid" aria-label="Scegli la data"></div>
           </div>
           <p class="empty-hint" id="dateEmpty" hidden>Nessuna data disponibile al momento.</p>
+          <div class="wizard-actions">
+            <button class="btn btn--primary" type="button" id="dateNext" disabled>Avanti</button>
+          </div>
         </section>
 
-        <section class="block" id="peopleStep">
+        <section class="block wizard-step" id="peopleStep" data-step="people">
           <h2 class="block__label">Coperti <small>quante persone</small></h2>
           <div class="stepper">
             <button class="stepper__btn" type="button" id="coMinus" aria-label="Diminuisci coperti">−</button>
@@ -500,30 +639,58 @@
             </div>
             <button class="stepper__btn" type="button" id="coPlus" aria-label="Aumenta coperti">+</button>
           </div>
+          <div class="wizard-actions wizard-actions--split">
+            <button class="btn btn--ghost" type="button" id="peopleBack">Indietro</button>
+            <button class="btn btn--primary" type="button" id="peopleNext">Avanti</button>
+          </div>
         </section>
 
-        <section class="block" id="timeStep">
+        <section class="block wizard-step" id="timeStep" data-step="time">
           <h2 class="block__label">Orario</h2>
           <div class="times" id="timeRow" role="group" aria-label="Scegli l'orario"></div>
           <p class="empty-hint" id="timeEmpty" hidden>Seleziona prima una data.</p>
+          <div class="wizard-actions wizard-actions--split">
+            <button class="btn btn--ghost" type="button" id="timeBack">Indietro</button>
+            <button class="btn btn--primary" type="button" id="timeNext" disabled>Avanti</button>
+          </div>
         </section>
 
-        <section class="block" id="detailsStep">
+        <section class="block wizard-step" id="detailsStep" data-step="details">
           <h2 class="block__label">I tuoi dati</h2>
           <form class="form" id="bookingForm" novalidate>
             <div class="grid-2">
               <div class="field">
                 <label for="firstName">Nome</label>
-                <input id="firstName" name="firstName" type="text" autocomplete="given-name" maxlength="80" required />
+                <input id="firstName" name="firstName" type="text" autocomplete="given-name" minlength="2" maxlength="40" required aria-describedby="firstNameError" />
+                <div class="field-error" id="firstNameError" aria-live="polite"></div>
               </div>
               <div class="field">
                 <label for="lastName">Cognome</label>
-                <input id="lastName" name="lastName" type="text" autocomplete="family-name" maxlength="80" required />
+                <input id="lastName" name="lastName" type="text" autocomplete="family-name" minlength="2" maxlength="40" required aria-describedby="lastNameError" />
+                <div class="field-error" id="lastNameError" aria-live="polite"></div>
               </div>
             </div>
             <div class="field">
+              <label for="email">Email</label>
+              <input id="email" name="email" type="email" autocomplete="email" maxlength="120" required aria-describedby="emailError" />
+              <div class="field-error" id="emailError" aria-live="polite"></div>
+            </div>
+            <div class="field">
               <label for="phone">Telefono</label>
-              <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="30" required />
+              <div class="phone-field">
+                <select id="phonePrefix" name="phonePrefix" aria-label="Prefisso internazionale">
+                  <option value="+39" selected>🇮🇹 +39</option>
+                  <option value="+33">🇫🇷 +33</option>
+                  <option value="+34">🇪🇸 +34</option>
+                  <option value="+49">🇩🇪 +49</option>
+                  <option value="+44">🇬🇧 +44</option>
+                  <option value="+41">🇨🇭 +41</option>
+                  <option value="+1">🇺🇸 +1</option>
+                </select>
+                <input id="phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="10" required aria-describedby="phoneError phonePreview" />
+              </div>
+              <div class="phone-preview" id="phonePreview" aria-live="polite">+39</div>
+              <div class="field-error" id="phoneError" aria-live="polite"></div>
             </div>
             <div class="field">
               <label for="notes">Note <span>(seggiolone, allergie, preferenza dehors…)</span></label>
@@ -537,13 +704,23 @@
                 <input id="privacyConsent" name="privacyConsent" type="checkbox" required />
                 <span>Ho letto e accetto la <a id="privacyLink" href="privacy-policy.html" target="_blank" rel="noopener">Privacy Policy</a>.</span>
               </label>
+              <div class="field-error" id="privacyError" aria-live="polite"></div>
               <label class="check" for="marketingConsent">
                 <input id="marketingConsent" name="marketingConsent" type="checkbox" />
                 <span>Acconsento a ricevere comunicazioni promozionali.</span>
               </label>
             </div>
 
-            <button class="btn btn--primary" type="submit" id="submitBtn" disabled>Prenota</button>
+            <nav class="legal-links" aria-label="Link legali">
+              <a id="detailsPrivacyLink" href="privacy-policy.html" target="_blank" rel="noopener">Privacy Policy</a>
+              <a id="detailsCookieLink" href="cookie-policy.html" target="_blank" rel="noopener">Cookie Policy</a>
+              <a id="detailsTermsLink" href="booking-terms.html" target="_blank" rel="noopener">Condizioni di Prenotazione</a>
+            </nav>
+
+            <div class="wizard-actions wizard-actions--split">
+              <button class="btn btn--ghost" type="button" id="detailsBack">Indietro</button>
+              <button class="btn btn--primary" type="submit" id="submitBtn" disabled>Prenota</button>
+            </div>
           </form>
         </section>
       </div>
@@ -561,7 +738,7 @@
       </div>
 
     </main>
-    <footer class="footer">
+    <footer class="footer" id="pageFooter" hidden>
       <span>Prenotazione soggetta a conferma del locale.</span>
       <nav class="footer__links" aria-label="Link legali">
         <a id="footerPrivacyLink" href="privacy-policy.html">Privacy Policy</a>
@@ -599,6 +776,7 @@
       LOCALE_CHIUSO: 'Il locale è chiuso nella data selezionata.',
       COPERTI_NON_VALIDI: 'Numero di coperti non valido.',
       DATI_CLIENTE_INCOMPLETI: 'Compila nome, cognome e telefono.',
+      EMAIL_NON_VALIDA: 'Inserisci un indirizzo email valido.',
       PRIVACY_NON_ACCETTATA: 'Per prenotare devi accettare la Privacy Policy.',
       NESSUNA_DISPONIBILITA: 'Non c\'è più posto per questa scelta. Prova un altro orario o data.',
     };
@@ -625,6 +803,7 @@
       selDate: null,              // ISO data scelta
       dayShifts: [],              // turni della data scelta: [{shift_id, shift_name, start_time, end_time, available}]
       selShift: null,             // turno scelto
+      progressStep: 'date',       // stato visuale del wizard
     };
 
     // -------------------------------------------------------------------
@@ -651,6 +830,14 @@
     function showState(which) {
       ['Loading','Fatal','Form','Confirm'].forEach((s) =>
         $('state' + s).hidden = (s !== which));
+      $('bookingCard').classList.toggle('is-loading', which === 'Loading');
+      $('bookingCard').classList.toggle('is-ready', which === 'Form' || which === 'Confirm');
+      $('pageFooter').hidden = which === 'Loading' || which === 'Form';
+      if (which === 'Form') {
+        $('stateForm').classList.remove('is-entering');
+        void $('stateForm').offsetWidth;
+        $('stateForm').classList.add('is-entering');
+      }
     }
 
     function fatal(msg) { $('fatalMsg').textContent = msg; showState('Fatal'); }
@@ -662,63 +849,230 @@
     }
 
     const progressSteps = [
-      { key: 'date', el: 'progressDate', target: 'dateStep', icon: '🗓' },
-      { key: 'people', el: 'progressPeople', target: 'peopleStep', icon: '👥' },
-      { key: 'time', el: 'progressTime', target: 'timeStep', icon: '🕒' },
-      { key: 'details', el: 'progressDetails', target: 'detailsStep', icon: '✍' },
+      { key: 'date', el: 'progressDate', target: 'dateStep', icon: '🗓', desc: 'Scegli il giorno in cui vuoi prenotare.' },
+      { key: 'people', el: 'progressPeople', target: 'peopleStep', icon: '👥', desc: 'Indica quante persone si siederanno al tavolo.' },
+      { key: 'time', el: 'progressTime', target: 'timeStep', icon: '🕒', desc: 'Seleziona il turno più comodo tra quelli disponibili.' },
+      { key: 'details', el: 'progressDetails', target: 'detailsStep', icon: '✍', desc: 'Lascia i dati necessari per completare la richiesta.' },
     ];
+    const stepOrder = progressSteps.map((step) => step.key);
+    const nameRegex = /^[\p{L}\s]{2,40}$/u;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
     function completedSteps() {
       return {
-        date: !!state.selDate,
-        people: state.coperti >= MIN_PARTY,
+        date: isDateStepValid(),
+        people: isPeopleStepValid(),
         time: !!state.selShift,
-        details: hasCustomerDetails(),
+        details: validateDetails(false),
       };
     }
 
-    function hasCustomerDetails() {
-      const form = $('bookingForm');
-      if (!form) return false;
-      return !!(
-        form.firstName.value.trim() &&
-        form.lastName.value.trim() &&
-        form.phone.value.trim() &&
-        form.privacyConsent.checked
-      );
+    function isDateStepValid() {
+      return !!(state.selDate && isSelectable(isoToDate(state.selDate)));
+    }
+
+    function isPeopleStepValid() {
+      return state.coperti >= MIN_PARTY && state.coperti <= MAX_PARTY;
+    }
+
+    function isStepValid(key, showErrors = false) {
+      if (key === 'date') return isDateStepValid();
+      if (key === 'people') return isPeopleStepValid();
+      if (key === 'time') return !!state.selShift;
+      if (key === 'details') return validateDetails(showErrors);
+      return false;
     }
 
     function activeStepKey(done = completedSteps()) {
-      if (!done.date) return 'date';
-      if (!done.people) return 'people';
-      if (!done.time) return 'time';
-      return 'details';
+      const requested = state.progressStep || 'date';
+      if (requested === 'people' && !done.date) return 'date';
+      if (requested === 'time' && (!done.date || !done.people)) return done.date ? 'people' : 'date';
+      if (requested === 'details' && (!done.date || !done.people || !done.time)) {
+        if (!done.date) return 'date';
+        if (!done.people) return 'people';
+        return 'time';
+      }
+      return requested;
     }
 
     function updateProgressNav() {
       const done = completedSteps();
       const active = activeStepKey(done);
+      state.progressStep = active;
+      const activeIndex = progressSteps.findIndex((step) => step.key === active);
       for (const step of progressSteps) {
         const btn = $(step.el);
         if (!btn) continue;
         const icon = btn.querySelector('.progress-nav__icon');
-        const isComplete = done[step.key] && step.key !== active;
+        const stepIndex = progressSteps.findIndex((item) => item.key === step.key);
+        const isComplete = stepIndex < activeIndex && done[step.key];
         const isActive = step.key === active;
         btn.classList.toggle('is-complete', isComplete);
         btn.classList.toggle('is-active', isActive);
-        btn.classList.toggle('is-future', !isComplete && !isActive);
+        btn.classList.toggle('is-future', stepIndex > activeIndex || (!isComplete && !isActive));
         btn.disabled = !isComplete;
         btn.setAttribute('aria-current', isActive ? 'step' : 'false');
         if (icon) icon.textContent = isComplete ? '✓' : step.icon;
       }
+      updateProgressCopy(active, activeIndex);
+      updateWizardStep(active);
+      updateWizardButtons();
+    }
+
+    function updateProgressCopy(active, activeIndex) {
+      const copy = $('progressCopy');
+      const count = $('progressCount');
+      const desc = $('progressDesc');
+      const step = progressSteps[activeIndex] || progressSteps[0];
+      if (!copy || !count || !desc) return;
+      const nextCount = `Step ${activeIndex + 1} di 4`;
+      if (count.textContent === nextCount && desc.textContent === step.desc) return;
+      copy.classList.add('is-changing');
+      window.setTimeout(() => {
+        count.textContent = nextCount;
+        desc.textContent = step.desc;
+        copy.classList.remove('is-changing');
+      }, 80);
     }
 
     function goToProgressStep(key) {
       const done = completedSteps();
       if (!done[key] || key === activeStepKey(done)) return;
-      const step = progressSteps.find((item) => item.key === key);
-      if (!step) return;
-      $(step.target).scrollIntoView({ block: 'start', behavior: 'smooth' });
+      goToStep(key);
+    }
+
+    function goToStep(key, focus = true) {
+      const targetIndex = stepOrder.indexOf(key);
+      if (targetIndex < 0) return;
+      for (let i = 0; i < targetIndex; i++) {
+        if (!isStepValid(stepOrder[i], true)) {
+          key = stepOrder[i];
+          break;
+        }
+      }
+      state.progressStep = key;
+      updateProgressNav();
+      if (focus) focusStep(key);
+    }
+
+    function goStep(delta) {
+      const current = activeStepKey();
+      const index = stepOrder.indexOf(current);
+      if (delta > 0 && !isStepValid(current, true)) {
+        updateWizardButtons();
+        return;
+      }
+      const next = stepOrder[Math.max(0, Math.min(stepOrder.length - 1, index + delta))];
+      goToStep(next);
+    }
+
+    function updateWizardStep(active) {
+      for (const step of progressSteps) {
+        const section = $(step.target);
+        if (!section) continue;
+        const isActive = step.key === active;
+        section.classList.toggle('is-active', isActive);
+        section.hidden = !isActive;
+      }
+    }
+
+    function updateWizardButtons() {
+      const active = activeStepKey();
+      const detailsValid = validateDetails(false);
+      $('dateNext').disabled = !isDateStepValid();
+      $('peopleNext').disabled = !isPeopleStepValid();
+      $('timeNext').disabled = !state.selShift;
+      $('submitBtn').disabled = !(active === 'details' && detailsValid);
+    }
+
+    function focusStep(key) {
+      const focusMap = {
+        date: '#calGrid button:not(:disabled)',
+        people: '#coPlus',
+        time: '#timeRow button:not(:disabled)',
+        details: '#firstName',
+      };
+      window.setTimeout(() => {
+        const target = document.querySelector(focusMap[key]);
+        if (target) target.focus({ preventScroll: true });
+      }, 230);
+    }
+
+    function setFieldError(input, errorId, message, show = true) {
+      const error = $(errorId);
+      if (input) input.setAttribute('aria-invalid', message ? 'true' : 'false');
+      if (error && (show || !message)) error.textContent = message;
+      return !message;
+    }
+
+    function validateNameField(input, errorId, label, show = true) {
+      const value = input.value.trim();
+      let message = '';
+      if (!value) message = `${label} è obbligatorio.`;
+      else if (value.length < 2) message = `${label} deve contenere almeno 2 caratteri.`;
+      else if (value.length > 40) message = `${label} deve contenere al massimo 40 caratteri.`;
+      else if (!nameRegex.test(value)) message = `${label} può contenere solo lettere e spazi.`;
+      return setFieldError(input, errorId, message, show);
+    }
+
+    function validateEmailField(show = true) {
+      const input = $('email');
+      const value = input.value.trim();
+      let message = '';
+      if (!value) message = 'Email obbligatoria.';
+      else if (!input.checkValidity() || !emailRegex.test(value)) message = 'Inserisci un indirizzo email valido.';
+      return setFieldError(input, 'emailError', message, show);
+    }
+
+    function sanitizePhone() {
+      const input = $('phone');
+      input.value = input.value.replace(/\D/g, '').slice(0, 10);
+      updatePhonePreview();
+    }
+
+    function getFormattedPhone() {
+      const digits = $('phone').value.replace(/\D/g, '').slice(0, 10);
+      return `${$('phonePrefix').value} ${digits}`.trim();
+    }
+
+    function updatePhonePreview() {
+      $('phonePreview').textContent = getFormattedPhone();
+    }
+
+    function validatePhoneField(show = true) {
+      sanitizePhone();
+      const input = $('phone');
+      const digits = input.value.trim();
+      let message = '';
+      if (!digits) message = 'Telefono obbligatorio.';
+      else if (!/^\d{6,10}$/.test(digits)) message = 'Inserisci un numero di telefono valido.';
+      return setFieldError(input, 'phoneError', message, show);
+    }
+
+    function validatePrivacy(show = true) {
+      const input = $('privacyConsent');
+      const message = input.checked ? '' : 'Devi accettare la Privacy Policy.';
+      return setFieldError(input, 'privacyError', message, show);
+    }
+
+    function validateDetails(show = true) {
+      const form = $('bookingForm');
+      if (!form) return false;
+      const validFirst = validateNameField(form.firstName, 'firstNameError', 'Il nome', show);
+      const validLast = validateNameField(form.lastName, 'lastNameError', 'Il cognome', show);
+      const validEmail = validateEmailField(show);
+      const validPhone = validatePhoneField(show);
+      const validPrivacy = validatePrivacy(show);
+      return validFirst && validLast && validEmail && validPhone && validPrivacy;
+    }
+
+    function handleWizardEnter(event) {
+      if (event.key !== 'Enter' || $('stateForm').hidden || event.target.tagName === 'TEXTAREA') return;
+      const active = activeStepKey();
+      if (active !== 'details') {
+        event.preventDefault();
+        goStep(1);
+      }
     }
 
     // -------------------------------------------------------------------
@@ -742,6 +1096,10 @@
         img.src = v.logo_url;
         img.alt = v.name || '';
         img.hidden = false;
+        const loadingImg = $('loadingLogo');
+        loadingImg.src = v.logo_url;
+        loadingImg.alt = v.name || '';
+        loadingImg.hidden = false;
       }
     }
 
@@ -773,6 +1131,9 @@
       const privacyUrl = withLocale(CONFIG.PRIVACY_URL || 'privacy-policy.html');
       $('privacyLink').href = privacyUrl;
       $('footerPrivacyLink').href = privacyUrl;
+      $('detailsPrivacyLink').href = privacyUrl;
+      $('detailsCookieLink').href = withLocale('cookie-policy.html');
+      $('detailsTermsLink').href = withLocale('booking-terms.html');
       document.querySelectorAll('.footer__links a').forEach((link) => {
         if (link.id === 'footerPrivacyLink') return;
         link.href = withLocale(link.getAttribute('href'));
@@ -828,6 +1189,7 @@
         state.calYear = t.getFullYear();
         state.calMonth = t.getMonth();
         state.selDate = firstSelectable();
+        state.progressStep = 'date';
 
         renderCalendar();
         showState('Form');
@@ -1018,7 +1380,6 @@
 
     function updateSubmit() {
       const btn = $('submitBtn');
-      btn.disabled = !(state.selDate && state.selShift && $('privacyConsent').checked);
       btn.textContent = isWaitlist() ? 'Mettiti in lista d\'attesa' : 'Prenota';
       updateProgressNav();
     }
@@ -1031,18 +1392,16 @@
 
       const firstName = form.firstName.value.trim();
       const lastName = form.lastName.value.trim();
-      const phone = form.phone.value.trim();
+      const email = form.email.value.trim();
+      const phone = getFormattedPhone();
       const notes = form.notes.value.trim();
       const marketingConsent = form.marketingConsent.checked;
 
       clearFieldErrors(form);
-      if (!firstName) return showFormError('Inserisci il nome.', form.firstName);
-      if (!lastName) return showFormError('Inserisci il cognome.', form.lastName);
-      if (!phone) return showFormError('Inserisci il numero di telefono.', form.phone);
+      if (!validateDetails(true)) return showFormError('Controlla i campi evidenziati.');
       if (state.coperti < MIN_PARTY) return showFormError('Il numero di persone deve essere almeno 1.');
       if (!state.selDate || isoToDate(state.selDate) < todayLocal()) return showFormError('Scegli una data futura.');
       if (!state.selShift) return showFormError('Scegli un orario.');
-      if (!form.privacyConsent.checked) return showFormError('Per prenotare devi accettare la Privacy Policy.', form.privacyConsent);
 
       const waitlist = isWaitlist();
       const btn = $('submitBtn');
@@ -1057,6 +1416,7 @@
           p_first_name: firstName,
           p_last_name: lastName,
           p_phone: phone,
+          p_customer_email: email,
           p_notes: notes || null,
           p_privacy_policy_accepted: true,
           p_marketing_consent: marketingConsent,
@@ -1079,6 +1439,7 @@
 
     function clearFieldErrors(form) {
       form.querySelectorAll('[aria-invalid="true"]').forEach((el) => el.removeAttribute('aria-invalid'));
+      form.querySelectorAll('.field-error').forEach((el) => el.textContent = '');
     }
 
     function showFormError(msg, field) {
@@ -1142,9 +1503,11 @@
 
     function reset() {
       state.selShift = null;
+      state.progressStep = 'date';
       $('bookingForm').reset();
       $('formError').hidden = true;
       clearFieldErrors($('bookingForm'));
+      updatePhonePreview();
       showState('Form');
       updateProgressNav();
       renderCalendar();
@@ -1159,9 +1522,21 @@
     $('coMinus').disabled = state.coperti <= MIN_PARTY;
     $('calPrev').addEventListener('click', () => shiftMonth(-1));
     $('calNext').addEventListener('click', () => shiftMonth(+1));
+    $('dateNext').addEventListener('click', () => goStep(1));
+    $('peopleBack').addEventListener('click', () => goStep(-1));
+    $('peopleNext').addEventListener('click', () => goStep(1));
+    $('timeBack').addEventListener('click', () => goStep(-1));
+    $('timeNext').addEventListener('click', () => goStep(1));
+    $('detailsBack').addEventListener('click', () => goStep(-1));
     $('bookingForm').addEventListener('submit', onSubmit);
-    $('privacyConsent').addEventListener('change', updateSubmit);
-    $('bookingForm').addEventListener('input', updateProgressNav);
+    $('firstName').addEventListener('input', () => { validateNameField($('firstName'), 'firstNameError', 'Il nome', true); updateSubmit(); });
+    $('lastName').addEventListener('input', () => { validateNameField($('lastName'), 'lastNameError', 'Il cognome', true); updateSubmit(); });
+    $('email').addEventListener('input', () => { validateEmailField(true); updateSubmit(); });
+    $('phone').addEventListener('input', () => { validatePhoneField(true); updateSubmit(); });
+    $('phonePrefix').addEventListener('change', () => { updatePhonePreview(); validatePhoneField(true); updateSubmit(); });
+    $('privacyConsent').addEventListener('change', () => { validatePrivacy(true); updateSubmit(); });
+    $('bookingForm').addEventListener('input', updateWizardButtons);
+    document.addEventListener('keydown', handleWizardEnter);
     for (const step of progressSteps) {
       $(step.el).addEventListener('click', () => goToProgressStep(step.key));
     }
