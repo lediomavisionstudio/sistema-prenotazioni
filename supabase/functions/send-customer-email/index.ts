@@ -36,6 +36,11 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({})) as {
       reservation_id?: string;
       template?: TemplateKind;
+      fallback_email?: string | null;
+      fallback_customer_name?: string | null;
+      fallback_notes?: string | null;
+      fallback_phone?: string | null;
+      fallback_used_legacy_rpc?: boolean;
     };
 
     reservationId = body.reservation_id || null;
@@ -44,7 +49,7 @@ Deno.serve(async (req) => {
 
     const booking = await loadReservation(reservationId);
     venueId = booking.venue.id;
-    recipient = booking.customer_email;
+    recipient = booking.customer_email || body.fallback_email || null;
 
     if (!recipient) {
       await writeLog(venueId, reservationId, kind, null, "skipped", "CUSTOMER_EMAIL_MISSING");
@@ -56,7 +61,10 @@ Deno.serve(async (req) => {
       return json({ sent: false, error: "RESEND_API_KEY non configurata" });
     }
 
-    const email = buildEmail(kind, booking);
+    const email = buildEmail(kind, booking, {
+      customerName: body.fallback_customer_name || null,
+      notes: body.fallback_notes || null,
+    });
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -92,7 +100,7 @@ Deno.serve(async (req) => {
 });
 
 async function loadReservation(id: string) {
-  const { data, error } = await supabase
+  const full = await supabase
     .from("reservations")
     .select(`
       id, venue_id, reservation_date, party_size, customer_first_name,
@@ -103,7 +111,32 @@ async function loadReservation(id: string) {
     .eq("id", id)
     .single();
 
-  if (error || !data) throw new Error(error?.message || "Prenotazione non trovata");
+  if (!full.error && full.data) return full.data as {
+    id: string;
+    venue_id: string;
+    reservation_date: string;
+    party_size: number;
+    customer_first_name: string;
+    customer_last_name: string;
+    customer_email: string | null;
+    notes: string | null;
+    venue: { name: string; phone?: string | null; address?: string | null };
+    shift: { name: string; start_time: string; end_time: string };
+  };
+
+  const basic = await supabase
+    .from("reservations")
+    .select(`
+      id, venue_id, reservation_date, party_size, customer_first_name,
+      customer_last_name, notes, shift_id,
+      venue:venues(name, phone, address),
+      shift:service_shifts(name, start_time, end_time)
+    `)
+    .eq("id", id)
+    .single();
+
+  if (basic.error || !basic.data) throw new Error(basic.error?.message || full.error?.message || "Prenotazione non trovata");
+  const data = { ...basic.data, customer_email: null };
   return data as {
     id: string;
     venue_id: string;
@@ -118,8 +151,12 @@ async function loadReservation(id: string) {
   };
 }
 
-function buildEmail(kind: TemplateKind, booking: Awaited<ReturnType<typeof loadReservation>>) {
-  const name = `${booking.customer_first_name} ${booking.customer_last_name}`.trim();
+function buildEmail(
+  kind: TemplateKind,
+  booking: Awaited<ReturnType<typeof loadReservation>>,
+  fallback: { customerName?: string | null; notes?: string | null } = {},
+) {
+  const name = fallback.customerName || `${booking.customer_first_name} ${booking.customer_last_name}`.trim();
   const details = [
     ["Locale", booking.venue.name],
     ["Data", booking.reservation_date],
@@ -127,7 +164,8 @@ function buildEmail(kind: TemplateKind, booking: Awaited<ReturnType<typeof loadR
     ["Persone", String(booking.party_size)],
     ["Nome", name],
   ];
-  if (booking.notes) details.push(["Note", booking.notes]);
+  const notes = booking.notes || fallback.notes;
+  if (notes) details.push(["Note", notes]);
 
   if (kind === "booking-confirmation") {
     const email = {
@@ -190,7 +228,8 @@ function renderEmail(email: EmailContent) {
 }
 
 async function writeFailure(reservationId: string, venueId: string, kind: string, recipient: string | null, message: string) {
-  await supabase.from("reservations").update({ customer_email_error: message }).eq("id", reservationId);
+  await supabase.from("reservations").update({ customer_email_error: message }).eq("id", reservationId)
+    .then(({ error }) => { if (error) console.warn("[send-customer-email] customer_email_error non aggiornato:", error.message); });
   await writeLog(venueId, reservationId, kind, recipient, "failed", message);
 }
 
@@ -200,9 +239,9 @@ async function writeLog(
   kind: string,
   recipient: string | null,
   status: "sent" | "skipped" | "failed",
-  error: string | null,
+  errorMessage: string | null,
 ) {
-  await supabase.from("notification_logs").insert({
+  const { error } = await supabase.from("notification_logs").insert({
     venue_id: venueId,
     reservation_id: reservationId,
     channel: "email",
@@ -210,8 +249,9 @@ async function writeLog(
     recipient,
     provider: "resend",
     status,
-    error_message: error,
+    error_message: errorMessage,
   });
+  if (error) console.warn("[send-customer-email] log non scritto:", error.message);
 }
 
 function hhmm(value: string) {

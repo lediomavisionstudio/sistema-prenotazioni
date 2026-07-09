@@ -1541,25 +1541,26 @@
       state.requestId = state.requestId || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
       setSubmitting(true);
       try {
-        const rpc = waitlist ? 'join_waitlist' : 'create_public_reservation';
-        const { data, error } = await withTimeout(supabase.rpc(rpc, {
-          p_venue_slug: venueSlug,
-          p_reservation_date: state.selDate,
-          p_shift_id: state.selShift.shift_id,
-          p_party_size: state.coperti,
-          p_first_name: firstName,
-          p_last_name: lastName,
-          p_phone: phone,
-          p_customer_email: email,
-          p_notes: notes || null,
-          p_privacy_policy_accepted: true,
-          p_marketing_consent: marketingConsent,
-          p_client_request_id: state.requestId,
+        const { data, error, usedLegacyRpc } = await withTimeout(createBookingRequest({
+          waitlist,
+          firstName,
+          lastName,
+          email,
+          phone,
+          notes,
+          marketingConsent,
         }));
         if (error) throw error;
         const result = Array.isArray(data) ? data[0] : data;
         notifyAdminBooking(result, waitlist);
-        notifyCustomerEmail(result, waitlist, 'request_received');
+        notifyCustomerEmail(result, waitlist, 'request_received', {
+          email,
+          firstName,
+          lastName,
+          phone,
+          notes,
+          usedLegacyRpc,
+        });
         markCompleted();
         showConfirm(result, waitlist);
       } catch (err) {
@@ -1578,6 +1579,48 @@
           updateSubmit();
         }
       }
+    }
+
+    async function createBookingRequest({ waitlist, firstName, lastName, email, phone, notes, marketingConsent }) {
+      const rpc = waitlist ? 'join_waitlist' : 'create_public_reservation';
+      const legacyPayload = {
+        p_venue_slug: venueSlug,
+        p_reservation_date: state.selDate,
+        p_shift_id: state.selShift.shift_id,
+        p_party_size: state.coperti,
+        p_first_name: firstName,
+        p_last_name: lastName,
+        p_phone: phone,
+        p_notes: notes || null,
+        p_privacy_policy_accepted: true,
+        p_marketing_consent: marketingConsent,
+      };
+      const legacyResult = await supabase.rpc(rpc, legacyPayload);
+      if (!isRpcSignatureMissing(legacyResult.error)) return { ...legacyResult, usedLegacyRpc: true };
+
+      console.warn('[booking] RPC compatibile non disponibile, uso firma nuova:', legacyResult.error);
+      const modernPayload = {
+          p_venue_slug: venueSlug,
+          p_reservation_date: state.selDate,
+          p_shift_id: state.selShift.shift_id,
+          p_party_size: state.coperti,
+          p_first_name: firstName,
+          p_last_name: lastName,
+          p_phone: phone,
+          p_customer_email: email,
+          p_notes: notes || null,
+          p_privacy_policy_accepted: true,
+          p_marketing_consent: marketingConsent,
+          p_client_request_id: state.requestId,
+      };
+      const modernResult = await supabase.rpc(rpc, modernPayload);
+      return { ...modernResult, usedLegacyRpc: false };
+    }
+
+    function isRpcSignatureMissing(error) {
+      if (!error) return false;
+      const raw = `${error.code || ''} ${error.message || ''} ${error.details || ''}`;
+      return raw.includes('PGRST202') || raw.includes('Could not find the function') || raw.includes('function') && raw.includes('schema cache');
     }
 
     function clearFieldErrors(form) {
@@ -1609,11 +1652,19 @@
       });
     }
 
-    function notifyCustomerEmail(result, waitlist = false, template = 'request_received') {
+    function notifyCustomerEmail(result, waitlist = false, template = 'request_received', fallback = {}) {
       const id = result && (result.reservation_id || result.waitlist_id);
       if (!id || waitlist || !supabase.functions) return;
       supabase.functions.invoke('send-customer-email', {
-        body: { reservation_id: id, template },
+        body: {
+          reservation_id: id,
+          template,
+          fallback_email: fallback.email || null,
+          fallback_customer_name: `${fallback.firstName || ''} ${fallback.lastName || ''}`.trim(),
+          fallback_notes: fallback.notes || null,
+          fallback_phone: fallback.phone || null,
+          fallback_used_legacy_rpc: !!fallback.usedLegacyRpc,
+        },
       }).catch((err) => {
         console.warn('[notifications] email cliente non inviata:', err);
       });
