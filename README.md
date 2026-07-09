@@ -33,6 +33,7 @@ public/                  frontend statico (deploy su Cloudflare Pages)
 docs/
   DATABASE.md            schema, RLS, decisioni di design, bootstrap locale
 .env.example              variabili d'ambiente (riferimento)
+NOTIFICATION_SETUP.md     setup email admin e architettura notifiche
 ```
 
 ## Widget cliente
@@ -95,6 +96,8 @@ stato di errore "Impossibile contattare il servizio prenotazioni".
 
 Vedi [docs/DATABASE.md](docs/DATABASE.md) per il dettaglio di tabelle, RLS e
 funzioni, e per la procedura di onboarding di un nuovo locale pilota.
+Per email admin, futura email cliente e futura architettura WhatsApp ufficiale,
+vedi [NOTIFICATION_SETUP.md](NOTIFICATION_SETUP.md).
 
 ## Setup
 
@@ -105,6 +108,8 @@ funzioni, e per la procedura di onboarding di un nuovo locale pilota.
    (dashboard Supabase → Project Settings → API).
 4. Segui la procedura di bootstrap in `docs/DATABASE.md` per creare il primo
    locale pilota, la sua sala (zone/tavoli/turni) e l'utente owner.
+5. Per notifiche, configura i secret backend descritti in
+   `NOTIFICATION_SETUP.md`; non inserirli in `public/assets/js/config.js`.
 
 Il prossimo passo è l'implementazione del frontend (widget pubblico e
 pannello gestionale).

@@ -869,7 +869,9 @@
           p_marketing_consent: marketingConsent,
         });
         if (error) throw error;
-        showConfirm(Array.isArray(data) ? data[0] : data, waitlist);
+        const result = Array.isArray(data) ? data[0] : data;
+        notifyAdminBooking(result, waitlist);
+        showConfirm(result, waitlist);
       } catch (err) {
         console.error(err);
         showFormError(mapError(err));
@@ -894,6 +896,20 @@
         field.focus({ preventScroll: true });
       }
       box.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+
+    function notifyAdminBooking(result, waitlist = false) {
+      const id = result && (result.reservation_id || result.waitlist_id);
+      if (!id || !supabase.functions) return;
+      supabase.functions.invoke('send-admin-booking-email', {
+        body: {
+          reservation_id: waitlist ? null : id,
+          waitlist_id: waitlist ? id : null,
+          venue_slug: venueSlug,
+        },
+      }).catch((err) => {
+        console.warn('[notifications] email admin non inviata:', err);
+      });
     }
 
     // -------------------------------------------------------------------
