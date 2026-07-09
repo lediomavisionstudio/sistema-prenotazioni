@@ -91,7 +91,7 @@ async function loadDay() {
   const [{ data, error }, waitlist] = await Promise.all([
     supabase
       .from('reservations')
-      .select('id, reservation_date, shift_id, party_size, customer_first_name, customer_last_name, customer_phone, notes, status, source, table_id, created_at')
+      .select('id, reservation_date, shift_id, party_size, customer_first_name, customer_last_name, customer_phone, customer_email, notes, status, source, table_id, created_at')
       .eq('venue_id', state.venue.id)
       .eq('reservation_date', state.date)
       .order('created_at', { ascending: true }),
@@ -198,6 +198,7 @@ async function changeStatus(id, to) {
   const { error } = await supabase.from('reservations').update({ status: to }).eq('id', id);
   if (error) { console.error(error); toast('Impossibile aggiornare lo stato.', true); return; }
   toast('Stato aggiornato: ' + STATUS_LABEL[to]);
+  notifyCustomerStatusEmail(id, to);
 
   // Turno liberato: promuovi automaticamente il primo in lista d'attesa.
   if ((to === 'annullata' || to === 'no_show') && res) {
@@ -211,6 +212,21 @@ async function changeStatus(id, to) {
   }
 
   await loadDay(); // realtime aggiornerà anche gli altri dispositivi
+}
+
+function notifyCustomerStatusEmail(id, status) {
+  const template = status === 'confermata'
+    ? 'booking-confirmation'
+    : status === 'annullata'
+      ? 'booking-cancelled'
+      : null;
+  if (!template || !supabase.functions) return;
+  supabase.functions.invoke('send-customer-email', {
+    body: { reservation_id: id, template },
+  }).catch((err) => {
+    console.warn('[notifications] email cliente non inviata:', err);
+    toast('Stato aggiornato, ma email cliente non inviata.', true);
+  });
 }
 
 // ---------------------------------------------------------------------------

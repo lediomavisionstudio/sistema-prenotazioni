@@ -461,6 +461,11 @@
       border: 1px solid #f1cabf; border-radius: var(--radius-sm);
       padding: 11px 13px; font-size: 0.86rem;
     }
+    .form-lock {
+      pointer-events: none;
+      opacity: .58;
+      filter: grayscale(.12);
+    }
     [hidden] { display: none !important; }
 
     .btn {
@@ -474,6 +479,8 @@
     .btn--primary:not(:disabled) { animation: buttonReady 230ms ease both; }
     .btn--primary:disabled { background: #cbb9a6; cursor: not-allowed; }
     .btn--ghost { background: transparent; color: var(--tomato-dark); border: 1.5px solid var(--line); }
+    .btn--danger { background: var(--tomato); color: #fff; }
+    .btn--danger:hover:not(:disabled) { background: var(--tomato-dark); }
     .wizard-actions {
       display: grid;
       grid-template-columns: 1fr;
@@ -547,6 +554,59 @@
     .recap__k { color: var(--ink-soft); font-size: 0.9rem; }
     .recap__v { font-weight: 700; text-align: right; }
     .recap__v.cap { text-transform: capitalize; }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background: rgba(58,43,35,.32);
+      backdrop-filter: blur(10px);
+      animation: modalFade 220ms ease both;
+    }
+    .modal__card {
+      width: min(420px, 100%);
+      background: var(--surface);
+      border: 1px solid rgba(227,214,186,.95);
+      border-radius: 20px;
+      box-shadow: 0 24px 70px rgba(58,43,35,.24);
+      padding: 22px;
+      animation: modalIn 240ms ease both;
+    }
+    .modal__title {
+      font-family: var(--font-title);
+      font-size: 1.35rem;
+      line-height: 1.1;
+      margin: 0 0 10px;
+    }
+    .modal__text { margin: 0; color: var(--ink-soft); font-size: .94rem; }
+    .modal__actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .submit-loader {
+      display: inline-grid;
+      width: 18px;
+      height: 18px;
+      margin-right: 8px;
+      border: 2px solid rgba(255,255,255,.42);
+      border-top-color: #fff;
+      border-radius: 50%;
+      vertical-align: -3px;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes modalFade {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: translateY(10px) scale(.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
 
     .footer { text-align: center; color: var(--ink-soft); font-size: 0.72rem; padding: 14px 4px 4px; }
     .footer__links {
@@ -728,13 +788,28 @@
       <!-- Conferma -->
       <div class="confirm" id="stateConfirm" hidden>
         <div class="confirm__badge" id="confirmBadge" aria-hidden="true">✓</div>
-        <h2 class="confirm__title" id="confirmTitle">Richiesta inviata!</h2>
+        <h2 class="confirm__title" id="confirmTitle">Grazie per averci scelto!</h2>
         <p class="confirm__lead" id="confirmLead">
-          La tua prenotazione è <strong>in attesa di conferma</strong> del locale.
-          Ti contatteremo al numero indicato.
+          Abbiamo ricevuto correttamente la tua richiesta di prenotazione.<br><br>
+          La pizzeria la prenderà in carico il prima possibile.<br>
+          Riceverai una mail non appena la tua prenotazione verrà confermata oppure rifiutata.<br><br>
+          Ti ringraziamo per la fiducia e ti aspettiamo!
         </p>
         <div class="recap" id="confirmRecap"></div>
-        <button class="btn btn--ghost" type="button" id="newBtn">Fai un'altra prenotazione</button>
+        <button class="btn btn--ghost" type="button" id="newBtn">Torna alla Home</button>
+      </div>
+
+      <div class="modal" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle" hidden>
+        <div class="modal__card">
+          <h2 class="modal__title" id="confirmModalTitle">Conferma prenotazione</h2>
+          <p class="modal__text">
+            Sei sicuro di voler inoltrare la richiesta di prenotazione? La prenotazione sarà confermata solo dopo l'approvazione della pizzeria.
+          </p>
+          <div class="modal__actions">
+            <button class="btn btn--ghost" type="button" id="confirmCancel">Annulla</button>
+            <button class="btn btn--danger" type="button" id="confirmSend">Inoltra richiesta</button>
+          </div>
+        </div>
       </div>
 
     </main>
@@ -804,6 +879,9 @@
       dayShifts: [],              // turni della data scelta: [{shift_id, shift_name, start_time, end_time, available}]
       selShift: null,             // turno scelto
       progressStep: 'date',       // stato visuale del wizard
+      submitting: false,
+      completed: false,
+      requestId: null,
     };
 
     // -------------------------------------------------------------------
@@ -1073,6 +1151,47 @@
         event.preventDefault();
         goStep(1);
       }
+    }
+
+    function openConfirmModal() {
+      if (state.submitting || state.completed) return;
+      $('confirmModal').hidden = false;
+      $('confirmSend').focus({ preventScroll: true });
+    }
+
+    function closeConfirmModal() {
+      if (state.submitting) return;
+      $('confirmModal').hidden = true;
+      $('submitBtn').focus({ preventScroll: true });
+    }
+
+    function setSubmitting(isSubmitting) {
+      state.submitting = isSubmitting;
+      $('stateForm').classList.toggle('form-lock', isSubmitting);
+      document.querySelectorAll('#stateForm button, #stateForm input, #stateForm textarea, #stateForm select, #confirmCancel, #confirmSend')
+        .forEach((el) => el.disabled = isSubmitting || (el.id === 'submitBtn' && !validateDetails(false)));
+      $('confirmSend').innerHTML = isSubmitting ? '<span class="submit-loader" aria-hidden="true"></span>Invio...' : 'Inoltra richiesta';
+      $('formError').hidden = true;
+    }
+
+    async function withTimeout(promise, ms = 15000) {
+      let timer;
+      const timeout = new Promise((_, reject) => {
+        timer = window.setTimeout(() => reject(new Error('TIMEOUT_INVIO')), ms);
+      });
+      try {
+        return await Promise.race([promise, timeout]);
+      } finally {
+        window.clearTimeout(timer);
+      }
+    }
+
+    function markCompleted() {
+      state.completed = true;
+      try {
+        sessionStorage.setItem(`booking-completed:${venueSlug}`, '1');
+        history.replaceState({ bookingCompleted: true }, '', location.href);
+      } catch (_) {}
     }
 
     // -------------------------------------------------------------------
@@ -1390,6 +1509,20 @@
       const errBox = $('formError');
       errBox.hidden = true;
 
+      clearFieldErrors(form);
+      if (!validateDetails(true)) return showFormError('Controlla i campi evidenziati.');
+      if (state.coperti < MIN_PARTY) return showFormError('Il numero di persone deve essere almeno 1.');
+      if (!state.selDate || isoToDate(state.selDate) < todayLocal()) return showFormError('Scegli una data futura.');
+      if (!state.selShift) return showFormError('Scegli un orario.');
+
+      openConfirmModal();
+    }
+
+    async function submitReservation() {
+      if (state.submitting || state.completed) return;
+      const form = $('bookingForm');
+      const errBox = $('formError');
+      errBox.hidden = true;
       const firstName = form.firstName.value.trim();
       const lastName = form.lastName.value.trim();
       const email = form.email.value.trim();
@@ -1405,10 +1538,11 @@
 
       const waitlist = isWaitlist();
       const btn = $('submitBtn');
-      btn.disabled = true; btn.textContent = 'Invio…';
+      state.requestId = state.requestId || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
+      setSubmitting(true);
       try {
         const rpc = waitlist ? 'join_waitlist' : 'create_public_reservation';
-        const { data, error } = await supabase.rpc(rpc, {
+        const { data, error } = await withTimeout(supabase.rpc(rpc, {
           p_venue_slug: venueSlug,
           p_reservation_date: state.selDate,
           p_shift_id: state.selShift.shift_id,
@@ -1420,20 +1554,29 @@
           p_notes: notes || null,
           p_privacy_policy_accepted: true,
           p_marketing_consent: marketingConsent,
-        });
+          p_client_request_id: state.requestId,
+        }));
         if (error) throw error;
         const result = Array.isArray(data) ? data[0] : data;
         notifyAdminBooking(result, waitlist);
+        notifyCustomerEmail(result, waitlist, 'request_received');
+        markCompleted();
         showConfirm(result, waitlist);
       } catch (err) {
         console.error(err);
-        showFormError(mapError(err));
+        showFormError((err.message || '').includes('TIMEOUT_INVIO')
+          ? 'La richiesta sta impiegando troppo tempo. Controlla la connessione e riprova.'
+          : mapError(err));
         // Disponibilità cambiata sotto i piedi: ricarica per riflettere lo stato reale.
         if ((err.message || '').includes('NESSUNA_DISPONIBILITA')) {
           try { await loadDayAvailability(); renderTimes(); } catch (_) {}
         }
       } finally {
-        btn.disabled = false; updateSubmit();
+        if (!state.completed) {
+          setSubmitting(false);
+          closeConfirmModal();
+          updateSubmit();
+        }
       }
     }
 
@@ -1466,10 +1609,22 @@
       });
     }
 
+    function notifyCustomerEmail(result, waitlist = false, template = 'request_received') {
+      const id = result && (result.reservation_id || result.waitlist_id);
+      if (!id || waitlist || !supabase.functions) return;
+      supabase.functions.invoke('send-customer-email', {
+        body: { reservation_id: id, template },
+      }).catch((err) => {
+        console.warn('[notifications] email cliente non inviata:', err);
+      });
+    }
+
     // -------------------------------------------------------------------
     // Conferma
     // -------------------------------------------------------------------
     function showConfirm(res, waitlist = false) {
+      $('confirmModal').hidden = true;
+      $('stateForm').classList.add('form-lock');
       const d = isoToDate(state.selDate);
       const rows = [
         ['Locale', state.venue.name],
@@ -1487,10 +1642,12 @@
         if (res && res.queue_position != null) rows.push(['Posizione in coda', '#' + res.queue_position]);
       } else {
         $('confirmBadge').textContent = '✓';
-        $('confirmTitle').textContent = 'Richiesta inviata!';
+        $('confirmTitle').textContent = 'Grazie per averci scelto!';
         $('confirmLead').innerHTML =
-          'La tua prenotazione è <strong>in attesa di conferma</strong> del locale. ' +
-          'Ti contatteremo al numero indicato.';
+          'Abbiamo ricevuto correttamente la tua richiesta di prenotazione.<br><br>' +
+          'La pizzeria la prenderà in carico il prima possibile.<br>' +
+          'Riceverai una mail non appena la tua prenotazione verrà confermata oppure rifiutata.<br><br>' +
+          'Ti ringraziamo per la fiducia e ti aspettiamo!';
         if (res && res.table_code) rows.push(['Tavolo', res.table_code]);
       }
 
@@ -1502,8 +1659,13 @@
     }
 
     function reset() {
+      if (state.completed) {
+        location.href = withLocale('index.html');
+        return;
+      }
       state.selShift = null;
       state.progressStep = 'date';
+      state.requestId = null;
       $('bookingForm').reset();
       $('formError').hidden = true;
       clearFieldErrors($('bookingForm'));
@@ -1537,6 +1699,14 @@
     $('privacyConsent').addEventListener('change', () => { validatePrivacy(true); updateSubmit(); });
     $('bookingForm').addEventListener('input', updateWizardButtons);
     document.addEventListener('keydown', handleWizardEnter);
+    $('confirmCancel').addEventListener('click', closeConfirmModal);
+    $('confirmSend').addEventListener('click', submitReservation);
+    $('confirmModal').addEventListener('click', (event) => {
+      if (event.target === $('confirmModal')) closeConfirmModal();
+    });
+    window.addEventListener('popstate', () => {
+      if (state.completed) showState('Confirm');
+    });
     for (const step of progressSteps) {
       $(step.el).addEventListener('click', () => goToProgressStep(step.key));
     }

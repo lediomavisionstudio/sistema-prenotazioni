@@ -66,7 +66,7 @@ async function load() {
   const today = todayISO();
   const { data, error } = await supabase
     .from('reservations')
-    .select('id, reservation_date, shift_id, party_size, customer_first_name, customer_last_name, customer_phone, notes, status, source, table_id, created_at')
+    .select('id, reservation_date, shift_id, party_size, customer_first_name, customer_last_name, customer_phone, customer_email, notes, status, source, table_id, created_at')
     .eq('venue_id', state.venue.id)
     .gte('reservation_date', today)
     .order('reservation_date', { ascending: true });
@@ -134,7 +134,23 @@ async function changeStatus(id, to) {
   const { error } = await supabase.from('reservations').update({ status: to }).eq('id', id);
   if (error) { console.error(error); toast('Impossibile aggiornare lo stato.', true); return; }
   toast('Stato aggiornato: ' + STATUS_LABEL[to]);
+  notifyCustomerStatusEmail(id, to);
   await load();
+}
+
+function notifyCustomerStatusEmail(id, status) {
+  const template = status === 'confermata'
+    ? 'booking-confirmation'
+    : status === 'annullata'
+      ? 'booking-cancelled'
+      : null;
+  if (!template || !supabase.functions) return;
+  supabase.functions.invoke('send-customer-email', {
+    body: { reservation_id: id, template },
+  }).catch((err) => {
+    console.warn('[notifications] email cliente non inviata:', err);
+    toast('Stato aggiornato, ma email cliente non inviata.', true);
+  });
 }
 
 function wireFilters() {

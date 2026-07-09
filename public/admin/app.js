@@ -64,7 +64,7 @@ export function formatLong(iso) { return dfLong.format(isoToDate(iso)); }
 export const hhmm = (t) => (t || '').slice(0, 5);
 
 export const STATUS_LABEL = {
-  in_attesa: 'In attesa',
+  in_attesa: 'In attesa di conferma',
   confermata: 'Confermata',
   arrivato: 'Arrivato',
   no_show: 'No-show',

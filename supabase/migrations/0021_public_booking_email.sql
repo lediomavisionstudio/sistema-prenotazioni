@@ -6,8 +6,24 @@
 alter table waitlist
   add column if not exists customer_email text;
 
+alter table reservations
+  add column if not exists client_request_id text;
+
+alter table waitlist
+  add column if not exists client_request_id text;
+
+create unique index if not exists reservations_client_request_id_idx
+  on reservations (client_request_id)
+  where client_request_id is not null;
+
+create unique index if not exists waitlist_client_request_id_idx
+  on waitlist (client_request_id)
+  where client_request_id is not null;
+
 drop function if exists create_public_reservation(text, date, uuid, int, text, text, text, text, boolean, boolean);
 drop function if exists join_waitlist(text, date, uuid, int, text, text, text, text, boolean, boolean);
+drop function if exists create_public_reservation(text, date, uuid, int, text, text, text, text, boolean, boolean, text);
+drop function if exists join_waitlist(text, date, uuid, int, text, text, text, text, boolean, boolean, text);
 drop function if exists create_public_reservation(text, date, uuid, int, text, text, text, text);
 drop function if exists join_waitlist(text, date, uuid, int, text, text, text, text);
 
@@ -22,7 +38,8 @@ create or replace function create_public_reservation(
   p_notes                    text default null,
   p_privacy_policy_accepted  boolean default false,
   p_marketing_consent        boolean default false,
-  p_customer_email           text default null
+  p_customer_email           text default null,
+  p_client_request_id        text default null
 ) returns table (
   reservation_id    uuid,
   status            reservation_status,
@@ -41,6 +58,22 @@ declare
   v_table   uuid;
   v_res     reservations%rowtype;
 begin
+  if p_client_request_id is not null then
+    select * into v_res from reservations r where r.client_request_id = p_client_request_id limit 1;
+    if found then
+      select * into v_shift from service_shifts s where s.id = v_res.shift_id limit 1;
+      return query
+      select
+        v_res.id,
+        v_res.status,
+        v_res.reservation_date,
+        v_shift.name,
+        v_res.party_size,
+        (select t.code from restaurant_tables t where t.id = v_res.table_id);
+      return;
+    end if;
+  end if;
+
   select * into v_venue from venues v where v.slug = p_venue_slug and v.active limit 1;
   if not found then
     raise exception 'LOCALE_NON_TROVATO' using errcode = 'P0001';
@@ -100,11 +133,11 @@ begin
   insert into reservations (
     venue_id, reservation_date, shift_id, party_size,
     customer_first_name, customer_last_name, customer_phone, customer_email, notes,
-    status, source, table_id, privacy_policy_accepted_at, marketing_consent_at
+    status, source, table_id, client_request_id, privacy_policy_accepted_at, marketing_consent_at
   ) values (
     v_venue.id, p_reservation_date, p_shift_id, p_party_size,
     trim(p_first_name), trim(p_last_name), trim(p_phone), lower(trim(p_customer_email)), nullif(trim(p_notes), ''),
-    'in_attesa', 'widget', v_table, now(),
+    'in_attesa', 'widget', v_table, nullif(trim(p_client_request_id), ''), now(),
     case when coalesce(p_marketing_consent, false) then now() else null end
   )
   returning * into v_res;
@@ -120,7 +153,7 @@ begin
 end;
 $$;
 
-grant execute on function create_public_reservation(text, date, uuid, int, text, text, text, text, boolean, boolean, text) to anon, authenticated;
+grant execute on function create_public_reservation(text, date, uuid, int, text, text, text, text, boolean, boolean, text, text) to anon, authenticated;
 
 create or replace function join_waitlist(
   p_venue_slug               text,
@@ -133,7 +166,8 @@ create or replace function join_waitlist(
   p_notes                    text default null,
   p_privacy_policy_accepted  boolean default false,
   p_marketing_consent        boolean default false,
-  p_customer_email           text default null
+  p_customer_email           text default null,
+  p_client_request_id        text default null
 ) returns table (
   waitlist_id      uuid,
   reservation_date date,
@@ -150,6 +184,29 @@ declare
   v_shift service_shifts%rowtype;
   v_wl    waitlist%rowtype;
 begin
+  if p_client_request_id is not null then
+    select * into v_wl from waitlist w where w.client_request_id = p_client_request_id limit 1;
+    if found then
+      select * into v_shift from service_shifts s where s.id = v_wl.shift_id limit 1;
+      return query
+      select
+        v_wl.id,
+        v_wl.reservation_date,
+        v_shift.name,
+        v_wl.party_size,
+        (
+          select count(*)::int
+          from waitlist w
+          where w.venue_id = v_wl.venue_id
+            and w.reservation_date = v_wl.reservation_date
+            and w.shift_id = v_wl.shift_id
+            and w.status = 'in_coda'
+            and w.created_at <= v_wl.created_at
+        );
+      return;
+    end if;
+  end if;
+
   select * into v_venue from venues v where v.slug = p_venue_slug and v.active limit 1;
   if not found then
     raise exception 'LOCALE_NON_TROVATO' using errcode = 'P0001';
@@ -203,11 +260,11 @@ begin
 
   insert into waitlist (
     venue_id, reservation_date, shift_id, party_size,
-    customer_first_name, customer_last_name, customer_phone, customer_email, notes, status,
+    customer_first_name, customer_last_name, customer_phone, customer_email, notes, status, client_request_id,
     privacy_policy_accepted_at, marketing_consent_at
   ) values (
     v_venue.id, p_reservation_date, p_shift_id, p_party_size,
-    trim(p_first_name), trim(p_last_name), trim(p_phone), lower(trim(p_customer_email)), nullif(trim(p_notes), ''), 'in_coda',
+    trim(p_first_name), trim(p_last_name), trim(p_phone), lower(trim(p_customer_email)), nullif(trim(p_notes), ''), 'in_coda', nullif(trim(p_client_request_id), ''),
     now(), case when coalesce(p_marketing_consent, false) then now() else null end
   )
   returning * into v_wl;
@@ -230,7 +287,7 @@ begin
 end;
 $$;
 
-grant execute on function join_waitlist(text, date, uuid, int, text, text, text, text, boolean, boolean, text) to anon, authenticated;
+grant execute on function join_waitlist(text, date, uuid, int, text, text, text, text, boolean, boolean, text, text) to anon, authenticated;
 
 create or replace function _promote_waitlist_entry(p_waitlist_id uuid)
 returns table (
