@@ -118,6 +118,7 @@
     .body { padding: 20px 18px 8px; }
 
     section.block { margin-bottom: 24px; }
+    section.block { scroll-margin-top: 18px; }
 
     .block__label {
       font-family: var(--font-title);
@@ -129,6 +130,115 @@
       gap: 8px;
     }
     .block__label small { font-family: var(--font-body); font-weight: 400; color: var(--ink-soft); font-size: 0.8rem; }
+
+    /* Progress navigation ------------------------------------------------ */
+    .progress-nav {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      width: calc(100% + 20px);
+      min-height: 54px;
+      margin: 0 -10px 22px;
+      padding: 3px;
+      border: 1px solid rgba(227, 214, 186, 0.95);
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(255,253,246,0.96), rgba(247,239,219,0.84));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), 0 8px 22px rgba(58, 43, 35, 0.07);
+      overflow: hidden;
+    }
+    .progress-nav__item {
+      position: relative;
+      min-width: 0;
+      min-height: 48px;
+      border: 1px solid transparent;
+      border-radius: 13px;
+      background: transparent;
+      color: var(--ink-soft);
+      font: inherit;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: not-allowed;
+      opacity: .62;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 0 6px;
+      transition: background 230ms ease, color 230ms ease, box-shadow 230ms ease, opacity 230ms ease, transform 230ms ease, border-color 230ms ease;
+    }
+    .progress-nav__item + .progress-nav__item::before {
+      content: "";
+      position: absolute;
+      left: -4px;
+      top: 10px;
+      bottom: 10px;
+      width: 1px;
+      background: linear-gradient(180deg, transparent, rgba(122,106,93,.28), transparent);
+      transition: opacity 230ms ease;
+    }
+    .progress-nav__icon {
+      width: 22px;
+      height: 22px;
+      flex: none;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      color: inherit;
+      font-size: 0.92rem;
+      line-height: 1;
+      transition: background 230ms ease, color 230ms ease, transform 230ms ease;
+    }
+    .progress-nav__label {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .progress-nav__item.is-active {
+      background: linear-gradient(180deg, var(--tomato), var(--tomato-dark));
+      border-color: rgba(255,255,255,.28);
+      color: #fff;
+      opacity: 1;
+      cursor: default;
+      box-shadow: 0 9px 20px rgba(200, 64, 42, 0.27);
+      transform: translateY(-1px);
+    }
+    .progress-nav__item.is-active .progress-nav__icon {
+      background: rgba(255,255,255,.16);
+      color: #fff;
+    }
+    .progress-nav__item.is-complete {
+      background: rgba(255,253,246,.82);
+      border-color: rgba(227, 214, 186, 0.95);
+      color: var(--tomato-dark);
+      opacity: 1;
+      cursor: pointer;
+    }
+    .progress-nav__item.is-complete:hover {
+      background: var(--tomato-soft);
+      border-color: rgba(200,64,42,.32);
+      transform: translateY(-1px);
+    }
+    .progress-nav__item.is-complete .progress-nav__icon {
+      background: var(--tomato-soft);
+      color: var(--tomato-dark);
+      font-weight: 800;
+    }
+    .progress-nav__item.is-future {
+      background: rgba(236, 228, 211, .34);
+    }
+    .progress-nav__item.is-active::before,
+    .progress-nav__item.is-active + .progress-nav__item::before {
+      opacity: 0;
+    }
+    .progress-nav__item:focus-visible {
+      outline: 3px solid var(--tomato-soft);
+      outline-offset: -2px;
+    }
+    @media (max-width: 380px) {
+      .progress-nav { min-height: 50px; border-radius: 14px; }
+      .progress-nav__item { min-height: 44px; gap: 4px; font-size: 0.7rem; padding: 0 4px; }
+      .progress-nav__icon { width: 19px; height: 19px; font-size: 0.78rem; }
+    }
 
     /* Stepper coperti ----------------------------------------------------- */
     .stepper {
@@ -345,20 +455,26 @@
 
       <!-- Widget -->
       <div class="body" id="stateForm" hidden>
+        <nav class="progress-nav" aria-label="Avanzamento prenotazione">
+          <button class="progress-nav__item" type="button" data-step="date" id="progressDate">
+            <span class="progress-nav__icon" aria-hidden="true">🗓</span>
+            <span class="progress-nav__label">Data</span>
+          </button>
+          <button class="progress-nav__item" type="button" data-step="people" id="progressPeople">
+            <span class="progress-nav__icon" aria-hidden="true">👥</span>
+            <span class="progress-nav__label">Persone</span>
+          </button>
+          <button class="progress-nav__item" type="button" data-step="time" id="progressTime">
+            <span class="progress-nav__icon" aria-hidden="true">🕒</span>
+            <span class="progress-nav__label">Orario</span>
+          </button>
+          <button class="progress-nav__item" type="button" data-step="details" id="progressDetails">
+            <span class="progress-nav__icon" aria-hidden="true">✍</span>
+            <span class="progress-nav__label">Dati</span>
+          </button>
+        </nav>
 
-        <section class="block">
-          <h2 class="block__label">Coperti <small>quante persone</small></h2>
-          <div class="stepper">
-            <button class="stepper__btn" type="button" id="coMinus" aria-label="Diminuisci coperti">−</button>
-            <div class="stepper__value">
-              <div class="stepper__num" id="coValue" aria-live="polite">2</div>
-              <span class="stepper__unit" id="coUnit">persone</span>
-            </div>
-            <button class="stepper__btn" type="button" id="coPlus" aria-label="Aumenta coperti">+</button>
-          </div>
-        </section>
-
-        <section class="block">
+        <section class="block" id="dateStep">
           <h2 class="block__label">Data <small>scegli il giorno</small></h2>
           <div class="cal" id="calendar">
             <div class="cal__head">
@@ -374,13 +490,25 @@
           <p class="empty-hint" id="dateEmpty" hidden>Nessuna data disponibile al momento.</p>
         </section>
 
-        <section class="block">
+        <section class="block" id="peopleStep">
+          <h2 class="block__label">Coperti <small>quante persone</small></h2>
+          <div class="stepper">
+            <button class="stepper__btn" type="button" id="coMinus" aria-label="Diminuisci coperti">−</button>
+            <div class="stepper__value">
+              <div class="stepper__num" id="coValue" aria-live="polite">2</div>
+              <span class="stepper__unit" id="coUnit">persone</span>
+            </div>
+            <button class="stepper__btn" type="button" id="coPlus" aria-label="Aumenta coperti">+</button>
+          </div>
+        </section>
+
+        <section class="block" id="timeStep">
           <h2 class="block__label">Orario</h2>
           <div class="times" id="timeRow" role="group" aria-label="Scegli l'orario"></div>
           <p class="empty-hint" id="timeEmpty" hidden>Seleziona prima una data.</p>
         </section>
 
-        <section class="block">
+        <section class="block" id="detailsStep">
           <h2 class="block__label">I tuoi dati</h2>
           <form class="form" id="bookingForm" novalidate>
             <div class="grid-2">
@@ -533,6 +661,66 @@
       return 'Si è verificato un errore. Riprova tra poco.';
     }
 
+    const progressSteps = [
+      { key: 'date', el: 'progressDate', target: 'dateStep', icon: '🗓' },
+      { key: 'people', el: 'progressPeople', target: 'peopleStep', icon: '👥' },
+      { key: 'time', el: 'progressTime', target: 'timeStep', icon: '🕒' },
+      { key: 'details', el: 'progressDetails', target: 'detailsStep', icon: '✍' },
+    ];
+
+    function completedSteps() {
+      return {
+        date: !!state.selDate,
+        people: state.coperti >= MIN_PARTY,
+        time: !!state.selShift,
+        details: hasCustomerDetails(),
+      };
+    }
+
+    function hasCustomerDetails() {
+      const form = $('bookingForm');
+      if (!form) return false;
+      return !!(
+        form.firstName.value.trim() &&
+        form.lastName.value.trim() &&
+        form.phone.value.trim() &&
+        form.privacyConsent.checked
+      );
+    }
+
+    function activeStepKey(done = completedSteps()) {
+      if (!done.date) return 'date';
+      if (!done.people) return 'people';
+      if (!done.time) return 'time';
+      return 'details';
+    }
+
+    function updateProgressNav() {
+      const done = completedSteps();
+      const active = activeStepKey(done);
+      for (const step of progressSteps) {
+        const btn = $(step.el);
+        if (!btn) continue;
+        const icon = btn.querySelector('.progress-nav__icon');
+        const isComplete = done[step.key] && step.key !== active;
+        const isActive = step.key === active;
+        btn.classList.toggle('is-complete', isComplete);
+        btn.classList.toggle('is-active', isActive);
+        btn.classList.toggle('is-future', !isComplete && !isActive);
+        btn.disabled = !isComplete;
+        btn.setAttribute('aria-current', isActive ? 'step' : 'false');
+        if (icon) icon.textContent = isComplete ? '✓' : step.icon;
+      }
+    }
+
+    function goToProgressStep(key) {
+      const done = completedSteps();
+      if (!done[key] || key === activeStepKey(done)) return;
+      const step = progressSteps.find((item) => item.key === key);
+      if (!step) return;
+      $(step.target).scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }
+
     // -------------------------------------------------------------------
     // Branding per locale: applica colore accento e logo presi dai dati
     // (venues.brand_primary / brand_primary_dark / logo_url). Se i campi sono
@@ -646,6 +834,7 @@
         if (state.selDate) { try { await loadDayAvailability(); } catch (_) {} }
         renderTimes();
         updateSubmit();
+        updateProgressNav();
       } catch (err) {
         console.error(err);
         fatal('Impossibile contattare il servizio prenotazioni. Riprova più tardi.');
@@ -710,6 +899,7 @@
         await loadDayAvailability();
         renderTimes();
         updateSubmit();
+        updateProgressNav();
       } catch (err) { console.error(err); fatal(mapError(err)); }
     }
 
@@ -771,6 +961,7 @@
       } catch (err) { console.error(err); fatal(mapError(err)); return; }
       renderTimes();
       updateSubmit();
+      updateProgressNav();
     }
 
     function shiftMonth(delta) {
@@ -813,6 +1004,7 @@
           state.selShift = s;
           renderTimes();
           updateSubmit();
+          updateProgressNav();
         });
         row.appendChild(btn);
       }
@@ -828,6 +1020,7 @@
       const btn = $('submitBtn');
       btn.disabled = !(state.selDate && state.selShift && $('privacyConsent').checked);
       btn.textContent = isWaitlist() ? 'Mettiti in lista d\'attesa' : 'Prenota';
+      updateProgressNav();
     }
 
     async function onSubmit(e) {
@@ -953,6 +1146,7 @@
       $('formError').hidden = true;
       clearFieldErrors($('bookingForm'));
       showState('Form');
+      updateProgressNav();
       renderCalendar();
       loadDayAvailability().then(() => { renderTimes(); updateSubmit(); }).catch((e) => fatal(mapError(e)));
     }
@@ -967,6 +1161,10 @@
     $('calNext').addEventListener('click', () => shiftMonth(+1));
     $('bookingForm').addEventListener('submit', onSubmit);
     $('privacyConsent').addEventListener('change', updateSubmit);
+    $('bookingForm').addEventListener('input', updateProgressNav);
+    for (const step of progressSteps) {
+      $(step.el).addEventListener('click', () => goToProgressStep(step.key));
+    }
     $('newBtn').addEventListener('click', reset);
 
     init();
