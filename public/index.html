@@ -554,6 +554,44 @@
     .recap__k { color: var(--ink-soft); font-size: 0.9rem; }
     .recap__v { font-weight: 700; text-align: right; }
     .recap__v.cap { text-transform: capitalize; }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      min-height: 30px;
+      padding: 6px 11px;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 800;
+      line-height: 1;
+      white-space: nowrap;
+      box-shadow: 0 8px 18px rgba(58, 43, 35, .07);
+    }
+    .status-badge__icon {
+      display: inline-grid;
+      place-items: center;
+      width: 16px;
+      height: 16px;
+      font-size: 0.86rem;
+      line-height: 1;
+    }
+    .status-badge--pending {
+      color: #94530d;
+      background: #fff1d7;
+      border-color: #f5c983;
+    }
+    .status-badge--confirmed {
+      color: #226747;
+      background: #ddf7e9;
+      border-color: #aee7c7;
+    }
+    .status-badge--rejected {
+      color: #982f25;
+      background: #fde4df;
+      border-color: #f2b5ad;
+    }
 
     .modal {
       position: fixed;
@@ -899,11 +937,37 @@
     const todayLocal = () => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate(), 12); };
     const hhmm = (t) => (t || '').slice(0, 5);
     const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[char]));
     const withLocale = (path) => {
       if (!venueSlug) return path;
       const sep = path.includes('?') ? '&' : '?';
       return `${path}${sep}locale=${encodeURIComponent(venueSlug)}`;
     };
+
+    const reservationStatusUi = {
+      in_attesa: { label: 'In attesa', icon: 'clock', className: 'pending' },
+      confermata: { label: 'Confermata', icon: 'check', className: 'confirmed' },
+      annullata: { label: 'Rifiutata', icon: 'x', className: 'rejected' },
+    };
+
+    function statusMeta(status) {
+      const key = String(status || '').toLowerCase();
+      return reservationStatusUi[key] || { label: status || 'Stato non disponibile', icon: 'clock', className: 'pending' };
+    }
+
+    function statusBadgeHtml(status) {
+      const meta = statusMeta(status);
+      const icon = meta.icon === 'check' ? '✓' : meta.icon === 'x' ? '×' : '◷';
+      return `<span class="status-badge status-badge--${meta.className}">` +
+        `<span class="status-badge__icon" aria-hidden="true">${icon}</span>` +
+        `<span>${escapeHtml(meta.label)}</span></span>`;
+    }
 
     function showState(which) {
       ['Loading','Fatal','Form','Confirm'].forEach((s) =>
@@ -1194,6 +1258,61 @@
       } catch (_) {}
     }
 
+    function summaryStorageKey() {
+      return `booking-summary:${venueSlug}`;
+    }
+
+    function saveBookingSummary(summary) {
+      try {
+        sessionStorage.setItem(summaryStorageKey(), JSON.stringify(summary));
+      } catch (_) {}
+    }
+
+    function readBookingSummary() {
+      try {
+        const raw = sessionStorage.getItem(summaryStorageKey());
+        return raw ? JSON.parse(raw) : null;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function clearCompletedBooking() {
+      try {
+        sessionStorage.removeItem(`booking-completed:${venueSlug}`);
+        sessionStorage.removeItem(summaryStorageKey());
+      } catch (_) {}
+    }
+
+    async function fetchReservationStatus(reservationId) {
+      if (!reservationId) return null;
+      const { data, error } = await supabase.rpc('get_public_reservation_status', {
+        p_reservation_id: reservationId,
+      });
+      if (error) {
+        console.warn('[booking] stato prenotazione non aggiornato:', error);
+        return null;
+      }
+      return typeof data === 'string' ? data : (data && data.status) || null;
+    }
+
+    async function restoreCompletedSummary() {
+      const summary = readBookingSummary();
+      if (!summary) return false;
+      state.completed = true;
+      $('stateForm').classList.add('form-lock');
+      if (summary.reservationId) {
+        const status = await fetchReservationStatus(summary.reservationId);
+        if (status) {
+          summary.status = status;
+          saveBookingSummary(summary);
+        }
+      }
+      renderConfirmSummary(summary);
+      showState('Confirm');
+      return true;
+    }
+
     // -------------------------------------------------------------------
     // Branding per locale: applica colore accento e logo presi dai dati
     // (venues.brand_primary / brand_primary_dark / logo_url). Se i campi sono
@@ -1309,6 +1428,8 @@
         state.calMonth = t.getMonth();
         state.selDate = firstSelectable();
         state.progressStep = 'date';
+
+        if (await restoreCompletedSummary()) return;
 
         renderCalendar();
         showState('Form');
@@ -1673,24 +1794,21 @@
     // -------------------------------------------------------------------
     // Conferma
     // -------------------------------------------------------------------
-    function showConfirm(res, waitlist = false) {
-      $('confirmModal').hidden = true;
-      $('stateForm').classList.add('form-lock');
-      const d = isoToDate(state.selDate);
+    function renderConfirmSummary(summary) {
       const rows = [
-        ['Locale', state.venue.name],
-        ['Data', cap(dfFull.format(d)), true],
-        ['Orario', `${state.selShift.shift_name} · ${hhmm(state.selShift.start_time)}–${hhmm(state.selShift.end_time)}`],
-        ['Coperti', String(state.coperti)],
+        ['Locale', summary.venueName],
+        ['Data', summary.dateText, true],
+        ['Orario', summary.shiftText],
+        ['Coperti', String(summary.partySize)],
       ];
 
-      if (waitlist) {
+      if (summary.waitlist) {
         $('confirmBadge').textContent = '⏳';
         $('confirmTitle').textContent = 'Sei in lista d\'attesa';
         $('confirmLead').innerHTML =
           'Il turno è al completo: ti abbiamo messo in <strong>lista d\'attesa</strong>. ' +
           'Se si libera un tavolo ti contatteremo al numero indicato.';
-        if (res && res.queue_position != null) rows.push(['Posizione in coda', '#' + res.queue_position]);
+        if (summary.queuePosition != null) rows.push(['Posizione in coda', '#' + summary.queuePosition]);
       } else {
         $('confirmBadge').textContent = '✓';
         $('confirmTitle').textContent = 'Grazie per averci scelto!';
@@ -1699,18 +1817,37 @@
           'La pizzeria la prenderà in carico il prima possibile.<br>' +
           'Riceverai una mail non appena la tua prenotazione verrà confermata oppure rifiutata.<br><br>' +
           'Ti ringraziamo per la fiducia e ti aspettiamo!';
-        if (res && res.table_code) rows.push(['Tavolo', res.table_code]);
+        rows.push(['Stato', statusBadgeHtml(summary.status), false, true]);
       }
 
-      $('confirmRecap').innerHTML = rows.map(([k, v, isCap]) =>
-        `<div class="recap__row"><span class="recap__k">${k}</span>` +
-        `<span class="recap__v${isCap ? ' cap' : ''}">${v}</span></div>`).join('');
+      $('confirmRecap').innerHTML = rows.map(([k, v, isCap, isHtml]) =>
+        `<div class="recap__row"><span class="recap__k">${escapeHtml(k)}</span>` +
+        `<span class="recap__v${isCap ? ' cap' : ''}">${isHtml ? v : escapeHtml(v)}</span></div>`).join('');
+    }
 
+    function showConfirm(res, waitlist = false) {
+      $('confirmModal').hidden = true;
+      $('stateForm').classList.add('form-lock');
+      const d = isoToDate(state.selDate);
+      const summary = {
+        reservationId: res && res.reservation_id,
+        waitlistId: res && res.waitlist_id,
+        waitlist,
+        venueName: state.venue.name,
+        dateText: cap(dfFull.format(d)),
+        shiftText: `${state.selShift.shift_name} · ${hhmm(state.selShift.start_time)}–${hhmm(state.selShift.end_time)}`,
+        partySize: state.coperti,
+        status: res && res.status,
+        queuePosition: res && res.queue_position,
+      };
+      saveBookingSummary(summary);
+      renderConfirmSummary(summary);
       showState('Confirm');
     }
 
     function reset() {
       if (state.completed) {
+        clearCompletedBooking();
         location.href = withLocale('index.html');
         return;
       }
