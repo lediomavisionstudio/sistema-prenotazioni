@@ -1255,7 +1255,9 @@
       try {
         sessionStorage.setItem(`booking-completed:${venueSlug}`, '1');
         history.replaceState({ bookingCompleted: true }, '', location.href);
-      } catch (_) {}
+      } catch (err) {
+        console.error('[booking] impossibile salvare stato completato:', err);
+      }
     }
 
     function summaryStorageKey() {
@@ -1265,14 +1267,17 @@
     function saveBookingSummary(summary) {
       try {
         sessionStorage.setItem(summaryStorageKey(), JSON.stringify(summary));
-      } catch (_) {}
+      } catch (err) {
+        console.error('[booking] impossibile salvare riepilogo prenotazione:', err);
+      }
     }
 
     function readBookingSummary() {
       try {
         const raw = sessionStorage.getItem(summaryStorageKey());
         return raw ? JSON.parse(raw) : null;
-      } catch (_) {
+      } catch (err) {
+        console.error('[booking] riepilogo prenotazione non leggibile:', err);
         return null;
       }
     }
@@ -1281,7 +1286,9 @@
       try {
         sessionStorage.removeItem(`booking-completed:${venueSlug}`);
         sessionStorage.removeItem(summaryStorageKey());
-      } catch (_) {}
+      } catch (err) {
+        console.error('[booking] impossibile pulire stato prenotazione completata:', err);
+      }
     }
 
     async function fetchReservationStatus(reservationId) {
@@ -1433,7 +1440,13 @@
 
         renderCalendar();
         showState('Form');
-        if (state.selDate) { try { await loadDayAvailability(); } catch (_) {} }
+        if (state.selDate) {
+          try {
+            await loadDayAvailability();
+          } catch (err) {
+            console.error('[booking] disponibilità iniziale non caricata:', err);
+          }
+        }
         renderTimes();
         updateSubmit();
         updateProgressNav();
@@ -1674,7 +1687,7 @@
         if (error) throw error;
         const result = Array.isArray(data) ? data[0] : data;
         const notificationResults = await Promise.allSettled([
-          notifyAdminBooking(result, waitlist),
+          notifyAdminBooking(result, waitlist, { email }),
           notifyCustomerEmail(result, waitlist, 'request_received', {
             email,
             firstName,
@@ -1694,7 +1707,12 @@
           : mapError(err));
         // Disponibilità cambiata sotto i piedi: ricarica per riflettere lo stato reale.
         if ((err.message || '').includes('NESSUNA_DISPONIBILITA')) {
-          try { await loadDayAvailability(); renderTimes(); } catch (_) {}
+          try {
+            await loadDayAvailability();
+            renderTimes();
+          } catch (reloadErr) {
+            console.error('[booking] ricarica disponibilità dopo errore non riuscita:', reloadErr);
+          }
         }
       } finally {
         if (!state.completed) {
@@ -1762,7 +1780,7 @@
       box.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
 
-    async function notifyAdminBooking(result, waitlist = false) {
+    async function notifyAdminBooking(result, waitlist = false, fallback = {}) {
       const id = result && (result.reservation_id || result.waitlist_id);
       if (!id || !supabase.functions) {
         console.error('[notifications] send-admin-booking-email non invocata: id o functions mancanti', { id, hasFunctions: !!supabase.functions });
@@ -1772,6 +1790,7 @@
         reservation_id: waitlist ? null : id,
         waitlist_id: waitlist ? id : null,
         venue_slug: venueSlug,
+        fallback_customer_email: fallback.email || null,
       };
       console.info('[notifications] invoco send-admin-booking-email', payload);
       try {

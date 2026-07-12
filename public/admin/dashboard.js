@@ -232,6 +232,15 @@ async function notifyCustomerStatusEmail(reservation, status) {
     const payload = {
       reservation_id: reservation.id,
       status: emailStatus,
+      customer_email: reservation.customer_email || null,
+      customer_first_name: reservation.customer_first_name || null,
+      customer_last_name: reservation.customer_last_name || null,
+      reservation_status: emailStatus,
+      venue_name: state.venue?.name || null,
+      reservation_date: reservation.reservation_date,
+      reservation_time: reservation.shift_id ? (state.shifts.find((s) => s.id === reservation.shift_id)?.start_time || null) : null,
+      party_size: reservation.party_size,
+      table_code: reservation.table_id ? (state.tablesById.get(reservation.table_id)?.code || null) : null,
       fallback_email: reservation.customer_email || null,
       fallback_customer_name: `${reservation.customer_first_name || ''} ${reservation.customer_last_name || ''}`.trim(),
       fallback_notes: reservation.notes || null,
@@ -371,7 +380,9 @@ async function refreshManualTableSelect() {
       p_venue_id: state.venue.id, p_date: state.date, p_shift_id: shiftId, p_party_size: party,
     });
     suggestedId = data || null;
-  } catch (_) {}
+  } catch (err) {
+    console.error('[dashboard] suggerimento tavolo non disponibile:', err);
+  }
 
   const opts = ['<option value="">— nessun tavolo —</option>'];
   for (const t of state.tables) {

@@ -70,7 +70,11 @@
   }
 
   function dismiss() {
-    try { localStorage.setItem(DISMISS_KEY, '1'); } catch (e) {}
+    try {
+      localStorage.setItem(DISMISS_KEY, '1');
+    } catch (e) {
+      console.error('[pwa] impossibile salvare preferenza installazione:', e);
+    }
     removeBanner();
   }
 

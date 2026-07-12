@@ -41,6 +41,15 @@ Deno.serve(async (req) => {
       reservation_id?: string;
       template?: TemplateKind;
       status?: CustomerEmailStatus;
+      customer_email?: string | null;
+      customer_first_name?: string | null;
+      customer_last_name?: string | null;
+      reservation_status?: string | null;
+      venue_name?: string | null;
+      reservation_date?: string | null;
+      reservation_time?: string | null;
+      party_size?: number | null;
+      table_code?: string | null;
       fallback_email?: string | null;
       fallback_customer_name?: string | null;
       fallback_notes?: string | null;
@@ -55,6 +64,15 @@ Deno.serve(async (req) => {
       status: body.status || null,
       template: body.template || null,
       resolved_template: kind,
+      customer_email: body.customer_email || null,
+      customer_first_name: body.customer_first_name || null,
+      customer_last_name: body.customer_last_name || null,
+      reservation_status: body.reservation_status || null,
+      venue_name: body.venue_name || null,
+      reservation_date: body.reservation_date || null,
+      reservation_time: body.reservation_time || null,
+      party_size: body.party_size || null,
+      table_code: body.table_code || null,
       fallback_email: body.fallback_email || null,
       fallback_used_legacy_rpc: !!body.fallback_used_legacy_rpc,
     });
@@ -62,7 +80,7 @@ Deno.serve(async (req) => {
 
     const booking = await loadReservation(reservationId);
     venueId = booking.venue.id;
-    recipient = booking.customer_email || body.fallback_email || null;
+    recipient = booking.customer_email || body.customer_email || body.fallback_email || null;
     console.info("[send-customer-email] prenotazione caricata", {
       reservation_id: reservationId,
       venue_id: venueId,
@@ -81,8 +99,8 @@ Deno.serve(async (req) => {
       return json({ sent: false, error: "CUSTOMER_EMAIL_INVALID" });
     }
 
-    if (!booking.customer_email && body.fallback_email) {
-      await backfillCustomerEmail(reservationId, body.fallback_email);
+    if (!booking.customer_email && recipient) {
+      await backfillCustomerEmail(reservationId, recipient);
     }
 
     const email = buildEmail(kind, booking, {
@@ -132,8 +150,9 @@ async function loadReservation(id: string) {
     .from("reservations")
     .select(`
       id, venue_id, reservation_date, party_size, customer_first_name,
-      customer_last_name, customer_email, notes, shift_id,
+      customer_last_name, customer_email, notes, shift_id, status, table_id,
       venue:venues(name, phone, address),
+      table:restaurant_tables(code),
       shift:service_shifts(name, start_time, end_time)
     `)
     .eq("id", id)
@@ -148,6 +167,8 @@ async function loadReservation(id: string) {
     customer_last_name: string;
     customer_email: string | null;
     notes: string | null;
+    status: string | null;
+    table: { code?: string | null } | null;
     venue: { name: string; phone?: string | null; address?: string | null };
     shift: { name: string; start_time: string; end_time: string };
   };
@@ -156,8 +177,9 @@ async function loadReservation(id: string) {
     .from("reservations")
     .select(`
       id, venue_id, reservation_date, party_size, customer_first_name,
-      customer_last_name, notes, shift_id,
+      customer_last_name, notes, shift_id, status, table_id,
       venue:venues(name, phone, address),
+      table:restaurant_tables(code),
       shift:service_shifts(name, start_time, end_time)
     `)
     .eq("id", id)
@@ -174,6 +196,8 @@ async function loadReservation(id: string) {
     customer_last_name: string;
     customer_email: string | null;
     notes: string | null;
+    status: string | null;
+    table: { code?: string | null } | null;
     venue: { name: string; phone?: string | null; address?: string | null };
     shift: { name: string; start_time: string; end_time: string };
   };
@@ -192,8 +216,11 @@ function buildEmail(
     ["Persone", String(booking.party_size)],
     ["Nome", name],
   ];
+  if (booking.table?.code) details.push(["Tavolo", booking.table.code]);
+  if (booking.status) details.push(["Stato", statusLabel(booking.status)]);
   const notes = booking.notes || fallback.notes;
   if (notes) details.push(["Note", notes]);
+  const directionsUrl = directionsHref(booking.venue.address);
 
   if (kind === "booking-confirmation") {
     const email = {
@@ -203,7 +230,7 @@ function buildEmail(
       text: "Grazie per averci scelto. La pizzeria ha confermato la tua prenotazione: ti aspettiamo!",
       details,
     };
-    return { ...email, html: renderEmail(email) };
+    return { ...email, html: renderEmail(email, directionsUrl) };
   }
   if (kind === "booking-cancelled") {
     const email = {
@@ -213,7 +240,7 @@ function buildEmail(
       text: "Per motivi organizzativi non è stato possibile confermare la tua richiesta. Ti invitiamo a contattare direttamente la pizzeria oppure a riprovare scegliendo un altro orario.",
       details,
     };
-    return { ...email, html: renderEmail(email) };
+    return { ...email, html: renderEmail(email, directionsUrl) };
   }
   if (kind === "booking-modified") {
     const email = {
@@ -223,7 +250,7 @@ function buildEmail(
       text: "Ti informiamo che i dettagli della tua prenotazione sono stati aggiornati. Trovi il riepilogo qui sotto.",
       details,
     };
-    return { ...email, html: renderEmail(email) };
+    return { ...email, html: renderEmail(email, directionsUrl) };
   }
   const email = {
     subject: "Abbiamo ricevuto la tua richiesta di prenotazione 🍕",
@@ -232,10 +259,10 @@ function buildEmail(
     text: "Abbiamo ricevuto correttamente la tua richiesta di prenotazione. È in attesa della conferma della pizzeria: riceverai una seconda mail con l'esito finale.",
     details,
   };
-  return { ...email, html: renderEmail(email) };
+  return { ...email, html: renderEmail(email, directionsUrl) };
 }
 
-function renderEmail(email: EmailContent) {
+function renderEmail(email: EmailContent, directionsUrl: string | null = null) {
   const rows = email.details.map(([label, value]) => `
     <tr>
       <td style="padding:11px 0;border-bottom:1px solid #eadfc9;color:#7a6a5d">${escapeHtml(label)}</td>
@@ -256,6 +283,7 @@ function renderEmail(email: EmailContent) {
         </td></tr>
         <tr><td style="padding:6px 24px 26px">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>
+          ${directionsUrl ? `<p style="margin:22px 0 0;text-align:center"><a href="${escapeAttr(directionsUrl)}" style="display:inline-block;padding:12px 16px;border-radius:8px;background:#3a2b23;color:#fffdf6;text-decoration:none;font-weight:700">Apri Indicazioni</a></p>` : ""}
         </td></tr>
         <tr><td style="padding:16px 24px;background:#3a2b23;color:#fffdf6;font-size:12px">Sistema Prenotazioni</td></tr>
       </table>
@@ -263,6 +291,22 @@ function renderEmail(email: EmailContent) {
   </table>
 </body>
 </html>`;
+}
+
+function directionsHref(address?: string | null) {
+  const value = String(address || "").trim();
+  if (!value) return null;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(value)}`;
+}
+
+function statusLabel(status?: string | null) {
+  return ({
+    in_attesa: "In attesa",
+    confermata: "Confermata",
+    annullata: "Rifiutata",
+    arrivato: "Arrivato",
+    no_show: "No-show",
+  } as Record<string, string>)[status || ""] || status || "-";
 }
 
 async function writeFailure(reservationId: string, venueId: string, kind: string, recipient: string | null, message: string) {
@@ -315,6 +359,10 @@ function escapeHtml(value: string) {
     '"': "&quot;",
     "'": "&#39;",
   }[char] || char));
+}
+
+function escapeAttr(value: string) {
+  return escapeHtml(value).replace(/`/g, "&#96;");
 }
 
 function json(data: unknown, status = 200) {

@@ -39,7 +39,11 @@
       necessary: true,
       updatedAt: new Date().toISOString()
     });
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch (e) {}
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    } catch (e) {
+      console.error('[cookie-consent] impossibile salvare preferenze:', e);
+    }
     closeBanner();
   }
 

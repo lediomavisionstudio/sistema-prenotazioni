@@ -15,6 +15,7 @@ type BookingPayload = {
   reservation_id?: string | null;
   waitlist_id?: string | null;
   venue_slug?: string | null;
+  fallback_customer_email?: string | null;
 };
 
 type BookingRecord = {
@@ -28,6 +29,7 @@ type BookingRecord = {
   customer_phone: string;
   customer_email?: string | null;
   notes?: string | null;
+  status?: string | null;
   table_id?: string | null;
   created_at?: string;
 };
@@ -78,12 +80,16 @@ Deno.serve(async (req) => {
     }
 
     const booking = await loadBooking(mode, id);
+    if (!booking.customer_email && payload.fallback_customer_email && isValidEmail(payload.fallback_customer_email)) {
+      booking.customer_email = payload.fallback_customer_email.trim().toLowerCase();
+    }
     const venue = await loadVenue(booking.venue_id, payload.venue_slug);
     console.info("[send-admin-booking-email] prenotazione caricata", {
       id,
       venue_id: venue.id,
       venue_slug: venue.slug,
       notification_admin_email_configured: !!venue.notification_admin_email,
+      customer_email: booking.customer_email || null,
     });
 
     if (venue.admin_booking_email_enabled === false) {
@@ -281,10 +287,8 @@ function renderAdminEmail(args: {
   const { booking, venue, mode, shift, table } = args;
   const customerName = `${booking.customer_first_name} ${booking.customer_last_name}`.trim();
   const phoneHref = `tel:${booking.customer_phone}`;
+  const customerEmail = booking.customer_email || "-";
   const emailHref = booking.customer_email ? `mailto:${booking.customer_email}` : "";
-  const mapsHref = venue.address
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venue.address)}`
-    : "";
   const shiftText = shift?.start_time ? `${shift.name || "Turno"} - ${formatTime(shift.start_time)}` : "-";
   const actionUrl = adminUrl || "#";
   const preheader = mode === "waitlist" ? "Nuova richiesta in lista d'attesa" : "Nuova prenotazione pubblica";
@@ -339,19 +343,19 @@ function renderAdminEmail(args: {
         <table class="grid" role="presentation">
           ${row("Nome cliente", booking.customer_first_name)}
           ${row("Cognome", booking.customer_last_name)}
+          ${row("Email", customerEmail)}
           ${row("Telefono", booking.customer_phone)}
-          ${row("Email", booking.customer_email || "-")}
           ${row("Numero persone", String(booking.party_size))}
           ${row("Data", booking.reservation_date)}
-          ${row("Ora", shiftText)}
+          ${row("Orario", shiftText)}
           ${row("Tavolo", mode === "waitlist" ? "Lista d'attesa" : table?.code || "-")}
+          ${row("Stato prenotazione", mode === "waitlist" ? "Lista d'attesa" : statusLabel(booking.status))}
         </table>
         ${booking.notes ? `<div class="note"><strong>Note</strong><br>${escapeHtml(booking.notes)}</div>` : ""}
         <div class="actions">
           <a class="btn" href="${escapeAttr(actionUrl)}">Apri Gestionale</a>
           <a class="btn alt" href="${escapeAttr(phoneHref)}">Chiama Cliente</a>
           ${emailHref ? `<a class="btn" href="${escapeAttr(emailHref)}">Scrivi Email</a>` : ""}
-          ${mapsHref ? `<a class="btn" href="${escapeAttr(mapsHref)}">Apri Maps</a>` : ""}
         </div>
       </div>
       <div class="foot">Sistema Prenotazioni &copy; ${new Date().getFullYear()}</div>
@@ -363,6 +367,16 @@ function renderAdminEmail(args: {
 
 function row(label: string, value: string) {
   return `<tr><td class="label">${escapeHtml(label)}</td><td class="value">${escapeHtml(value || "-")}</td></tr>`;
+}
+
+function statusLabel(status?: string | null) {
+  return ({
+    in_attesa: "In attesa",
+    confermata: "Confermata",
+    annullata: "Rifiutata",
+    arrivato: "Arrivato",
+    no_show: "No-show",
+  } as Record<string, string>)[status || ""] || status || "-";
 }
 
 function formatTime(value: string) {
