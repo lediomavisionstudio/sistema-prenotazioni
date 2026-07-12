@@ -1673,15 +1673,18 @@
         }));
         if (error) throw error;
         const result = Array.isArray(data) ? data[0] : data;
-        notifyAdminBooking(result, waitlist);
-        notifyCustomerEmail(result, waitlist, 'request_received', {
-          email,
-          firstName,
-          lastName,
-          phone,
-          notes,
-          usedLegacyRpc,
-        });
+        const notificationResults = await Promise.allSettled([
+          notifyAdminBooking(result, waitlist),
+          notifyCustomerEmail(result, waitlist, 'request_received', {
+            email,
+            firstName,
+            lastName,
+            phone,
+            notes,
+            usedLegacyRpc,
+          }),
+        ]);
+        console.info('[notifications] esito notifiche post-prenotazione:', notificationResults);
         markCompleted();
         showConfirm(result, waitlist);
       } catch (err) {
@@ -1759,36 +1762,61 @@
       box.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
 
-    function notifyAdminBooking(result, waitlist = false) {
+    async function notifyAdminBooking(result, waitlist = false) {
       const id = result && (result.reservation_id || result.waitlist_id);
-      if (!id || !supabase.functions) return;
-      supabase.functions.invoke('send-admin-booking-email', {
-        body: {
-          reservation_id: waitlist ? null : id,
-          waitlist_id: waitlist ? id : null,
-          venue_slug: venueSlug,
-        },
-      }).catch((err) => {
-        console.warn('[notifications] email admin non inviata:', err);
-      });
+      if (!id || !supabase.functions) {
+        console.error('[notifications] send-admin-booking-email non invocata: id o functions mancanti', { id, hasFunctions: !!supabase.functions });
+        return { sent: false, skipped: true, reason: 'MISSING_ID_OR_FUNCTIONS' };
+      }
+      const payload = {
+        reservation_id: waitlist ? null : id,
+        waitlist_id: waitlist ? id : null,
+        venue_slug: venueSlug,
+      };
+      console.info('[notifications] invoco send-admin-booking-email', payload);
+      try {
+        const { data, error } = await supabase.functions.invoke('send-admin-booking-email', { body: payload });
+        if (error || data?.error || data?.sent === false) {
+          console.error('[notifications] send-admin-booking-email fallita:', error || data);
+          return { sent: false, error: error || data };
+        }
+        console.info('[notifications] send-admin-booking-email completata:', data);
+        return data;
+      } catch (err) {
+        console.error('[notifications] send-admin-booking-email errore invoke:', err);
+        return { sent: false, error: err };
+      }
     }
 
-    function notifyCustomerEmail(result, waitlist = false, template = 'request_received', fallback = {}) {
+    async function notifyCustomerEmail(result, waitlist = false, template = 'request_received', fallback = {}) {
       const id = result && (result.reservation_id || result.waitlist_id);
-      if (!id || waitlist || !supabase.functions) return;
-      supabase.functions.invoke('send-customer-email', {
-        body: {
-          reservation_id: id,
-          template,
-          fallback_email: fallback.email || null,
-          fallback_customer_name: `${fallback.firstName || ''} ${fallback.lastName || ''}`.trim(),
-          fallback_notes: fallback.notes || null,
-          fallback_phone: fallback.phone || null,
-          fallback_used_legacy_rpc: !!fallback.usedLegacyRpc,
-        },
-      }).catch((err) => {
-        console.warn('[notifications] email cliente non inviata:', err);
-      });
+      if (!id || waitlist || !supabase.functions) {
+        console.info('[notifications] send-customer-email non invocata:', { id, waitlist, hasFunctions: !!supabase.functions });
+        return { sent: false, skipped: true, reason: 'WAITLIST_OR_MISSING_ID_OR_FUNCTIONS' };
+      }
+      const payload = {
+        reservation_id: id,
+        template,
+        status: template === 'request_received' ? 'request_received' : null,
+        fallback_email: fallback.email || null,
+        fallback_customer_name: `${fallback.firstName || ''} ${fallback.lastName || ''}`.trim(),
+        fallback_notes: fallback.notes || null,
+        fallback_phone: fallback.phone || null,
+        fallback_used_legacy_rpc: !!fallback.usedLegacyRpc,
+      };
+      console.info('[notifications] invoco send-customer-email', payload);
+      try {
+        const { data, error } = await supabase.functions.invoke('send-customer-email', { body: payload });
+        if (error || data?.error || data?.sent === false) {
+          console.error('[notifications] send-customer-email fallita:', error || data);
+          return { sent: false, error: error || data };
+        }
+        console.info('[notifications] send-customer-email completata:', data);
+        return data;
+      } catch (err) {
+        console.error('[notifications] send-customer-email errore invoke:', err);
+        return { sent: false, error: err };
+      }
     }
 
     // -------------------------------------------------------------------

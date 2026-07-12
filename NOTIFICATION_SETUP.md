@@ -1,75 +1,99 @@
 # Setup notifiche prenotazioni
 
-Questa guida configura la prima versione del sistema notifiche:
+Questa guida configura il sistema notifiche email del progetto.
 
-- email al gestore quando arriva una nuova prenotazione pubblica;
-- architettura pronta per future email cliente;
-- architettura pronta per futuri reminder WhatsApp ufficiali;
-- log backend su `notification_logs`;
-- nessuna API key nel frontend o nel repository.
+- Provider predefinito: **Gmail SMTP tramite Nodemailer**.
+- Provider mantenuto come fallback futuro: **Resend**.
+- Le credenziali restano solo nei **Supabase Secrets**.
+- Le funzioni Edge scrivono esiti ed errori su `notification_logs`.
+- Le prenotazioni non vengono annullate se l'invio email fallisce.
 
-## 1. Applicare la migration
+## 1. Applicare le migration
+
+Non applicare migration automaticamente da Codex. Da terminale:
 
 ```bash
 supabase db push
 ```
 
+Verifica che risultino applicate almeno:
+
+- `0020_notifications.sql`
+- `0021_public_booking_email.sql`
+- `0022_public_reservation_status.sql`
+
 La migration `0020_notifications.sql` aggiunge:
 
 - campi di configurazione notifiche su `venues`;
 - campi di tracciamento invio/errori su `reservations`;
-- tabella `notification_logs` con RLS in sola lettura per lo staff;
-- nessuna policy pubblica di scrittura sui log.
+- tabella `notification_logs` con RLS in sola lettura per lo staff.
+
+La migration `0021_public_booking_email.sql` aggiorna le RPC pubbliche per salvare `customer_email` e `client_request_id`.
 
 ## 2. Deploy Edge Functions
+
+Le funzioni usate dal frontend sono:
 
 ```bash
 supabase functions deploy send-admin-booking-email
 supabase functions deploy send-customer-email
+```
+
+`whatsapp-reminder` resta separata:
+
+```bash
 supabase functions deploy whatsapp-reminder
 ```
 
-Le funzioni usano `SUPABASE_SERVICE_ROLE_KEY` lato backend. Non inserirla mai in
-`public/assets/js/config.js`.
+## 3. Secret Supabase richiesti per Gmail SMTP
 
-## 3. Secret Supabase richiesti
+Configura Gmail SMTP tramite Supabase Secrets:
 
 ```bash
+supabase secrets set SMTP_HOST="smtp.gmail.com"
+supabase secrets set SMTP_PORT="465"
+supabase secrets set SMTP_SECURE="true"
+supabase secrets set SMTP_USER="<indirizzo-gmail>"
+supabase secrets set SMTP_PASS="<password-per-le-app-google>"
+supabase secrets set EMAIL_FROM="<indirizzo-gmail-o-alias-verificato>"
+supabase secrets set PUBLIC_ADMIN_URL="https://tuodominio.it/admin/"
 supabase secrets set SUPABASE_URL="https://<project-ref>.supabase.co"
 supabase secrets set SUPABASE_SERVICE_ROLE_KEY="<service-role-key>"
-supabase secrets set RESEND_API_KEY="<resend-api-key>"
-supabase secrets set EMAIL_FROM="Prenotazioni <prenotazioni@tuodominio.it>"
-supabase secrets set PUBLIC_ADMIN_URL="https://tuodominio.it/admin/"
 ```
 
-`PUBLIC_ADMIN_URL` viene usato nel pulsante "Apri Gestionale" dentro l'email.
+`EMAIL_FROM` deve essere un indirizzo valido e autorizzato nell'account Gmail. Se usi un alias, configurarlo prima in Gmail.
 
-## 4. Resend
+## 4. Creare una Password per le app Google
 
-1. Crea un account Resend.
-2. Aggiungi e verifica il dominio mittente.
-3. Configura DNS SPF/DKIM/DMARC come indicato da Resend.
-4. Genera una API key.
-5. Salvala nei Supabase Secrets con `RESEND_API_KEY`.
+Gmail SMTP non deve usare la password principale dell'account Google.
 
-Il codice supporta Resend in questa versione. Altri provider email possono
-essere aggiunti creando un adapter dedicato.
+Procedura:
+
+1. Accedi all'account Google che inviera' le email.
+2. Attiva la verifica in due passaggi. E' obbligatoria per generare una Password per le app.
+3. Apri **Account Google > Sicurezza**.
+4. Cerca **Password per le app**.
+5. Crea una nuova password per l'app, ad esempio con nome `Sistema Prenotazioni`.
+6. Copia la password generata.
+7. Salvala solo nei Supabase Secrets come `SMTP_PASS`.
+
+Non salvare mai la Password per le app nel repository, nel frontend o in file `.env` committati.
 
 ## 5. Destinatario email admin
 
-La funzione sceglie il destinatario cosi:
+La funzione `send-admin-booking-email` usa esclusivamente email configurate sul locale:
 
-1. usa `venues.notification_admin_email`, se valorizzata;
-2. altrimenti recupera la prima email di un utente `owner` collegato al locale
-   in `venue_staff`;
-3. se non trova owner con email, prova con lo staff.
+1. `venues.notification_admin_email`, se valorizzata;
+2. `venues.contact_email`, cioe' il campo **Email** nella pagina impostazioni del gestionale.
 
-Per cambiare il destinatario senza modificare codice:
+Non usa l'email di login admin come fallback. Se entrambi i campi sono vuoti, l'email admin non viene inviata e viene scritto un errore nei log.
+
+Per impostare il destinatario senza modificare codice:
 
 ```sql
 update venues
-set notification_admin_email = 'gestore@tuodominio.it'
-where slug = 'slug-del-locale';
+set notification_admin_email = '<email-reale-gestore>'
+where slug = '<slug-locale>';
 ```
 
 Per disattivare l'email admin:
@@ -77,30 +101,129 @@ Per disattivare l'email admin:
 ```sql
 update venues
 set admin_booking_email_enabled = false
-where slug = 'slug-del-locale';
+where slug = '<slug-locale>';
 ```
 
 ## 6. Email cliente
 
-La funzione `send-customer-email` e i template HTML sono predisposti ma non
-inviano ancora messaggi ai clienti in questa versione.
+La funzione `send-customer-email` invia:
 
-Template presenti:
+- richiesta ricevuta dopo prenotazione pubblica;
+- conferma prenotazione quando l'admin conferma;
+- rifiuto/annullamento quando l'admin annulla;
+- eventuale email di modifica prenotazione.
 
-- `supabase/functions/_shared/templates/booking-confirmation.html`
-- `supabase/functions/_shared/templates/booking-reminder.html`
-- `supabase/functions/_shared/templates/booking-cancelled.html`
-- `supabase/functions/_shared/templates/booking-modified.html`
+L'indirizzo cliente viene letto da `reservations.customer_email`.
 
-Quando verra' attivata, la funzione dovra':
+Se una prenotazione e' stata creata con una vecchia RPC senza `customer_email`, la funzione prova a usare il fallback passato dal widget subito dopo l'invio e a salvare l'indirizzo nella prenotazione.
 
-- leggere `reservations.customer_email`;
-- scegliere il template;
-- inviare via provider email;
-- aggiornare `customer_email_sent_at` o `customer_email_error`;
-- scrivere sempre su `notification_logs`.
+## 7. Log e diagnosi
 
-## 7. WhatsApp ufficiale
+Ogni invio registra:
+
+- provider;
+- destinatario;
+- tipo email;
+- stato;
+- message id provider, quando disponibile;
+- errore completo, senza password o API key;
+- timestamp.
+
+Query utili:
+
+```sql
+select channel, kind, recipient, provider, status, error_message, metadata, created_at
+from notification_logs
+order by created_at desc
+limit 20;
+```
+
+```sql
+select id, customer_email, admin_notification_error, customer_email_error,
+       admin_notification_sent_at, customer_email_sent_at
+from reservations
+order by created_at desc
+limit 10;
+```
+
+Log funzioni:
+
+```bash
+supabase functions logs send-admin-booking-email
+supabase functions logs send-customer-email
+```
+
+## 8. Passare da Gmail SMTP a Resend
+
+Resend resta disponibile. Per riattivarlo:
+
+```bash
+supabase secrets set EMAIL_PROVIDER="resend"
+supabase secrets set RESEND_API_KEY="<resend-api-key>"
+supabase secrets set EMAIL_FROM="Prenotazioni <prenotazioni@tuodominio.it>"
+```
+
+Poi ridistribuisci:
+
+```bash
+supabase functions deploy send-admin-booking-email
+supabase functions deploy send-customer-email
+```
+
+Per tornare a Gmail SMTP:
+
+```bash
+supabase secrets unset EMAIL_PROVIDER
+```
+
+oppure:
+
+```bash
+supabase secrets set EMAIL_PROVIDER="smtp"
+```
+
+## 9. Test consigliati
+
+Email admin:
+
+1. applica le migration;
+2. deploya le funzioni;
+3. imposta i secret Gmail SMTP;
+4. configura `notification_admin_email`;
+5. crea una prenotazione dal widget pubblico;
+6. verifica arrivo email admin;
+7. controlla `reservations.admin_notification_sent_at`;
+8. controlla `notification_logs`.
+
+Email cliente:
+
+1. crea una prenotazione con email reale del cliente;
+2. verifica email "richiesta ricevuta";
+3. conferma dal gestionale;
+4. verifica email di conferma;
+5. crea o usa un'altra prenotazione;
+6. annulla dal gestionale;
+7. verifica email di rifiuto;
+8. controlla `customer_email_sent_at`, `customer_email_error` e `notification_logs`.
+
+Errore provider:
+
+1. rimuovi temporaneamente `SMTP_PASS` dai secrets solo in ambiente test;
+2. invia una prenotazione;
+3. verifica che la prenotazione resti salvata;
+4. verifica `customer_email_error` o `admin_notification_error`;
+5. verifica un log `failed` in `notification_logs`.
+
+## 10. Sicurezza
+
+- Non inserire password Gmail nel frontend.
+- Non inserire password Gmail nel repository.
+- Non salvare password o API key nei log.
+- Usa solo Supabase Secrets per `SMTP_PASS`, `RESEND_API_KEY` e `SUPABASE_SERVICE_ROLE_KEY`.
+- Usa una Password per le app Google, non la password principale.
+- Mantieni attiva la verifica in due passaggi sull'account Google.
+
+## 11. WhatsApp ufficiale
 
 WhatsApp personale o WhatsApp Web non bastano per reminder automatici. Servono:
 
@@ -124,50 +247,3 @@ supabase secrets set TWILIO_ACCOUNT_SID="<account-sid>"
 supabase secrets set TWILIO_AUTH_TOKEN="<auth-token>"
 supabase secrets set TWILIO_WHATSAPP_FROM="whatsapp:+14155238886"
 ```
-
-Il provider e' documentato in
-`supabase/functions/_shared/services/whatsapp/provider.ts` ed espone:
-
-- `sendWhatsappReminder()`
-- `sendWhatsappConfirmation()`
-- `sendWhatsappCancellation()`
-
-In questa versione gli adapter sono stub documentati e non inviano messaggi.
-
-## 8. Attivare un reminder futuro
-
-Quando si passa all'invio reale:
-
-1. aggiungere opt-in WhatsApp esplicito nel flusso cliente;
-2. usare template approvati Meta/Twilio se richiesti;
-3. schedulare `whatsapp-reminder` con Supabase Scheduled Functions o cron esterno;
-4. cercare prenotazioni future con `whatsapp_reminder_sent_at is null`;
-5. aggiornare `whatsapp_reminder_sent_at` o `whatsapp_reminder_error`;
-6. scrivere un record in `notification_logs`.
-
-## 9. Test consigliati
-
-Email admin:
-
-1. applica migration e deploy funzioni;
-2. imposta i secret;
-3. configura `notification_admin_email` o collega un owner in `venue_staff`;
-4. crea una prenotazione dal widget pubblico;
-5. verifica arrivo email;
-6. controlla `reservations.admin_notification_sent_at`;
-7. controlla `notification_logs`.
-
-Error handling:
-
-- se Resend fallisce, la prenotazione resta salvata;
-- l'errore viene salvato in `admin_notification_error`;
-- viene creato un log `failed`;
-- la funzione risponde senza cancellare o bloccare la prenotazione.
-
-## 10. Prima della produzione
-
-- Verificare dominio email e deliverability.
-- Inserire segreti solo nei Supabase Secrets.
-- Testare email su desktop e mobile.
-- Definire policy privacy per email cliente e WhatsApp.
-- Attivare WhatsApp solo con opt-in esplicito e provider ufficiale.

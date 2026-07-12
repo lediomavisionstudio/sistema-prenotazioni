@@ -215,30 +215,40 @@ async function changeStatus(id, to) {
 }
 
 async function notifyCustomerStatusEmail(reservation, status) {
-  const template = status === 'confermata'
-    ? 'booking-confirmation'
+  const emailStatus = status === 'confermata'
+    ? 'confirmed'
     : status === 'annullata'
-      ? 'booking-cancelled'
+      ? 'rejected'
       : null;
-  if (!template || !supabase.functions) return;
+  if (!emailStatus || !supabase.functions) {
+    console.info('[notifications] send-customer-email non invocata per cambio stato:', {
+      reservation_id: reservation?.id,
+      status,
+      hasFunctions: !!supabase.functions,
+    });
+    return;
+  }
   try {
+    const payload = {
+      reservation_id: reservation.id,
+      status: emailStatus,
+      fallback_email: reservation.customer_email || null,
+      fallback_customer_name: `${reservation.customer_first_name || ''} ${reservation.customer_last_name || ''}`.trim(),
+      fallback_notes: reservation.notes || null,
+      fallback_phone: reservation.customer_phone || null,
+    };
+    console.info('[notifications] invoco send-customer-email per cambio stato:', payload);
     const { data, error } = await supabase.functions.invoke('send-customer-email', {
-      body: {
-        reservation_id: reservation.id,
-        template,
-        fallback_email: reservation.customer_email || null,
-        fallback_customer_name: `${reservation.customer_first_name || ''} ${reservation.customer_last_name || ''}`.trim(),
-        fallback_notes: reservation.notes || null,
-      },
+      body: payload,
     });
     if (error || data?.error || data?.sent === false) {
-      console.warn('[notifications] email cliente non inviata:', error || data);
+      console.error('[notifications] email cliente non inviata:', error || data);
       toast('Stato aggiornato, ma email cliente non inviata.', true);
       return;
     }
-    console.info('[notifications] email cliente inviata:', { reservation_id: reservation.id, template, recipient: reservation.customer_email || data?.recipient });
+    console.info('[notifications] email cliente inviata:', { reservation_id: reservation.id, status: emailStatus, recipient: reservation.customer_email || data?.recipient, response: data });
   } catch (err) {
-    console.warn('[notifications] email cliente non inviata:', err);
+    console.error('[notifications] email cliente non inviata:', err);
     toast('Stato aggiornato, ma email cliente non inviata.', true);
   }
 }

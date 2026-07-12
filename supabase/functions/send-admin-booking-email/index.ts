@@ -1,4 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import {
+  getConfiguredEmailProviderName,
+  isValidEmail,
+  sendTransactionalEmail,
+} from "../_shared/services/email/provider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,6 +39,7 @@ type Venue = {
   phone?: string | null;
   address?: string | null;
   timezone?: string | null;
+  contact_email?: string | null;
   notification_admin_email?: string | null;
   admin_booking_email_enabled?: boolean;
   logo_url?: string | null;
@@ -41,8 +47,6 @@ type Venue = {
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const resendApiKey = Deno.env.get("RESEND_API_KEY") || "";
-const emailFrom = Deno.env.get("EMAIL_FROM") || "Sistema Prenotazioni <prenotazioni@example.com>";
 const adminUrl = Deno.env.get("PUBLIC_ADMIN_URL") || Deno.env.get("PUBLIC_SITE_URL") || "";
 
 const supabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -62,6 +66,12 @@ Deno.serve(async (req) => {
     const payload = await req.json().catch(() => ({})) as BookingPayload;
     const mode = payload.waitlist_id ? "waitlist" : "reservation";
     const id = payload.waitlist_id || payload.reservation_id;
+    console.info("[send-admin-booking-email] payload ricevuto", {
+      reservation_id: payload.reservation_id || null,
+      waitlist_id: payload.waitlist_id || null,
+      venue_slug: payload.venue_slug || null,
+      mode,
+    });
 
     if (!id) {
       return json({ sent: false, error: "reservation_id o waitlist_id richiesto" }, 400);
@@ -69,6 +79,12 @@ Deno.serve(async (req) => {
 
     const booking = await loadBooking(mode, id);
     const venue = await loadVenue(booking.venue_id, payload.venue_slug);
+    console.info("[send-admin-booking-email] prenotazione caricata", {
+      id,
+      venue_id: venue.id,
+      venue_slug: venue.slug,
+      notification_admin_email_configured: !!venue.notification_admin_email,
+    });
 
     if (venue.admin_booking_email_enabled === false) {
       await writeLog({
@@ -83,7 +99,13 @@ Deno.serve(async (req) => {
       return json({ sent: false, skipped: true, reason: "ADMIN_BOOKING_EMAIL_DISABLED" });
     }
 
-    const recipient = await resolveAdminEmail(venue);
+    const adminRecipient = resolveAdminEmail(venue);
+    const recipient = adminRecipient.email;
+    console.info("[send-admin-booking-email] destinatario admin risolto", {
+      venue_id: venue.id,
+      recipient,
+      source: adminRecipient.source,
+    });
     if (!recipient) {
       const message = "Nessuna email admin configurata per il locale";
       await markReservation(mode, id, false, message);
@@ -99,8 +121,8 @@ Deno.serve(async (req) => {
       return json({ sent: false, error: message });
     }
 
-    if (!resendApiKey) {
-      const message = "RESEND_API_KEY non configurata";
+    if (!isValidEmail(recipient)) {
+      const message = "Email admin non valida";
       await markReservation(mode, id, false, message);
       await writeLog({
         venueId: venue.id,
@@ -117,27 +139,25 @@ Deno.serve(async (req) => {
     const details = await loadDetails(booking);
     const html = renderAdminEmail({ booking, venue, mode, ...details });
     let sendError: string | null = null;
+    let providerMessageId: string | null = null;
+    const provider = getConfiguredEmailProviderName();
     try {
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${resendApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: emailFrom,
-          to: [recipient],
-          subject: "🔔 Nuova prenotazione ricevuta",
-          html,
-        }),
+      console.info("[send-admin-booking-email] invio email admin", {
+        provider,
+        recipient,
+        reservation_id: mode === "reservation" ? id : null,
+        waitlist_id: mode === "waitlist" ? id : null,
       });
-
-      if (!response.ok) {
-        const body = await response.text();
-        sendError = `Resend ${response.status}: ${body}`;
-      }
+      const result = await sendTransactionalEmail({
+        to: recipient,
+        subject: "🔔 Nuova prenotazione ricevuta",
+        html,
+      });
+      providerMessageId = result.messageId;
+      console.info("[send-admin-booking-email] risposta provider email", result);
     } catch (error) {
       sendError = error instanceof Error ? error.message : String(error);
+      console.error("[send-admin-booking-email] errore invio email admin", error);
     }
 
     if (sendError) {
@@ -150,6 +170,7 @@ Deno.serve(async (req) => {
         recipient,
         status: "failed",
         error: sendError,
+        provider,
       });
       return json({ sent: false, error: sendError });
     }
@@ -163,9 +184,11 @@ Deno.serve(async (req) => {
       recipient,
       status: "sent",
       error: null,
+      provider,
+      providerMessageId,
     });
 
-    return json({ sent: true });
+    return json({ sent: true, provider, message_id: providerMessageId });
   } catch (error) {
     console.error("[send-admin-booking-email]", error);
     return json({ sent: false, error: error instanceof Error ? error.message : String(error) });
@@ -201,28 +224,14 @@ async function loadDetails(booking: BookingRecord) {
   };
 }
 
-async function resolveAdminEmail(venue: Venue): Promise<string | null> {
-  if (venue.notification_admin_email) return venue.notification_admin_email;
+function resolveAdminEmail(venue: Venue): { email: string | null; source: string | null } {
+  const notificationEmail = venue.notification_admin_email?.trim();
+  if (notificationEmail) return { email: notificationEmail, source: "venues.notification_admin_email" };
 
-  const { data: staff, error } = await supabase
-    .from("venue_staff")
-    .select("user_id, role, created_at")
-    .eq("venue_id", venue.id)
-    .order("created_at", { ascending: true });
+  const contactEmail = venue.contact_email?.trim();
+  if (contactEmail) return { email: contactEmail, source: "venues.contact_email" };
 
-  if (error || !staff?.length) return null;
-
-  const preferred = [...staff].sort((a, b) => {
-    if (a.role === b.role) return 0;
-    return a.role === "owner" ? -1 : 1;
-  });
-
-  for (const member of preferred) {
-    const { data } = await supabase.auth.admin.getUserById(member.user_id);
-    if (data.user?.email) return data.user.email;
-  }
-
-  return null;
+  return { email: null, source: null };
 }
 
 async function markReservation(mode: string, id: string, sent: boolean, error: string | null) {
@@ -244,18 +253,22 @@ async function writeLog(params: {
   recipient: string | null;
   status: "sent" | "skipped" | "failed";
   error: string | null;
+  provider?: string;
+  providerMessageId?: string | null;
 }) {
-  await supabase.from("notification_logs").insert({
+  const { error } = await supabase.from("notification_logs").insert({
     venue_id: params.venueId,
     reservation_id: params.reservationId,
     waitlist_id: params.waitlistId,
     channel: "email",
     kind: params.kind,
     recipient: params.recipient,
-    provider: "resend",
+    provider: params.provider || getConfiguredEmailProviderName(),
     status: params.status,
     error_message: params.error,
+    metadata: params.providerMessageId ? { provider_message_id: params.providerMessageId } : {},
   });
+  if (error) console.error("[send-admin-booking-email] log notification_logs non scritto", error);
 }
 
 function renderAdminEmail(args: {

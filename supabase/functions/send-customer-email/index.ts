@@ -1,4 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import {
+  getConfiguredEmailProviderName,
+  isValidEmail,
+  sendTransactionalEmail,
+} from "../_shared/services/email/provider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,7 +11,8 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-type TemplateKind = "request_received" | "booking-confirmation" | "booking-cancelled";
+type TemplateKind = "request_received" | "booking-confirmation" | "booking-cancelled" | "booking-modified";
+type CustomerEmailStatus = "request_received" | "confirmed" | "rejected" | "modified";
 type EmailContent = {
   subject: string;
   eyebrow: string;
@@ -17,8 +23,6 @@ type EmailContent = {
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const resendApiKey = Deno.env.get("RESEND_API_KEY") || "";
-const emailFrom = Deno.env.get("EMAIL_FROM") || "Sistema Prenotazioni <prenotazioni@example.com>";
 
 const supabase = createClient(supabaseUrl, serviceRoleKey, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -36,6 +40,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({})) as {
       reservation_id?: string;
       template?: TemplateKind;
+      status?: CustomerEmailStatus;
       fallback_email?: string | null;
       fallback_customer_name?: string | null;
       fallback_notes?: string | null;
@@ -44,63 +49,83 @@ Deno.serve(async (req) => {
     };
 
     reservationId = body.reservation_id || null;
-    kind = body.template || "request_received";
+    kind = resolveTemplate(body.status, body.template);
+    console.info("[send-customer-email] payload ricevuto", {
+      reservation_id: reservationId,
+      status: body.status || null,
+      template: body.template || null,
+      resolved_template: kind,
+      fallback_email: body.fallback_email || null,
+      fallback_used_legacy_rpc: !!body.fallback_used_legacy_rpc,
+    });
     if (!reservationId) return json({ sent: false, error: "reservation_id richiesto" }, 400);
 
     const booking = await loadReservation(reservationId);
     venueId = booking.venue.id;
     recipient = booking.customer_email || body.fallback_email || null;
-    if (!booking.customer_email && body.fallback_email) {
-      await backfillCustomerEmail(reservationId, body.fallback_email);
-    }
+    console.info("[send-customer-email] prenotazione caricata", {
+      reservation_id: reservationId,
+      venue_id: venueId,
+      customer_email_in_db: booking.customer_email || null,
+      recipient,
+      template: kind,
+    });
 
     if (!recipient) {
       await writeLog(venueId, reservationId, kind, null, "skipped", "CUSTOMER_EMAIL_MISSING");
       return json({ sent: false, skipped: true, reason: "CUSTOMER_EMAIL_MISSING" });
     }
 
-    if (!resendApiKey) {
-      await writeFailure(reservationId, venueId, kind, recipient, "RESEND_API_KEY non configurata");
-      return json({ sent: false, error: "RESEND_API_KEY non configurata" });
+    if (!isValidEmail(recipient)) {
+      await writeFailure(reservationId, venueId, kind, recipient, "CUSTOMER_EMAIL_INVALID");
+      return json({ sent: false, error: "CUSTOMER_EMAIL_INVALID" });
+    }
+
+    if (!booking.customer_email && body.fallback_email) {
+      await backfillCustomerEmail(reservationId, body.fallback_email);
     }
 
     const email = buildEmail(kind, booking, {
       customerName: body.fallback_customer_name || null,
       notes: body.fallback_notes || null,
     });
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${resendApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: emailFrom,
-        to: [recipient],
-        subject: email.subject,
-        html: email.html,
-      }),
+    const provider = getConfiguredEmailProviderName();
+    console.info("[send-customer-email] invio email cliente", {
+      provider,
+      recipient,
+      reservation_id: reservationId,
+      template: kind,
     });
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`Resend ${response.status}: ${errorBody}`);
-    }
+    const sendResult = await sendTransactionalEmail({
+      to: recipient,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
+    });
+    console.info("[send-customer-email] risposta provider email", sendResult);
 
     await supabase.from("reservations").update({
       customer_email_sent_at: new Date().toISOString(),
       customer_email_error: null,
     }).eq("id", reservationId);
-    await writeLog(venueId, reservationId, kind, recipient, "sent", null);
+    await writeLog(venueId, reservationId, kind, recipient, "sent", null, sendResult.provider, sendResult.messageId);
 
-    return json({ sent: true, recipient, template: kind });
+    return json({ sent: true, recipient, template: kind, provider: sendResult.provider, message_id: sendResult.messageId });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error("[send-customer-email]", message);
+    console.error("[send-customer-email] errore", error);
     if (reservationId && venueId) await writeFailure(reservationId, venueId, kind, recipient, message);
     return json({ sent: false, error: message });
   }
 });
+
+function resolveTemplate(status?: CustomerEmailStatus, template?: TemplateKind): TemplateKind {
+  if (status === "confirmed") return "booking-confirmation";
+  if (status === "rejected") return "booking-cancelled";
+  if (status === "modified") return "booking-modified";
+  if (status === "request_received") return "request_received";
+  return template || "request_received";
+}
 
 async function loadReservation(id: string) {
   const full = await supabase
@@ -190,6 +215,16 @@ function buildEmail(
     };
     return { ...email, html: renderEmail(email) };
   }
+  if (kind === "booking-modified") {
+    const email = {
+      subject: "La tua prenotazione è stata aggiornata",
+      eyebrow: "Prenotazione aggiornata",
+      title: "Abbiamo aggiornato la tua prenotazione",
+      text: "Ti informiamo che i dettagli della tua prenotazione sono stati aggiornati. Trovi il riepilogo qui sotto.",
+      details,
+    };
+    return { ...email, html: renderEmail(email) };
+  }
   const email = {
     subject: "Abbiamo ricevuto la tua richiesta di prenotazione 🍕",
     eyebrow: "Richiesta ricevuta",
@@ -232,7 +267,7 @@ function renderEmail(email: EmailContent) {
 
 async function writeFailure(reservationId: string, venueId: string, kind: string, recipient: string | null, message: string) {
   await supabase.from("reservations").update({ customer_email_error: message }).eq("id", reservationId)
-    .then(({ error }) => { if (error) console.warn("[send-customer-email] customer_email_error non aggiornato:", error.message); });
+    .then(({ error }) => { if (error) console.error("[send-customer-email] customer_email_error non aggiornato:", error.message); });
   await writeLog(venueId, reservationId, kind, recipient, "failed", message);
 }
 
@@ -241,7 +276,7 @@ async function backfillCustomerEmail(reservationId: string, email: string) {
     .from("reservations")
     .update({ customer_email: email.toLowerCase().trim() })
     .eq("id", reservationId);
-  if (error) console.warn("[send-customer-email] customer_email non aggiornato:", error.message);
+  if (error) console.error("[send-customer-email] customer_email non aggiornato:", error.message);
 }
 
 async function writeLog(
@@ -251,6 +286,8 @@ async function writeLog(
   recipient: string | null,
   status: "sent" | "skipped" | "failed",
   errorMessage: string | null,
+  provider = getConfiguredEmailProviderName(),
+  providerMessageId: string | null = null,
 ) {
   const { error } = await supabase.from("notification_logs").insert({
     venue_id: venueId,
@@ -258,11 +295,12 @@ async function writeLog(
     channel: "email",
     kind,
     recipient,
-    provider: "resend",
+    provider,
     status,
     error_message: errorMessage,
+    metadata: providerMessageId ? { provider_message_id: providerMessageId } : {},
   });
-  if (error) console.warn("[send-customer-email] log non scritto:", error.message);
+  if (error) console.error("[send-customer-email] log non scritto:", error.message);
 }
 
 function hhmm(value: string) {
