@@ -1733,9 +1733,11 @@
         p_first_name: firstName,
         p_last_name: lastName,
         p_phone: phone,
+        p_customer_email: email,
         p_notes: notes || null,
         p_privacy_policy_accepted: true,
         p_marketing_consent: marketingConsent,
+        p_client_request_id: state.requestId,
       };
       const legacyResult = await supabase.rpc(rpc, legacyPayload);
       if (!isRpcSignatureMissing(legacyResult.error)) return { ...legacyResult, usedLegacyRpc: true };
