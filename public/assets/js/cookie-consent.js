@@ -21,8 +21,12 @@
   }
 
   function init() {
-    injectStyle();
-    if (!readConsent()) showBanner(false);
+    try {
+      injectStyle();
+      if (!readConsent()) showBanner(false);
+    } catch (e) {
+      console.error('[cookie-consent] inizializzazione non riuscita:', e);
+    }
   }
 
   function readConsent() {
@@ -48,6 +52,7 @@
   }
 
   function showBanner(preferences) {
+    if (!document.body) return;
     closeBanner();
 
     var saved = readConsent() || DEFAULTS;
@@ -77,7 +82,12 @@
         '</div>' +
       '</div>';
 
-    document.body.appendChild(overlay);
+    try {
+      document.body.appendChild(overlay);
+    } catch (e) {
+      console.error('[cookie-consent] banner non mostrato:', e);
+      return;
+    }
 
     document.getElementById('cookieReject').addEventListener('click', function () {
       saveConsent({ functional: false, thirdParty: false });

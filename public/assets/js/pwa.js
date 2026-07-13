@@ -9,7 +9,16 @@
   // sw.js è servito dalla root del sito: lo scope '/' copre widget e /admin.
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('/sw.js').catch(function (e) {
+      var registration = navigator.serviceWorker.register('/sw.js');
+      var timeout = new Promise(function (_, reject) {
+        setTimeout(function () { reject(new Error('SERVICE_WORKER_TIMEOUT')); }, 5000);
+      });
+      Promise.race([registration, timeout]).then(function (reg) {
+        console.log('[pwa] service worker registrato');
+        if (reg && reg.update) reg.update().catch(function (e) {
+          console.warn('[pwa] aggiornamento service worker non riuscito:', e);
+        });
+      }).catch(function (e) {
         console.warn('[pwa] service worker non registrato:', e);
       });
     });
@@ -24,7 +33,11 @@
     // Blocca il mini-infobar di default e mostra il nostro banner.
     e.preventDefault();
     deferredPrompt = e;
-    if (localStorage.getItem(DISMISS_KEY)) return; // l'utente l'ha già chiuso
+    try {
+      if (localStorage.getItem(DISMISS_KEY)) return; // l'utente l'ha già chiuso
+    } catch (err) {
+      console.warn('[pwa] localStorage non disponibile:', err);
+    }
     showBanner();
   });
 
@@ -63,7 +76,11 @@
   function doInstall() {
     if (!deferredPrompt) { removeBanner(); return; }
     deferredPrompt.prompt();
-    deferredPrompt.userChoice.finally(function () {
+    deferredPrompt.userChoice.then(function () {
+      deferredPrompt = null;
+      removeBanner();
+    }, function (e) {
+      console.warn('[pwa] scelta installazione non completata:', e);
       deferredPrompt = null;
       removeBanner();
     });

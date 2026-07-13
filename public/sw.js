@@ -9,7 +9,7 @@
 //
 // Per rilasciare un aggiornamento degli asset, incrementa CACHE_VERSION.
 
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7';
 const CACHE = 'prenotazioni-' + CACHE_VERSION;
 
 // App shell: file che (quando presenti) precarichiamo all'installazione.
@@ -47,15 +47,17 @@ self.addEventListener('install', (event) => {
     const cache = await caches.open(CACHE);
     // allSettled: se un file non esiste (es. config.js non committato) non blocca.
     await Promise.allSettled(CORE.map((url) => cache.add(url)));
-    self.skipWaiting();
+    if (self.skipWaiting) self.skipWaiting();
   })());
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)));
-    await self.clients.claim();
+    await Promise.all(keys
+      .filter((k) => k.indexOf('prenotazioni-') === 0 && k !== CACHE)
+      .map((k) => caches.delete(k)));
+    if (self.clients && self.clients.claim) await self.clients.claim();
   })());
 });
 
@@ -77,6 +79,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // HTML e JavaScript critici devono restare allineati al deploy corrente.
+  if (req.destination === 'script' || url.pathname.endsWith('.html')) {
+    event.respondWith(networkFirst(req));
+    return;
+  }
+
   // Tutto il resto (asset statici, font, librerie CDN): cache-first.
   event.respondWith(cacheFirst(req));
 });
@@ -86,7 +94,7 @@ async function cacheFirst(req) {
   const cached = await caches.match(req);
   if (cached) return cached;
   try {
-    const res = await fetch(req);
+    const res = await fetchWithTimeout(req, 8000);
     putSafe(req, res);
     return res;
   } catch (err) {
@@ -112,4 +120,23 @@ function putSafe(req, res) {
   if (!res || (res.status !== 0 && !res.ok)) return;
   const copy = res.clone();
   caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+}
+
+function fetchWithTimeout(req, ms) {
+  if (typeof AbortController !== 'function') {
+    return Promise.race([
+      fetch(req),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('SW_FETCH_TIMEOUT')), ms)),
+    ]);
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return fetch(req, { signal: controller.signal })
+    .then((res) => {
+      clearTimeout(timer);
+      return res;
+    }, (err) => {
+      clearTimeout(timer);
+      throw err;
+    });
 }

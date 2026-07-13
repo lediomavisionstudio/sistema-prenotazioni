@@ -681,6 +681,7 @@
       <!-- Errore bloccante -->
       <div class="state" id="stateFatal" hidden>
         <p class="error" id="fatalMsg" style="text-align:left"></p>
+        <button class="btn btn--primary" type="button" id="retryBootBtn" hidden>Riprova</button>
       </div>
 
       <!-- Widget -->
@@ -865,6 +866,31 @@
   <script src="assets/js/config.js"></script>
   <script src="assets/js/pwa.js"></script>
   <script src="assets/js/cookie-consent.js"></script>
+  <script>
+    window.__BOOKING_BOOT_STATUS = { done: false };
+    window.setTimeout(function () {
+      var status = window.__BOOKING_BOOT_STATUS || {};
+      var loading = document.getElementById('stateLoading');
+      if (status.done || !loading || loading.hidden) return;
+      console.error('[BOOT] timeout watchdog: bootstrap non completato');
+      var fatal = document.getElementById('stateFatal');
+      var form = document.getElementById('stateForm');
+      var confirm = document.getElementById('stateConfirm');
+      var card = document.getElementById('bookingCard');
+      var msg = document.getElementById('fatalMsg');
+      var retry = document.getElementById('retryBootBtn');
+      loading.hidden = true;
+      if (form) form.hidden = true;
+      if (confirm) confirm.hidden = true;
+      if (fatal) fatal.hidden = false;
+      if (card) {
+        card.classList.remove('is-loading');
+        card.classList.add('is-ready');
+      }
+      if (msg) msg.textContent = 'Il caricamento sta impiegando troppo tempo. Controlla la connessione e riprova.';
+      if (retry) retry.hidden = false;
+    }, 20000);
+  </script>
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -898,8 +924,33 @@
       console.warn('[config] Supabase non configurato: copia assets/js/config.example.js in config.js.');
     }
 
+    const BOOT_FETCH_TIMEOUT_MS = 12000;
+
+    async function fetchWithTimeout(input, init = {}) {
+      const hasAbortController = typeof AbortController === 'function';
+      const controller = hasAbortController ? new AbortController() : null;
+      const options = Object.assign({}, init);
+      let timer;
+      if (controller && !options.signal) {
+        options.signal = controller.signal;
+        timer = window.setTimeout(() => controller.abort(), BOOT_FETCH_TIMEOUT_MS);
+      }
+      try {
+        if (!controller) {
+          return await withTimeout(window.fetch(input, options), BOOT_FETCH_TIMEOUT_MS, 'TIMEOUT_FETCH');
+        }
+        return await window.fetch(input, options);
+      } catch (error) {
+        console.error('[BOOT] fetch fallita o scaduta:', error);
+        throw error;
+      } finally {
+        if (timer) window.clearTimeout(timer);
+      }
+    }
+
     const supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
       auth: { persistSession: false },
+      global: { fetch: fetchWithTimeout },
     });
 
     // -------------------------------------------------------------------
@@ -982,7 +1033,20 @@
       }
     }
 
-    function fatal(msg) { $('fatalMsg').textContent = msg; showState('Fatal'); }
+    function fatal(msg, retry = false) {
+      $('fatalMsg').textContent = msg;
+      $('retryBootBtn').hidden = !retry;
+      showState('Fatal');
+    }
+
+    function bootLog(message, details) {
+      if (details === undefined) console.log('[BOOT] ' + message);
+      else console.log('[BOOT] ' + message, details);
+    }
+
+    function bootError(message, error) {
+      console.error('[BOOT] ' + message, error);
+    }
 
     function mapError(err) {
       const raw = (err && (err.message || err.hint || err.details || '')) || '';
@@ -997,7 +1061,7 @@
       { key: 'details', el: 'progressDetails', target: 'detailsStep', icon: '✍', desc: 'Lascia i dati necessari per completare la richiesta.' },
     ];
     const stepOrder = progressSteps.map((step) => step.key);
-    const nameRegex = /^[\p{L}\s]{2,40}$/u;
+    const nameRegex = /^[^\d!@#$%^&*_=+{}[\]|\\:;"<>?/~`]+$/;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
     function completedSteps() {
@@ -1238,10 +1302,10 @@
       $('formError').hidden = true;
     }
 
-    async function withTimeout(promise, ms = 15000) {
+    async function withTimeout(promise, ms = 15000, timeoutMessage = 'TIMEOUT_INVIO') {
       let timer;
       const timeout = new Promise((_, reject) => {
-        timer = window.setTimeout(() => reject(new Error('TIMEOUT_INVIO')), ms);
+        timer = window.setTimeout(() => reject(new Error(timeoutMessage)), ms);
       });
       try {
         return await Promise.race([promise, timeout]);
@@ -1309,10 +1373,18 @@
       state.completed = true;
       $('stateForm').classList.add('form-lock');
       if (summary.reservationId) {
-        const status = await fetchReservationStatus(summary.reservationId);
-        if (status) {
-          summary.status = status;
-          saveBookingSummary(summary);
+        try {
+          const status = await withTimeout(
+            fetchReservationStatus(summary.reservationId),
+            BOOT_FETCH_TIMEOUT_MS,
+            'TIMEOUT_STATO_PRENOTAZIONE'
+          );
+          if (status) {
+            summary.status = status;
+            saveBookingSummary(summary);
+          }
+        } catch (err) {
+          bootError('stato prenotazione non recuperato, uso riepilogo salvato', err);
         }
       }
       renderConfirmSummary(summary);
@@ -1373,6 +1445,13 @@
     // Avvio
     // -------------------------------------------------------------------
     async function init() {
+      bootLog('avvio bootstrap');
+      showState('Loading');
+      const retryBtn = $('retryBootBtn');
+      if (retryBtn) {
+        retryBtn.hidden = true;
+        retryBtn.addEventListener('click', () => window.location.reload(), { once: true });
+      }
       const privacyUrl = withLocale(CONFIG.PRIVACY_URL || 'privacy-policy.html');
       $('privacyLink').href = privacyUrl;
       $('footerPrivacyLink').href = privacyUrl;
@@ -1384,22 +1463,31 @@
         link.href = withLocale(link.getAttribute('href'));
       });
       $('cookiePrefs').addEventListener('click', () => {
-        if (window.CookieConsent) window.CookieConsent.openPreferences();
+        try {
+          if (window.CookieConsent) window.CookieConsent.openPreferences();
+        } catch (err) {
+          bootError('preferenze cookie non apribili', err);
+        }
       });
 
-      if (!venueSlug) return fatal('Link non valido: manca l\'identificativo del locale.');
+      if (!venueSlug) return fatal('Link non valido: manca l\'identificativo del locale.', true);
 
       try {
         // select('*') così il widget non si rompe se la migration del branding
         // (colonne brand_*) non è ancora applicata: i campi mancanti restano
         // undefined e applyBranding lascia il tema di default.
-        const { data: venue, error } = await supabase
-          .from('venues')
-          .select('*')
-          .eq('slug', venueSlug)
-          .maybeSingle();
+        bootLog('carico locale', { venueSlug });
+        const { data: venue, error } = await withTimeout(
+          supabase
+            .from('venues')
+            .select('*')
+            .eq('slug', venueSlug)
+            .maybeSingle(),
+          BOOT_FETCH_TIMEOUT_MS,
+          'TIMEOUT_LOCALE'
+        );
         if (error) throw error;
-        if (!venue || !venue.active) return fatal('Locale non trovato o non disponibile per le prenotazioni online.');
+        if (!venue || !venue.active) return fatal('Locale non trovato o non disponibile per le prenotazioni online.', true);
 
         state.venue = venue;
         applyBranding(venue);
@@ -1408,19 +1496,35 @@
         document.title = 'Prenota — ' + venue.name;
 
         // Chiusure straordinarie (per disabilitare quei giorni nel calendario)
-        const { data: closures } = await supabase
-          .from('venue_closures')
-          .select('closed_date')
-          .eq('venue_id', venue.id);
-        state.closures = new Set((closures || []).map((c) => c.closed_date));
+        bootLog('carico chiusure');
+        try {
+          const { data: closures, error: closuresError } = await withTimeout(
+            supabase
+              .from('venue_closures')
+              .select('closed_date')
+              .eq('venue_id', venue.id),
+            BOOT_FETCH_TIMEOUT_MS,
+            'TIMEOUT_CHIUSURE'
+          );
+          if (closuresError) throw closuresError;
+          state.closures = new Set((closures || []).map((c) => c.closed_date));
+        } catch (err) {
+          bootError('chiusure non caricate, continuo senza bloccare il widget', err);
+          state.closures = new Set();
+        }
 
         // Turni attivi (leggibili pubblicamente): danno i giorni aperti e gli orari.
-        const { data: shifts, error: shErr } = await supabase
-          .from('service_shifts')
-          .select('id, code, name, start_time, end_time, days_of_week, sort_order')
-          .eq('venue_id', venue.id)
-          .eq('active', true)
-          .order('sort_order');
+        bootLog('carico turni');
+        const { data: shifts, error: shErr } = await withTimeout(
+          supabase
+            .from('service_shifts')
+            .select('id, code, name, start_time, end_time, days_of_week, sort_order')
+            .eq('venue_id', venue.id)
+            .eq('active', true)
+            .order('sort_order'),
+          BOOT_FETCH_TIMEOUT_MS,
+          'TIMEOUT_TURNI'
+        );
         if (shErr) throw shErr;
 
         state.shifts = (shifts || []).map((s) => ({ ...s, days: new Set((s.days_of_week || []).map(Number)) }));
@@ -1436,23 +1540,31 @@
         state.selDate = firstSelectable();
         state.progressStep = 'date';
 
+        bootLog('controllo riepilogo salvato');
         if (await restoreCompletedSummary()) return;
 
+        bootLog('renderizzo form');
         renderCalendar();
         showState('Form');
         if (state.selDate) {
           try {
-            await loadDayAvailability();
+            await withTimeout(loadDayAvailability(), BOOT_FETCH_TIMEOUT_MS, 'TIMEOUT_DISPONIBILITA');
           } catch (err) {
-            console.error('[booking] disponibilità iniziale non caricata:', err);
+            bootError('disponibilità iniziale non caricata, il widget resta utilizzabile', err);
           }
         }
         renderTimes();
         updateSubmit();
         updateProgressNav();
       } catch (err) {
-        console.error(err);
-        fatal('Impossibile contattare il servizio prenotazioni. Riprova più tardi.');
+        bootError('Avvio fallito', err);
+        fatal('Impossibile contattare il servizio prenotazioni. Controlla la connessione e riprova.', true);
+      } finally {
+        if (window.__BOOKING_BOOT_STATUS) window.__BOOKING_BOOT_STATUS.done = true;
+        if (!$('stateLoading').hidden) {
+          fatal('Il caricamento sta impiegando troppo tempo. Controlla la connessione e riprova.', true);
+        }
+        bootLog('bootstrap concluso');
       }
     }
 
@@ -1701,7 +1813,7 @@
         markCompleted();
         showConfirm(result, waitlist);
       } catch (err) {
-        console.error(err);
+        console.error('[booking] invio prenotazione fallito:', err);
         showFormError((err.message || '').includes('TIMEOUT_INVIO')
           ? 'La richiesta sta impiegando troppo tempo. Controlla la connessione e riprova.'
           : mapError(err));
