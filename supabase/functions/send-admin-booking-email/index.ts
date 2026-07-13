@@ -290,7 +290,7 @@ function renderAdminEmail(args: {
   const customerEmail = booking.customer_email || "-";
   const emailHref = booking.customer_email ? `mailto:${booking.customer_email}` : "";
   const shiftText = shift?.start_time ? `${shift.name || "Turno"} - ${formatTime(shift.start_time)}` : "-";
-  const actionUrl = adminUrl || "#";
+  const actionUrl = adminDashboardUrl(adminUrl);
   const preheader = mode === "waitlist" ? "Nuova richiesta in lista d'attesa" : "Nuova prenotazione pubblica";
 
   return `<!doctype html>
@@ -381,6 +381,25 @@ function statusLabel(status?: string | null) {
 
 function formatTime(value: string) {
   return value.slice(0, 5);
+}
+
+function adminDashboardUrl(value: string) {
+  const raw = String(value || "").trim();
+  if (!raw) return "#";
+  try {
+    const url = new URL(raw);
+    const path = url.pathname.replace(/\/+$/, "");
+    if (!path || path === "/admin") {
+      url.pathname = `${path || "/admin"}/dashboard.html`;
+    } else if (path.endsWith("/admin/index.html")) {
+      url.pathname = path.replace(/index\.html$/, "dashboard.html");
+    }
+    return url.toString();
+  } catch (_error) {
+    return raw.endsWith("/admin") || raw.endsWith("/admin/")
+      ? raw.replace(/\/+$/, "") + "/dashboard.html"
+      : raw;
+  }
 }
 
 function escapeHtml(value: string) {

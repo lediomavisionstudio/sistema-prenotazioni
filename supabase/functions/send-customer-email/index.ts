@@ -152,7 +152,7 @@ async function loadReservation(id: string) {
       id, venue_id, reservation_date, party_size, customer_first_name,
       customer_last_name, customer_email, notes, shift_id, status, table_id,
       venue:venues(name, phone, address),
-      table:restaurant_tables(code),
+      table:restaurant_tables!reservations_table_id_fkey(code),
       shift:service_shifts(name, start_time, end_time)
     `)
     .eq("id", id)
@@ -179,7 +179,7 @@ async function loadReservation(id: string) {
       id, venue_id, reservation_date, party_size, customer_first_name,
       customer_last_name, notes, shift_id, status, table_id,
       venue:venues(name, phone, address),
-      table:restaurant_tables(code),
+      table:restaurant_tables!reservations_table_id_fkey(code),
       shift:service_shifts(name, start_time, end_time)
     `)
     .eq("id", id)
