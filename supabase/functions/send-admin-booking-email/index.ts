@@ -349,7 +349,7 @@ function renderAdminEmail(args: {
           ${row("Numero persone", String(booking.party_size))}
           ${row("Data", booking.reservation_date)}
           ${row("Orario", shiftText)}
-          ${row("Tavolo", mode === "waitlist" ? "Lista d'attesa" : table?.code || "-")}
+          ${row("Tavolo", mode === "waitlist" ? "Lista d'attesa" : table?.code || "Da assegnare")}
           ${row("Stato prenotazione", mode === "waitlist" ? "Lista d'attesa" : statusLabel(booking.status))}
         </table>
         ${booking.notes ? `<div class="note"><strong>Note</strong><br>${escapeHtml(booking.notes)}</div>` : ""}

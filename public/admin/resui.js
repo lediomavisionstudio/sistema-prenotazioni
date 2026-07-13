@@ -22,6 +22,7 @@ export function reservationCardHtml(r, opts = {}) {
   const acts = (TRANSITIONS[r.status] || []).map((t) =>
     `<button class="act ${t.cls}" data-id="${r.id}" data-to="${t.to}">${t.label}</button>`).join('');
   const emailBadge = emailVerificationBadgeHtml(r);
+  const tableControl = tableAssignmentHtml(r, opts);
   return `
     <div class="res">
       <div class="res__time">${escapeHtml(opts.timeLabel || '')}</div>
@@ -31,15 +32,32 @@ export function reservationCardHtml(r, opts = {}) {
         <div class="res__meta">
           <a href="tel:${escapeHtml(r.customer_phone)}">${escapeHtml(r.customer_phone)}</a>
           <span>${r.party_size} coperti</span>
-          <span>${opts.tableCode ? 'Tavolo ' + escapeHtml(opts.tableCode) : '— nessun tavolo'}</span>
+          <span>${opts.tableCode ? 'Tavolo ' + escapeHtml(opts.tableCode) : 'Tavolo non assegnato'}</span>
           ${opts.shiftName ? `<span>${escapeHtml(opts.shiftName)}</span>` : ''}
           ${emailBadge}
         </div>
+        ${tableControl}
         ${r.notes ? `<div class="res__notes">${escapeHtml(r.notes)}</div>` : ''}
       </div>
       <div class="res__side"><span class="badge badge--${r.status}">${STATUS_LABEL[r.status]}</span></div>
       ${acts ? `<div class="res__actions">${acts}</div>` : ''}
     </div>`;
+}
+
+function tableAssignmentHtml(r, opts = {}) {
+  if (!Array.isArray(opts.tableOptions)) return '';
+  const options = [
+    `<option value="">Tavolo non assegnato</option>`,
+    ...opts.tableOptions.map((table) => {
+      const selected = table.id === r.table_id ? ' selected' : '';
+      const disabled = table.disabled ? ' disabled' : '';
+      return `<option value="${escapeHtml(table.id)}"${selected}${disabled}>${escapeHtml(table.label)}</option>`;
+    }),
+  ].join('');
+  return `<div class="res__table-assign">
+    <select data-table-select="${escapeHtml(r.id)}" aria-label="Assegna tavolo">${options}</select>
+    <button class="act act--mute" type="button" data-table-save="${escapeHtml(r.id)}">Assegna tavolo</button>
+  </div>`;
 }
 
 function emailVerificationBadgeHtml(r) {
@@ -50,8 +68,17 @@ function emailVerificationBadgeHtml(r) {
 
 // Aggancia i click delle azioni di stato dentro `container`.
 export function wireRowActions(container, onChange) {
-  container.querySelectorAll('.act').forEach((b) =>
+  container.querySelectorAll('.act[data-id][data-to]').forEach((b) =>
     b.addEventListener('click', () => onChange(b.dataset.id, b.dataset.to)));
+}
+
+export function wireTableAssignment(container, onAssign) {
+  container.querySelectorAll('[data-table-save]').forEach((button) =>
+    button.addEventListener('click', () => {
+      const id = button.dataset.tableSave;
+      const select = button.closest('.res')?.querySelector('[data-table-select]');
+      onAssign(id, select ? select.value || null : null);
+    }));
 }
 
 // HTML di una voce della lista d'attesa. `position` è la posizione in coda

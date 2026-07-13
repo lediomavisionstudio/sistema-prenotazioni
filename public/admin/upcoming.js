@@ -5,7 +5,7 @@ import {
   supabase, requireSession, signOut, loadCurrentVenue,
   todayISO, formatLong, hhmm, escapeHtml, toast, STATUS_LABEL,
 } from './app.js';
-import { statusRank, reservationCardHtml, wireRowActions } from './resui.js';
+import { statusRank, reservationCardHtml, wireRowActions, wireTableAssignment } from './resui.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -53,7 +53,7 @@ async function init() {
 async function loadConfig() {
   const [{ data: shifts, error: e1 }, { data: tables, error: e2 }] = await Promise.all([
     supabase.from('service_shifts').select('id, name, start_time, end_time, sort_order').eq('venue_id', state.venue.id).order('sort_order'),
-    supabase.from('restaurant_tables').select('id, code').eq('venue_id', state.venue.id),
+    supabase.from('restaurant_tables').select('id, code, seats_min, seats_max').eq('venue_id', state.venue.id),
   ]);
   if (e1) throw e1;
   if (e2) throw e2;
@@ -137,6 +137,7 @@ function render() {
         timeLabel: shift ? hhmm(shift.start_time) : '',
         tableCode: r.table_id ? state.tablesById.get(r.table_id)?.code : null,
         shiftName: shift ? shift.name : '',
+        tableOptions: tableOptionsForReservation(r),
       });
     }).join('');
 
@@ -151,15 +152,65 @@ function render() {
   }).join('');
 
   wireRowActions(box, changeStatus);
+  wireTableAssignment(box, assignTable);
 }
 
 async function changeStatus(id, to) {
   const res = state.reservations.find((r) => r.id === id);
+  if (to === 'confermata' && res && !res.table_id) {
+    toast('Assegna un tavolo prima di confermare la prenotazione.', true);
+    return;
+  }
   const { error } = await supabase.from('reservations').update({ status: to }).eq('id', id);
   if (error) { console.error(error); toast('Impossibile aggiornare lo stato.', true); return; }
   toast('Stato aggiornato: ' + STATUS_LABEL[to]);
   if (res) await notifyCustomerStatusEmail(res, to);
   await load();
+}
+
+function tableOptionsForReservation(reservation) {
+  const occupied = new Set(state.reservations
+    .filter((r) =>
+      r.id !== reservation.id &&
+      r.table_id &&
+      r.reservation_date === reservation.reservation_date &&
+      r.shift_id === reservation.shift_id &&
+      r.status !== 'annullata' &&
+      r.status !== 'no_show')
+    .map((r) => r.table_id));
+
+  return [...state.tablesById.values()].map((table) => {
+    const fits = reservation.party_size >= table.seats_min && reservation.party_size <= table.seats_max;
+    const busy = occupied.has(table.id);
+    return {
+      id: table.id,
+      disabled: (!fits || busy) && table.id !== reservation.table_id,
+      label: `${table.code} (${table.seats_min}-${table.seats_max})${fits ? '' : ' - non adatto'}${busy ? ' - occupato' : ''}`,
+    };
+  });
+}
+
+async function assignTable(id, tableId) {
+  try {
+    const { error } = await supabase.rpc('assign_reservation_table', {
+      p_reservation_id: id,
+      p_table_id: tableId,
+    });
+    if (error) throw error;
+    toast(tableId ? 'Tavolo assegnato' : 'Tavolo rimosso');
+    await load();
+  } catch (error) {
+    console.error('[tables] assegnazione tavolo fallita:', error);
+    toast(tableAssignmentError(error), true);
+  }
+}
+
+function tableAssignmentError(error) {
+  const raw = `${error?.message || ''} ${error?.details || ''}`;
+  if (raw.includes('TAVOLO_NON_COMPATIBILE')) return 'Il tavolo non è compatibile con il numero di persone.';
+  if (raw.includes('TAVOLO_GIA_ASSEGNATO')) return 'Questo tavolo è già assegnato nello stesso turno.';
+  if (raw.includes('TAVOLO_NON_VALIDO')) return 'Tavolo non valido.';
+  return 'Impossibile assegnare il tavolo.';
 }
 
 async function notifyCustomerStatusEmail(reservation, status) {
@@ -188,7 +239,6 @@ async function notifyCustomerStatusEmail(reservation, status) {
       reservation_date: reservation.reservation_date,
       reservation_time: reservation.shift_id ? (state.shiftsById.get(reservation.shift_id)?.start_time || null) : null,
       party_size: reservation.party_size,
-      table_code: reservation.table_id ? (state.tablesById.get(reservation.table_id)?.code || null) : null,
       fallback_email: reservation.customer_email || null,
       fallback_customer_name: `${reservation.customer_first_name || ''} ${reservation.customer_last_name || ''}`.trim(),
       fallback_notes: reservation.notes || null,

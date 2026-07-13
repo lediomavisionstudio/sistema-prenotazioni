@@ -216,7 +216,6 @@ function buildEmail(
     ["Persone", String(booking.party_size)],
     ["Nome", name],
   ];
-  if (booking.table?.code) details.push(["Tavolo", booking.table.code]);
   if (booking.status) details.push(["Stato", statusLabel(booking.status)]);
   const notes = booking.notes || fallback.notes;
   if (notes) details.push(["Note", notes]);
