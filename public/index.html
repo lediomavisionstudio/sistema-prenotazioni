@@ -891,11 +891,21 @@
     };
     window.addEventListener('error', function (event) {
       var status = window.__BOOKING_BOOT_STATUS || {};
-      if (!status.done) window.__showBookingBootError('Impossibile avviare il sistema prenotazioni. Ricarica la pagina e riprova.', event.error || event.message);
+      if (!status.done) console.error('[BOOT] errore runtime durante bootstrap', {
+        message: event.message,
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+        error: event.error,
+        stack: event.error && event.error.stack,
+      });
     });
     window.addEventListener('unhandledrejection', function (event) {
       var status = window.__BOOKING_BOOT_STATUS || {};
-      if (!status.done) window.__showBookingBootError('Impossibile avviare il sistema prenotazioni. Ricarica la pagina e riprova.', event.reason);
+      if (!status.done) console.error('[BOOT] Promise non gestita durante bootstrap', {
+        reason: event.reason,
+        stack: event.reason && event.reason.stack,
+      });
     });
     window.setTimeout(function () {
       var status = window.__BOOKING_BOOT_STATUS || {};
@@ -917,7 +927,7 @@
     }, window.APP_CONFIG || {});
 
     const params = new URLSearchParams(location.search);
-    const venueSlug = params.get('locale') || CONFIG.DEFAULT_VENUE_SLUG;
+    const venueSlug = params.get('locale') || params.get('venue') || CONFIG.DEFAULT_VENUE_SLUG;
 
     const MAX_PARTY = 12, MIN_PARTY = 1;
 
@@ -1059,7 +1069,39 @@
     }
 
     function bootError(message, error) {
-      console.error('[BOOT] ' + message, error);
+      console.error('[BOOT] ' + message, {
+        error,
+        message: error && error.message,
+        code: error && error.code,
+        details: error && error.details,
+        hint: error && error.hint,
+        stack: error && error.stack,
+      });
+    }
+
+    async function bootStep(name, promise, options = {}) {
+      const timeoutMs = options.timeoutMs || BOOT_FETCH_TIMEOUT_MS;
+      bootLog(`${name}: richiesta avviata`);
+      try {
+        const result = await withTimeout(promise, timeoutMs, options.timeoutMessage || `TIMEOUT_${name}`);
+        if (result && result.error) {
+          bootError(`${name}: richiesta fallita`, result.error);
+        } else {
+          bootLog(`${name}: richiesta completata`, summarizeBootResult(result));
+        }
+        return result;
+      } catch (err) {
+        bootError(`${name}: eccezione`, err);
+        throw err;
+      }
+    }
+
+    function summarizeBootResult(result) {
+      if (!result || !('data' in result)) return result;
+      const data = result.data;
+      if (Array.isArray(data)) return { rows: data.length };
+      if (data && typeof data === 'object') return { keys: Object.keys(data), id: data.id || null, slug: data.slug || null };
+      return { data };
     }
 
     function mapError(err) {
@@ -1466,39 +1508,52 @@
         retryBtn.hidden = true;
         retryBtn.addEventListener('click', () => window.location.reload(), { once: true });
       }
-      const privacyUrl = withLocale(CONFIG.PRIVACY_URL || 'privacy-policy.html');
-      $('privacyLink').href = privacyUrl;
-      $('footerPrivacyLink').href = privacyUrl;
-      $('detailsPrivacyLink').href = privacyUrl;
-      $('detailsCookieLink').href = withLocale('cookie-policy.html');
-      $('detailsTermsLink').href = withLocale('booking-terms.html');
-      document.querySelectorAll('.footer__links a').forEach((link) => {
-        if (link.id === 'footerPrivacyLink') return;
-        link.href = withLocale(link.getAttribute('href'));
-      });
-      $('cookiePrefs').addEventListener('click', () => {
-        try {
-          if (window.CookieConsent) window.CookieConsent.openPreferences();
-        } catch (err) {
-          bootError('preferenze cookie non apribili', err);
-        }
-      });
+      try {
+        bootLog('parametri URL letti', {
+          locale: params.get('locale'),
+          venue: params.get('venue'),
+          defaultVenueSlug: CONFIG.DEFAULT_VENUE_SLUG || null,
+          venueSlug,
+        });
+        const privacyUrl = withLocale(CONFIG.PRIVACY_URL || 'privacy-policy.html');
+        $('privacyLink').href = privacyUrl;
+        $('footerPrivacyLink').href = privacyUrl;
+        $('detailsPrivacyLink').href = privacyUrl;
+        $('detailsCookieLink').href = withLocale('cookie-policy.html');
+        $('detailsTermsLink').href = withLocale('booking-terms.html');
+        document.querySelectorAll('.footer__links a').forEach((link) => {
+          if (link.id === 'footerPrivacyLink') return;
+          link.href = withLocale(link.getAttribute('href'));
+        });
+        $('cookiePrefs').addEventListener('click', () => {
+          try {
+            if (window.CookieConsent) window.CookieConsent.openPreferences();
+          } catch (err) {
+            bootError('preferenze cookie non apribili', err);
+          }
+        });
 
-      if (!venueSlug) return fatal('Link non valido: manca l\'identificativo del locale.', true);
+        if (!venueSlug) return fatal('Link non valido: manca l\'identificativo del locale.', true);
+      } catch (err) {
+        bootError('configurazione iniziale bootstrap fallita', err);
+        fatal('Impossibile avviare il sistema prenotazioni. Ricarica la pagina e riprova.', true);
+        if (window.__BOOKING_BOOT_STATUS) window.__BOOKING_BOOT_STATUS.done = true;
+        return;
+      }
 
       try {
         // select('*') così il widget non si rompe se la migration del branding
         // (colonne brand_*) non è ancora applicata: i campi mancanti restano
         // undefined e applyBranding lascia il tema di default.
         bootLog('carico locale', { venueSlug });
-        const { data: venue, error } = await withTimeout(
+        const { data: venue, error } = await bootStep(
+          'caricamento venue',
           supabase
             .from('venues')
             .select('*')
             .eq('slug', venueSlug)
             .maybeSingle(),
-          BOOT_FETCH_TIMEOUT_MS,
-          'TIMEOUT_LOCALE'
+          { timeoutMessage: 'TIMEOUT_LOCALE' }
         );
         if (error) throw error;
         if (!venue || !venue.active) return fatal('Locale non trovato o non disponibile per le prenotazioni online.', true);
@@ -1512,13 +1567,13 @@
         // Chiusure straordinarie (per disabilitare quei giorni nel calendario)
         bootLog('carico chiusure');
         try {
-          const { data: closures, error: closuresError } = await withTimeout(
+          const { data: closures, error: closuresError } = await bootStep(
+            'caricamento venue_closures',
             supabase
               .from('venue_closures')
               .select('closed_date')
               .eq('venue_id', venue.id),
-            BOOT_FETCH_TIMEOUT_MS,
-            'TIMEOUT_CHIUSURE'
+            { timeoutMessage: 'TIMEOUT_CHIUSURE' }
           );
           if (closuresError) throw closuresError;
           state.closures = new Set((closures || []).map((c) => c.closed_date));
@@ -1529,15 +1584,15 @@
 
         // Turni attivi (leggibili pubblicamente): danno i giorni aperti e gli orari.
         bootLog('carico turni');
-        const { data: shifts, error: shErr } = await withTimeout(
+        const { data: shifts, error: shErr } = await bootStep(
+          'caricamento service_shifts',
           supabase
             .from('service_shifts')
             .select('id, code, name, start_time, end_time, days_of_week, sort_order')
             .eq('venue_id', venue.id)
             .eq('active', true)
             .order('sort_order'),
-          BOOT_FETCH_TIMEOUT_MS,
-          'TIMEOUT_TURNI'
+          { timeoutMessage: 'TIMEOUT_TURNI' }
         );
         if (shErr) throw shErr;
 
@@ -1562,7 +1617,11 @@
         showState('Form');
         if (state.selDate) {
           try {
-            await withTimeout(loadDayAvailability(), BOOT_FETCH_TIMEOUT_MS, 'TIMEOUT_DISPONIBILITA');
+            await bootStep(
+              'caricamento disponibilità iniziale',
+              loadDayAvailability(),
+              { timeoutMessage: 'TIMEOUT_DISPONIBILITA' }
+            );
           } catch (err) {
             bootError('disponibilità iniziale non caricata, il widget resta utilizzabile', err);
           }
