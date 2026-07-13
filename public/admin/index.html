@@ -39,13 +39,18 @@
     </div>
   </div>
 
-  <script src="../assets/js/config.js"></script>
+  <script src="/assets/js/config.js"></script>
   <script src="../assets/js/pwa.js"></script>
   <script type="module">
     import { supabase } from './app.js';
 
     // Se già autenticato, vai diretto alla dashboard.
     (async () => {
+      if (!supabase) {
+        show('Configurazione gestionale non disponibile. Ricarica la pagina o verifica il deploy.');
+        btn.disabled = true;
+        return;
+      }
       const { data: { session } } = await supabase.auth.getSession();
       if (session) location.replace('dashboard.html');
     })();
@@ -60,6 +65,7 @@
       const email = form.email.value.trim();
       const password = form.password.value;
       if (!email || !password) { show('Inserisci email e password.'); return; }
+      if (!supabase) { show('Configurazione gestionale non disponibile. Ricarica la pagina o verifica il deploy.'); return; }
 
       btn.disabled = true; btn.textContent = 'Accesso…';
       const { error } = await supabase.auth.signInWithPassword({ email, password });

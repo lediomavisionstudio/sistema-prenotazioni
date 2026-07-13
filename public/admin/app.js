@@ -4,16 +4,29 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
 const CONFIG = window.APP_CONFIG || {};
-if (!CONFIG.SUPABASE_URL || CONFIG.SUPABASE_URL.includes('xxxx')) {
-  console.warn('[config] Supabase non configurato: copia assets/js/config.example.js in config.js.');
+const hasSupabaseConfig = !!(
+  CONFIG.SUPABASE_URL &&
+  !CONFIG.SUPABASE_URL.includes('xxxx') &&
+  CONFIG.SUPABASE_ANON_KEY &&
+  !CONFIG.SUPABASE_ANON_KEY.includes('...')
+);
+
+if (!hasSupabaseConfig) {
+  console.error('[config] Supabase non configurato: /assets/js/config.js mancante o incompleto.');
 }
 
-export const supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
-  auth: { persistSession: true, autoRefreshToken: true },
-});
+export const supabase = hasSupabaseConfig
+  ? createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
+      auth: { persistSession: true, autoRefreshToken: true },
+    })
+  : null;
 
 // --- Guardia auth: reindirizza al login se non c'è sessione ----------------
 export async function requireSession() {
+  if (!supabase) {
+    document.body.innerHTML = '<div class="login-wrap"><div class="login-card"><h1>Configurazione mancante</h1><p class="sub">Impossibile caricare la configurazione del gestionale. Ricarica la pagina o verifica il deploy.</p></div></div>';
+    return null;
+  }
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
     location.replace('index.html');

@@ -4,5 +4,6 @@ node_modules/
 .supabase/
 supabase/.temp/
 
-# Config con i valori del progetto Supabase (generato da config.example.js)
-public/assets/js/config.js
+# Config pubblica del frontend statico.
+# Contiene solo Supabase URL e anon/publishable key, mai service_role o segreti server-side.
+!public/assets/js/config.js

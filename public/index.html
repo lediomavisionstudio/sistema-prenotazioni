@@ -863,7 +863,7 @@
     </footer>
   </div>
 
-  <script src="assets/js/config.js"></script>
+  <script src="/assets/js/config.js"></script>
   <script src="assets/js/pwa.js"></script>
   <script src="assets/js/cookie-consent.js"></script>
   <script>
@@ -944,8 +944,14 @@
       NESSUNA_DISPONIBILITA: 'Non c\'è più posto per questa scelta. Prova un altro orario o data.',
     };
 
-    if (!CONFIG.SUPABASE_URL || CONFIG.SUPABASE_URL.includes('xxxx')) {
-      console.warn('[config] Supabase non configurato: copia assets/js/config.example.js in config.js.');
+    function isSupabaseConfigReady(config) {
+      return !!(
+        config &&
+        config.SUPABASE_URL &&
+        !config.SUPABASE_URL.includes('xxxx') &&
+        config.SUPABASE_ANON_KEY &&
+        !config.SUPABASE_ANON_KEY.includes('...')
+      );
     }
 
     const BOOT_FETCH_TIMEOUT_MS = 12000;
@@ -972,10 +978,15 @@
       }
     }
 
-    const supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
-      auth: { persistSession: false },
-      global: { fetch: fetchWithTimeout },
-    });
+    let supabase = null;
+    if (isSupabaseConfigReady(CONFIG)) {
+      supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
+        auth: { persistSession: false },
+        global: { fetch: fetchWithTimeout },
+      });
+    } else {
+      console.error('[config] Supabase non configurato: /assets/js/config.js mancante o incompleto.');
+    }
 
     // -------------------------------------------------------------------
     // Stato
@@ -1507,6 +1518,16 @@
       if (retryBtn) {
         retryBtn.hidden = true;
         retryBtn.addEventListener('click', () => window.location.reload(), { once: true });
+      }
+      if (!supabase) {
+        bootError('config Supabase mancante', {
+          hasAppConfig: !!window.APP_CONFIG,
+          hasUrl: !!CONFIG.SUPABASE_URL,
+          hasAnonKey: !!CONFIG.SUPABASE_ANON_KEY,
+        });
+        fatal('Configurazione prenotazioni non disponibile. Ricarica la pagina o contatta il locale.', true);
+        if (window.__BOOKING_BOOT_STATUS) window.__BOOKING_BOOT_STATUS.done = true;
+        return;
       }
       try {
         bootLog('parametri URL letti', {
