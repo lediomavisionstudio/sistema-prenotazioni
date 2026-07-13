@@ -868,18 +868,16 @@
   <script src="assets/js/cookie-consent.js"></script>
   <script>
     window.__BOOKING_BOOT_STATUS = { done: false };
-    window.setTimeout(function () {
-      var status = window.__BOOKING_BOOT_STATUS || {};
+    window.__showBookingBootError = function (message, error) {
+      if (error) console.error('[BOOT] errore globale', error);
       var loading = document.getElementById('stateLoading');
-      if (status.done || !loading || loading.hidden) return;
-      console.error('[BOOT] timeout watchdog: bootstrap non completato');
       var fatal = document.getElementById('stateFatal');
       var form = document.getElementById('stateForm');
       var confirm = document.getElementById('stateConfirm');
       var card = document.getElementById('bookingCard');
       var msg = document.getElementById('fatalMsg');
       var retry = document.getElementById('retryBootBtn');
-      loading.hidden = true;
+      if (loading) loading.hidden = true;
       if (form) form.hidden = true;
       if (confirm) confirm.hidden = true;
       if (fatal) fatal.hidden = false;
@@ -887,8 +885,24 @@
         card.classList.remove('is-loading');
         card.classList.add('is-ready');
       }
-      if (msg) msg.textContent = 'Il caricamento sta impiegando troppo tempo. Controlla la connessione e riprova.';
+      if (msg) msg.textContent = message || 'Impossibile avviare il sistema prenotazioni. Controlla la connessione e riprova.';
       if (retry) retry.hidden = false;
+      if (window.__BOOKING_BOOT_STATUS) window.__BOOKING_BOOT_STATUS.done = true;
+    };
+    window.addEventListener('error', function (event) {
+      var status = window.__BOOKING_BOOT_STATUS || {};
+      if (!status.done) window.__showBookingBootError('Impossibile avviare il sistema prenotazioni. Ricarica la pagina e riprova.', event.error || event.message);
+    });
+    window.addEventListener('unhandledrejection', function (event) {
+      var status = window.__BOOKING_BOOT_STATUS || {};
+      if (!status.done) window.__showBookingBootError('Impossibile avviare il sistema prenotazioni. Ricarica la pagina e riprova.', event.reason);
+    });
+    window.setTimeout(function () {
+      var status = window.__BOOKING_BOOT_STATUS || {};
+      var loading = document.getElementById('stateLoading');
+      if (status.done || !loading || loading.hidden) return;
+      console.error('[BOOT] timeout watchdog: bootstrap non completato');
+      window.__showBookingBootError('Il caricamento sta impiegando troppo tempo. Controlla la connessione e riprova.');
     }, 20000);
   </script>
   <script type="module">
@@ -2061,7 +2075,14 @@
     }
     $('newBtn').addEventListener('click', reset);
 
-    init();
+    init().catch((err) => {
+      bootError('Promise init non gestita', err);
+      if (window.__showBookingBootError) {
+        window.__showBookingBootError('Impossibile avviare il sistema prenotazioni. Ricarica la pagina e riprova.', err);
+      } else {
+        fatal('Impossibile avviare il sistema prenotazioni. Ricarica la pagina e riprova.', true);
+      }
+    });
   </script>
 </body>
 </html>
