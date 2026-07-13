@@ -149,23 +149,25 @@
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
       width: calc(100% + 20px);
-      min-height: 60px;
+      min-height: 66px;
       margin: 0 -10px 22px;
-      padding: 4px;
-      border: 1px solid rgba(227, 214, 186, 0.95);
-      border-radius: 17px;
+      padding: 5px;
+      border: 1px solid rgba(227, 214, 186, 0.98);
+      border-radius: 20px;
       background:
-        linear-gradient(180deg, rgba(255,255,255,0.58), rgba(255,255,255,0)),
-        rgba(247,239,219,0.9);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.76), 0 10px 26px rgba(58, 43, 35, 0.09);
+        linear-gradient(180deg, rgba(255,255,255,0.84), rgba(255,255,255,0.16)),
+        linear-gradient(135deg, rgba(247,239,219,0.98), rgba(255,253,246,0.82));
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.92),
+        0 14px 32px rgba(58, 43, 35, 0.10);
       overflow: hidden;
     }
     .progress-nav__item {
       position: relative;
       min-width: 0;
-      min-height: 52px;
+      min-height: 56px;
       border: 1px solid transparent;
-      border-radius: 14px;
+      border-radius: 16px;
       background: transparent;
       color: var(--ink-soft);
       font: inherit;
@@ -178,21 +180,22 @@
       justify-content: center;
       gap: 7px;
       padding: 0 7px;
-      transition: background 230ms ease, color 230ms ease, box-shadow 230ms ease, opacity 230ms ease, transform 230ms ease, border-color 230ms ease;
+      isolation: isolate;
+      transition: background 240ms ease, color 240ms ease, box-shadow 240ms ease, opacity 240ms ease, transform 240ms ease, border-color 240ms ease;
     }
     .progress-nav__item + .progress-nav__item::before {
       content: "";
       position: absolute;
-      left: -4px;
-      top: 10px;
-      bottom: 10px;
+      left: -5px;
+      top: 12px;
+      bottom: 12px;
       width: 1px;
-      background: linear-gradient(180deg, transparent, rgba(122,106,93,.28), transparent);
-      transition: opacity 230ms ease;
+      background: linear-gradient(180deg, transparent, rgba(122,106,93,.22), transparent);
+      transition: opacity 240ms ease;
     }
     .progress-nav__icon {
-      width: 22px;
-      height: 22px;
+      width: 24px;
+      height: 24px;
       flex: none;
       border-radius: 999px;
       display: grid;
@@ -200,7 +203,9 @@
       color: inherit;
       font-size: 0.92rem;
       line-height: 1;
-      transition: background 230ms ease, color 230ms ease, transform 230ms ease;
+      background: rgba(255,253,246,.5);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.68);
+      transition: background 240ms ease, color 240ms ease, transform 240ms ease, box-shadow 240ms ease;
     }
     .progress-nav__label {
       min-width: 0;
@@ -209,25 +214,29 @@
       white-space: nowrap;
     }
     .progress-nav__item.is-active {
-      background: linear-gradient(180deg, var(--tomato), var(--tomato-dark));
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,0)),
+        linear-gradient(180deg, var(--tomato), var(--tomato-dark));
       border-color: rgba(255,255,255,.28);
       color: #fff;
       opacity: 1;
       cursor: default;
-      box-shadow: 0 9px 20px rgba(200, 64, 42, 0.27);
-      transform: translateY(-1px);
+      box-shadow: 0 12px 24px rgba(200, 64, 42, 0.28), inset 0 1px 0 rgba(255,255,255,.18);
+      transform: translateY(-2px);
     }
     .progress-nav__item.is-active .progress-nav__icon {
-      background: rgba(255,255,255,.16);
+      background: rgba(255,255,255,.18);
       color: #fff;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.26);
+      transform: scale(1.04);
     }
     .progress-nav__item.is-complete {
-      background: rgba(255,253,246,.82);
+      background: rgba(255,253,246,.92);
       border-color: rgba(227, 214, 186, 0.95);
       color: var(--tomato-dark);
       opacity: 1;
       cursor: pointer;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 6px 14px rgba(58,43,35,.05);
     }
     .progress-nav__item.is-complete:hover {
       background: var(--tomato-soft);
@@ -238,9 +247,11 @@
       background: var(--tomato-soft);
       color: var(--tomato-dark);
       font-weight: 800;
+      box-shadow: inset 0 0 0 1px rgba(200,64,42,.14);
     }
     .progress-nav__item.is-future {
-      background: rgba(236, 228, 211, .34);
+      background: rgba(236, 228, 211, .24);
+      color: rgba(122,106,93,.86);
     }
     .progress-nav__item.is-active::before,
     .progress-nav__item.is-active + .progress-nav__item::before {
@@ -251,9 +262,9 @@
       outline-offset: -2px;
     }
     @media (max-width: 380px) {
-      .progress-nav { min-height: 60px; border-radius: 15px; }
-      .progress-nav__item { min-height: 52px; gap: 4px; font-size: 0.7rem; padding: 0 4px; }
-      .progress-nav__icon { width: 19px; height: 19px; font-size: 0.78rem; }
+      .progress-nav { min-height: 62px; border-radius: 17px; padding: 4px; }
+      .progress-nav__item { min-height: 54px; gap: 4px; font-size: 0.7rem; padding: 0 4px; border-radius: 14px; }
+      .progress-nav__icon { width: 20px; height: 20px; font-size: 0.78rem; }
     }
 
     .progress-copy {
@@ -308,8 +319,34 @@
     .stepper__btn:hover:not(:disabled) { border-color: var(--tomato); background: var(--tomato-soft); }
     .stepper__btn:active:not(:disabled) { transform: scale(.92); }
     .stepper__btn:disabled { opacity: .4; cursor: not-allowed; }
-    .stepper__value { text-align: center; }
-    .stepper__num { font-family: var(--font-title); font-weight: 700; font-size: 1.7rem; line-height: 1; }
+    .stepper__value { text-align: center; min-width: 96px; }
+    .stepper__num {
+      width: 86px;
+      border: 1.5px solid transparent;
+      border-radius: 14px;
+      background: rgba(255,253,246,.72);
+      color: var(--ink);
+      font-family: var(--font-title);
+      font-weight: 700;
+      font-size: 1.7rem;
+      line-height: 1;
+      text-align: center;
+      padding: 8px 10px;
+      outline: none;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.74);
+      transition: border-color .18s ease, background .18s ease, box-shadow .18s ease;
+      -moz-appearance: textfield;
+    }
+    .stepper__num::-webkit-outer-spin-button,
+    .stepper__num::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    .stepper__num:focus {
+      background: var(--surface);
+      border-color: rgba(200,64,42,.45);
+      box-shadow: 0 0 0 3px var(--tomato-soft), inset 0 1px 0 rgba(255,255,255,.78);
+    }
     .stepper__unit { display: block; font-size: 0.75rem; color: var(--ink-soft); margin-top: 2px; }
 
     /* Calendario mensile -------------------------------------------------- */
@@ -733,7 +770,7 @@
           <div class="stepper">
             <button class="stepper__btn" type="button" id="coMinus" aria-label="Diminuisci coperti">−</button>
             <div class="stepper__value">
-              <div class="stepper__num" id="coValue" aria-live="polite">2</div>
+              <input class="stepper__num" id="coValue" type="number" inputmode="numeric" pattern="[0-9]*" min="1" max="12" step="1" value="2" aria-label="Numero persone" aria-live="polite" />
               <span class="stepper__unit" id="coUnit">persone</span>
             </div>
             <button class="stepper__btn" type="button" id="coPlus" aria-label="Aumenta coperti">+</button>
@@ -1261,7 +1298,7 @@
     function focusStep(key) {
       const focusMap = {
         date: '#calGrid button:not(:disabled)',
-        people: '#coPlus',
+        people: '#coValue',
         time: '#timeRow button:not(:disabled)',
         details: '#firstName',
       };
@@ -1708,13 +1745,29 @@
     // Coperti
     // -------------------------------------------------------------------
     async function changeCoperti(delta) {
-      const next = Math.min(MAX_PARTY, Math.max(MIN_PARTY, state.coperti + delta));
+      await setCoperti(state.coperti + delta);
+    }
+
+    function normalizeCopertiValue(value) {
+      const digits = String(value ?? '').replace(/\D/g, '');
+      const parsed = Number.parseInt(digits, 10);
+      if (!Number.isFinite(parsed)) return MIN_PARTY;
+      return Math.min(MAX_PARTY, Math.max(MIN_PARTY, parsed));
+    }
+
+    function syncCopertiUi() {
+      const input = $('coValue');
+      if (input) input.value = String(state.coperti);
+      $('coUnit').textContent = state.coperti === 1 ? 'persona' : 'persone';
+      $('coMinus').disabled = state.coperti <= MIN_PARTY;
+      $('coPlus').disabled = state.coperti >= MAX_PARTY;
+    }
+
+    async function setCoperti(value) {
+      const next = normalizeCopertiValue(value);
       if (next === state.coperti) return;
       state.coperti = next;
-      $('coValue').textContent = next;
-      $('coUnit').textContent = next === 1 ? 'persona' : 'persone';
-      $('coMinus').disabled = next <= MIN_PARTY;
-      $('coPlus').disabled = next >= MAX_PARTY;
+      syncCopertiUi();
       state.selShift = null;
       try {
         await loadDayAvailability();
@@ -1722,6 +1775,13 @@
         updateSubmit();
         updateProgressNav();
       } catch (err) { console.error(err); fatal(mapError(err)); }
+    }
+
+    function sanitizeCopertiInput() {
+      const input = $('coValue');
+      const next = normalizeCopertiValue(input.value);
+      input.value = String(next);
+      setCoperti(next);
     }
 
     // -------------------------------------------------------------------
@@ -2124,7 +2184,21 @@
     // -------------------------------------------------------------------
     $('coMinus').addEventListener('click', () => changeCoperti(-1));
     $('coPlus').addEventListener('click', () => changeCoperti(+1));
-    $('coMinus').disabled = state.coperti <= MIN_PARTY;
+    $('coValue').min = String(MIN_PARTY);
+    $('coValue').max = String(MAX_PARTY);
+    $('coValue').addEventListener('keydown', (event) => {
+      if (['e', 'E', '+', '-', '.', ','].includes(event.key)) event.preventDefault();
+    });
+    $('coValue').addEventListener('paste', (event) => {
+      const clipboard = event.clipboardData || window.clipboardData;
+      const text = clipboard ? clipboard.getData('text') : '';
+      if (!/^\d+$/.test(text.trim())) event.preventDefault();
+    });
+    $('coValue').addEventListener('input', sanitizeCopertiInput);
+    $('coValue').addEventListener('change', sanitizeCopertiInput);
+    $('coValue').addEventListener('blur', sanitizeCopertiInput);
+    $('coValue').addEventListener('focus', (event) => event.target.select());
+    syncCopertiUi();
     $('calPrev').addEventListener('click', () => shiftMonth(-1));
     $('calNext').addEventListener('click', () => shiftMonth(+1));
     $('dateNext').addEventListener('click', () => goStep(1));
