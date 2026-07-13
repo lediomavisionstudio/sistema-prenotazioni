@@ -66,13 +66,36 @@ async function load() {
   const today = todayISO();
   const { data, error } = await supabase
     .from('reservations')
-    .select('id, reservation_date, shift_id, party_size, customer_first_name, customer_last_name, customer_phone, customer_email, notes, status, source, table_id, created_at')
+    .select('id, reservation_date, shift_id, party_size, customer_first_name, customer_last_name, customer_phone, customer_email, notes, status, source, table_id, client_request_id, created_at')
     .eq('venue_id', state.venue.id)
     .gte('reservation_date', today)
     .order('reservation_date', { ascending: true });
   if (error) throw error;
-  state.reservations = data || [];
+  state.reservations = await withEmailVerificationStatus(data || []);
   render();
+}
+
+async function withEmailVerificationStatus(rows) {
+  const candidates = rows.filter((r) => r.customer_email && r.client_request_id);
+  if (!candidates.length) return rows.map((r) => ({ ...r, email_verified: false }));
+  try {
+    const { data, error } = await supabase
+      .from('email_verification_codes')
+      .select('client_request_id, email, verified_at')
+      .eq('venue_id', state.venue.id)
+      .in('client_request_id', candidates.map((r) => r.client_request_id));
+    if (error) throw error;
+    const verified = new Set((data || [])
+      .filter((row) => row.verified_at)
+      .map((row) => `${row.client_request_id}|${String(row.email || '').toLowerCase()}`));
+    return rows.map((r) => ({
+      ...r,
+      email_verified: !!(r.customer_email && r.client_request_id && verified.has(`${r.client_request_id}|${String(r.customer_email).toLowerCase()}`)),
+    }));
+  } catch (e) {
+    console.warn('[email-verification] stato non disponibile:', e.message || e);
+    return rows.map((r) => ({ ...r, email_verified: false }));
+  }
 }
 
 function render() {

@@ -492,6 +492,12 @@
       background: #fff9f7;
     }
     .field textarea { resize: vertical; min-height: 64px; }
+    .field-help {
+      margin: -1px 0 0;
+      color: var(--ink-soft);
+      font-size: 0.78rem;
+      line-height: 1.35;
+    }
     .field-error {
       min-height: 18px;
       color: var(--tomato-dark);
@@ -715,6 +721,38 @@
       gap: 10px;
       margin-top: 20px;
     }
+    .modal__actions--three {
+      grid-template-columns: 1fr;
+    }
+    .otp-field {
+      width: 100%;
+      margin-top: 18px;
+      padding: 14px 16px;
+      border: 1.5px solid var(--line);
+      border-radius: 14px;
+      background: var(--surface-soft);
+      color: var(--ink);
+      font: inherit;
+      font-size: 1.45rem;
+      font-weight: 800;
+      letter-spacing: 0.42em;
+      text-align: center;
+      transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+    }
+    .otp-field:focus {
+      outline: none;
+      border-color: var(--tomato);
+      background: var(--surface);
+      box-shadow: 0 0 0 4px var(--tomato-soft);
+    }
+    .otp-status {
+      min-height: 20px;
+      margin: 10px 0 0;
+      color: var(--ink-soft);
+      font-size: .86rem;
+      line-height: 1.35;
+    }
+    .otp-status.is-error { color: var(--tomato-dark); }
     .submit-loader {
       display: inline-grid;
       width: 18px;
@@ -860,7 +898,8 @@
             </div>
             <div class="field">
               <label for="email">Email</label>
-              <input id="email" name="email" type="email" autocomplete="email" maxlength="120" required aria-describedby="emailError" />
+              <input id="email" name="email" type="email" autocomplete="email" maxlength="120" aria-describedby="emailHelp emailError" />
+              <p class="field-help" id="emailHelp">Inserisci l'email per ricevere conferme e aggiornamenti sulla prenotazione.</p>
               <div class="field-error" id="emailError" aria-live="polite"></div>
             </div>
             <div class="field">
@@ -936,6 +975,21 @@
           <div class="modal__actions">
             <button class="btn btn--ghost" type="button" id="confirmCancel">Annulla</button>
             <button class="btn btn--danger" type="button" id="confirmSend">Inoltra richiesta</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal" id="otpModal" role="dialog" aria-modal="true" aria-labelledby="otpModalTitle" hidden>
+        <div class="modal__card">
+          <h2 class="modal__title" id="otpModalTitle">Verifica indirizzo email</h2>
+          <p class="modal__text">Abbiamo inviato un codice di verifica.</p>
+          <p class="modal__text">Inseriscilo per continuare.</p>
+          <input class="otp-field" id="otpCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" aria-label="Codice di verifica email" />
+          <p class="otp-status" id="otpStatus" aria-live="polite"></p>
+          <div class="modal__actions modal__actions--three">
+            <button class="btn btn--primary" type="button" id="otpVerify">Verifica</button>
+            <button class="btn btn--ghost" type="button" id="otpResend">Invia nuovamente</button>
+            <button class="btn btn--ghost" type="button" id="otpCancel">Annulla</button>
           </div>
         </div>
       </div>
@@ -1029,6 +1083,7 @@
       COPERTI_NON_VALIDI: 'Numero di coperti non valido.',
       DATI_CLIENTE_INCOMPLETI: 'Compila nome, cognome e telefono.',
       EMAIL_NON_VALIDA: 'Inserisci un indirizzo email valido.',
+      EMAIL_NON_VERIFICATA: 'Verifica l\'indirizzo email prima di completare la prenotazione.',
       PRIVACY_NON_ACCETTATA: 'Per prenotare devi accettare la Privacy Policy.',
       NESSUNA_DISPONIBILITA: 'Non c\'è più posto per questa scelta. Prova un altro orario o data.',
     };
@@ -1095,6 +1150,13 @@
       submitting: false,
       completed: false,
       requestId: null,
+      otp: {
+        email: null,
+        verifiedRequestId: null,
+        verifiedEmail: null,
+        sending: false,
+        verifying: false,
+      },
     };
 
     // -------------------------------------------------------------------
@@ -1386,8 +1448,7 @@
       const input = $('email');
       const value = input.value.trim();
       let message = '';
-      if (!value) message = 'Email obbligatoria.';
-      else if (!input.checkValidity() || !emailRegex.test(value)) message = 'Inserisci un indirizzo email valido.';
+      if (value && (!input.checkValidity() || !emailRegex.test(value))) message = 'Inserisci un indirizzo email valido.';
       return setFieldError(input, 'emailError', message, show);
     }
 
@@ -1454,10 +1515,47 @@
       $('submitBtn').focus({ preventScroll: true });
     }
 
+    function otpIsVerified(email) {
+      return !!email &&
+        state.otp.verifiedRequestId === state.requestId &&
+        state.otp.verifiedEmail === email.toLowerCase();
+    }
+
+    function setOtpStatus(message = '', isError = false) {
+      const el = $('otpStatus');
+      if (!el) return;
+      el.textContent = message;
+      el.classList.toggle('is-error', !!isError);
+    }
+
+    function setOtpBusy(isBusy) {
+      state.otp.sending = isBusy;
+      state.otp.verifying = isBusy;
+      ['otpVerify', 'otpResend', 'otpCancel', 'otpCode'].forEach((id) => {
+        const el = $(id);
+        if (el) el.disabled = isBusy;
+      });
+    }
+
+    function openOtpModal(email) {
+      state.otp.email = email.toLowerCase();
+      $('confirmModal').hidden = true;
+      $('otpCode').value = '';
+      setOtpStatus('Controlla la tua casella email. Il codice scade tra 10 minuti.');
+      $('otpModal').hidden = false;
+      $('otpCode').focus({ preventScroll: true });
+    }
+
+    function closeOtpModal() {
+      if (state.submitting || state.otp.sending || state.otp.verifying) return;
+      $('otpModal').hidden = true;
+      $('submitBtn').focus({ preventScroll: true });
+    }
+
     function setSubmitting(isSubmitting) {
       state.submitting = isSubmitting;
       $('stateForm').classList.toggle('form-lock', isSubmitting);
-      document.querySelectorAll('#stateForm button, #stateForm input, #stateForm textarea, #stateForm select, #confirmCancel, #confirmSend')
+      document.querySelectorAll('#stateForm button, #stateForm input, #stateForm textarea, #stateForm select, #confirmCancel, #confirmSend, #otpVerify, #otpResend, #otpCancel, #otpCode')
         .forEach((el) => el.disabled = isSubmitting || (el.id === 'submitBtn' && !validateDetails(false)));
       $('confirmSend').innerHTML = isSubmitting ? '<span class="submit-loader" aria-hidden="true"></span>Invio...' : 'Inoltra richiesta';
       $('formError').hidden = true;
@@ -1975,7 +2073,7 @@
       openConfirmModal();
     }
 
-    async function submitReservation() {
+    async function submitReservation(options = {}) {
       if (state.submitting || state.completed) return;
       const form = $('bookingForm');
       const errBox = $('formError');
@@ -1996,6 +2094,22 @@
       const waitlist = isWaitlist();
       const btn = $('submitBtn');
       state.requestId = state.requestId || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
+
+      if (email && !options.skipOtp && !otpIsVerified(email)) {
+        setSubmitting(true);
+        try {
+          await requestEmailOtp(email);
+          openOtpModal(email);
+        } catch (err) {
+          console.error('[otp] invio codice fallito:', err);
+          showFormError(mapOtpError(err));
+          $('confirmModal').hidden = true;
+        } finally {
+          setSubmitting(false);
+        }
+        return;
+      }
+
       setSubmitting(true);
       try {
         const { data, error, usedLegacyRpc } = await withTimeout(createBookingRequest({
@@ -2009,17 +2123,18 @@
         }));
         if (error) throw error;
         const result = Array.isArray(data) ? data[0] : data;
-        const notificationResults = await Promise.allSettled([
+        const notifications = [
           notifyAdminBooking(result, waitlist, { email }),
-          notifyCustomerEmail(result, waitlist, 'request_received', {
+        ];
+        if (email) notifications.push(notifyCustomerEmail(result, waitlist, 'request_received', {
             email,
             firstName,
             lastName,
             phone,
             notes,
             usedLegacyRpc,
-          }),
-        ]);
+        }));
+        const notificationResults = await Promise.allSettled(notifications);
         console.info('[notifications] esito notifiche post-prenotazione:', notificationResults);
         markCompleted();
         showConfirm(result, waitlist);
@@ -2046,6 +2161,82 @@
       }
     }
 
+    async function requestEmailOtp(email) {
+      if (!supabase.functions) throw new Error('FUNZIONI_NON_DISPONIBILI');
+      const payload = {
+        venue_slug: venueSlug,
+        email,
+        client_request_id: state.requestId,
+      };
+      console.info('[otp] invoco send-email-otp', payload);
+      const { data, error } = await supabase.functions.invoke('send-email-otp', { body: payload });
+      if (error || data?.error || data?.sent === false) {
+        console.error('[otp] send-email-otp fallita:', error || data);
+        throw new Error(data?.error || error?.message || 'OTP_INVIO_FALLITO');
+      }
+      console.info('[otp] send-email-otp completata:', data);
+      return data;
+    }
+
+    async function verifyEmailOtp() {
+      if (state.submitting || state.completed || state.otp.verifying) return;
+      const email = state.otp.email || $('email').value.trim().toLowerCase();
+      const code = $('otpCode').value.replace(/\D/g, '').slice(0, 6);
+      if (!/^\d{6}$/.test(code)) {
+        setOtpStatus('Inserisci il codice di 6 cifre ricevuto via email.', true);
+        return;
+      }
+      setOtpBusy(true);
+      setOtpStatus('Verifica del codice in corso...');
+      try {
+        const payload = { email, client_request_id: state.requestId, code };
+        console.info('[otp] invoco verify-email-otp', { email, client_request_id: state.requestId, code_length: code.length });
+        const { data, error } = await supabase.functions.invoke('verify-email-otp', { body: payload });
+        if (error || data?.error || data?.verified !== true) {
+          console.error('[otp] verify-email-otp fallita:', error || data);
+          throw new Error(data?.error || error?.message || 'OTP_VERIFICA_FALLITA');
+        }
+        state.otp.verifiedRequestId = state.requestId;
+        state.otp.verifiedEmail = email;
+        setOtpStatus('Email verificata. Sto completando la prenotazione...');
+        $('otpModal').hidden = true;
+        await submitReservation({ skipOtp: true });
+      } catch (err) {
+        console.error('[otp] verifica codice fallita:', err);
+        setOtpStatus(mapOtpError(err), true);
+      } finally {
+        setOtpBusy(false);
+      }
+    }
+
+    async function resendEmailOtp() {
+      if (state.submitting || state.completed || state.otp.sending) return;
+      const email = state.otp.email || $('email').value.trim().toLowerCase();
+      setOtpBusy(true);
+      setOtpStatus('Invio di un nuovo codice...');
+      try {
+        await requestEmailOtp(email);
+        $('otpCode').value = '';
+        setOtpStatus('Ti abbiamo inviato un nuovo codice. Il codice scade tra 10 minuti.');
+        $('otpCode').focus({ preventScroll: true });
+      } catch (err) {
+        console.error('[otp] reinvio codice fallito:', err);
+        setOtpStatus(mapOtpError(err), true);
+      } finally {
+        setOtpBusy(false);
+      }
+    }
+
+    function mapOtpError(err) {
+      const raw = err && (err.message || err.error || String(err));
+      if ((raw || '').includes('OTP_RESEND_LIMIT')) return 'Hai raggiunto il limite di invii. Attendi qualche minuto e riprova.';
+      if ((raw || '').includes('OTP_ERRATO')) return 'Il codice inserito non è corretto.';
+      if ((raw || '').includes('OTP_SCADUTO')) return 'Il codice è scaduto. Richiedine uno nuovo.';
+      if ((raw || '').includes('OTP_TROPPI_TENTATIVI')) return 'Troppi tentativi. Richiedi un nuovo codice.';
+      if ((raw || '').includes('EMAIL_OTP_SECRET')) return 'Verifica email non configurata. Contatta il locale.';
+      return 'Non è stato possibile verificare l\'email. Riprova tra poco.';
+    }
+
     async function createBookingRequest({ waitlist, firstName, lastName, email, phone, notes, marketingConsent }) {
       const rpc = waitlist ? 'join_waitlist' : 'create_public_reservation';
       const legacyPayload = {
@@ -2056,7 +2247,7 @@
         p_first_name: firstName,
         p_last_name: lastName,
         p_phone: phone,
-        p_customer_email: email,
+        p_customer_email: email || null,
         p_notes: notes || null,
         p_privacy_policy_accepted: true,
         p_marketing_consent: marketingConsent,
@@ -2074,7 +2265,7 @@
           p_first_name: firstName,
           p_last_name: lastName,
           p_phone: phone,
-          p_customer_email: email,
+          p_customer_email: email || null,
           p_notes: notes || null,
           p_privacy_policy_accepted: true,
           p_marketing_consent: marketingConsent,
@@ -2267,7 +2458,12 @@
     $('bookingForm').addEventListener('submit', onSubmit);
     $('firstName').addEventListener('input', () => { validateNameField($('firstName'), 'firstNameError', 'Il nome', true); updateSubmit(); });
     $('lastName').addEventListener('input', () => { validateNameField($('lastName'), 'lastNameError', 'Il cognome', true); updateSubmit(); });
-    $('email').addEventListener('input', () => { validateEmailField(true); updateSubmit(); });
+    $('email').addEventListener('input', () => {
+      state.otp.verifiedRequestId = null;
+      state.otp.verifiedEmail = null;
+      validateEmailField(true);
+      updateSubmit();
+    });
     $('phone').addEventListener('input', () => { validatePhoneField(true); updateSubmit(); });
     $('phonePrefix').addEventListener('change', () => { updatePhonePreview(); validatePhoneField(true); updateSubmit(); });
     $('privacyConsent').addEventListener('change', () => { validatePrivacy(true); updateSubmit(); });
@@ -2277,6 +2473,15 @@
     $('confirmSend').addEventListener('click', submitReservation);
     $('confirmModal').addEventListener('click', (event) => {
       if (event.target === $('confirmModal')) closeConfirmModal();
+    });
+    $('otpCode').addEventListener('input', () => {
+      $('otpCode').value = $('otpCode').value.replace(/\D/g, '').slice(0, 6);
+    });
+    $('otpVerify').addEventListener('click', verifyEmailOtp);
+    $('otpResend').addEventListener('click', resendEmailOtp);
+    $('otpCancel').addEventListener('click', closeOtpModal);
+    $('otpModal').addEventListener('click', (event) => {
+      if (event.target === $('otpModal')) closeOtpModal();
     });
     window.addEventListener('popstate', () => {
       if (state.completed) showState('Confirm');

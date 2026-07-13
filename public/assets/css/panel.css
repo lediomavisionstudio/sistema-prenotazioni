@@ -154,6 +154,27 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
 .badge--arrivato    { color: var(--st-arrivato);  background: var(--st-arrivato-bg); }
 .badge--no_show     { color: var(--st-noshow);    background: var(--st-noshow-bg); }
 .badge--annullata   { color: var(--st-annullata); background: var(--st-annullata-bg); }
+.email-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.email-badge::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+}
+.email-badge--verified { color: #226747; background: #ddf7e9; border-color: #aee7c7; }
+.email-badge--unverified { color: #94530d; background: #fff1d7; border-color: #f5c983; }
+.email-badge--none { color: #6f6259; background: #f3eee3; border-color: #e3d6ba; }
 
 /* Bottoni azione stato ----------------------------------------------------- */
 .act { border: 1.5px solid var(--line); background: var(--surface); border-radius: var(--radius-xs); padding: 6px 10px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--ink); }
