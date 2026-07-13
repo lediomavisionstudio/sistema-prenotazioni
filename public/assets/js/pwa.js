@@ -1,12 +1,9 @@
 // PWA: registrazione del service worker + banner d'installazione personalizzato.
-// Script "classico" (nessun import): incluso sia dal widget cliente che dalle
-// pagine del pannello. Inietta da solo il proprio stile, così non dipende dal
-// CSS della pagina che lo ospita.
+// Script classico: incluso sia dal widget cliente che dalle pagine del pannello.
 (function () {
   'use strict';
 
   // --- 1) Registrazione del service worker --------------------------------
-  // sw.js è servito dalla root del sito: lo scope '/' copre widget e /admin.
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
       var registration = navigator.serviceWorker.register('/sw.js');
@@ -26,22 +23,21 @@
 
   // --- 2) Prompt d'installazione personalizzato ---------------------------
   var deferredPrompt = null;
-  var DISMISS_KEY = 'pwa-install-dismissed';
+  var DISMISS_KEY = 'pwa-install-dismissed-v2';
+  var INSTALLED_KEY = 'pwa-install-installed';
   var isAdmin = location.pathname.indexOf('/admin') !== -1;
 
   window.addEventListener('beforeinstallprompt', function (e) {
-    // Blocca il mini-infobar di default e mostra il nostro banner.
+    console.info('[pwa] installazione disponibile');
     e.preventDefault();
     deferredPrompt = e;
-    try {
-      if (localStorage.getItem(DISMISS_KEY)) return; // l'utente l'ha già chiuso
-    } catch (err) {
-      console.warn('[pwa] localStorage non disponibile:', err);
-    }
+    if (isInstalled() || getStorageFlag(INSTALLED_KEY) || getStorageFlag(DISMISS_KEY)) return;
     showBanner();
   });
 
   window.addEventListener('appinstalled', function () {
+    setStorageFlag(INSTALLED_KEY);
+    setStorageFlag(DISMISS_KEY);
     removeBanner();
     deferredPrompt = null;
   });
@@ -53,7 +49,9 @@
   }
 
   function showBanner() {
+    if (isInstalled() || getStorageFlag(INSTALLED_KEY) || getStorageFlag(DISMISS_KEY)) return;
     if (document.getElementById('pwaBanner')) return;
+    if (!document.body) return;
     injectStyle();
 
     var bar = document.createElement('div');
@@ -75,23 +73,24 @@
 
   function doInstall() {
     if (!deferredPrompt) { removeBanner(); return; }
-    deferredPrompt.prompt();
-    deferredPrompt.userChoice.then(function () {
-      deferredPrompt = null;
+    var promptEvent = deferredPrompt;
+    deferredPrompt = null;
+    promptEvent.prompt();
+    promptEvent.userChoice.then(function (choice) {
+      if (choice && choice.outcome === 'accepted') {
+        setStorageFlag(INSTALLED_KEY);
+      }
+      setStorageFlag(DISMISS_KEY);
       removeBanner();
     }, function (e) {
       console.warn('[pwa] scelta installazione non completata:', e);
-      deferredPrompt = null;
+      setStorageFlag(DISMISS_KEY);
       removeBanner();
     });
   }
 
   function dismiss() {
-    try {
-      localStorage.setItem(DISMISS_KEY, '1');
-    } catch (e) {
-      console.error('[pwa] impossibile salvare preferenza installazione:', e);
-    }
+    setStorageFlag(DISMISS_KEY);
     removeBanner();
   }
 
@@ -104,6 +103,27 @@
 
   function iconPath() {
     return isAdmin ? '../assets/icons/icon.svg' : 'assets/icons/icon.svg';
+  }
+
+  function isInstalled() {
+    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  }
+
+  function getStorageFlag(key) {
+    try {
+      return localStorage.getItem(key) === '1';
+    } catch (err) {
+      console.warn('[pwa] localStorage non disponibile:', err);
+      return false;
+    }
+  }
+
+  function setStorageFlag(key) {
+    try {
+      localStorage.setItem(key, '1');
+    } catch (err) {
+      console.warn('[pwa] impossibile salvare preferenza installazione:', err);
+    }
   }
 
   function injectStyle() {

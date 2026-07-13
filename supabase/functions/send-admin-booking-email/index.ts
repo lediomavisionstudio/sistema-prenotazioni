@@ -143,7 +143,7 @@ Deno.serve(async (req) => {
     }
 
     const details = await loadDetails(booking);
-    const html = renderAdminEmail({ booking, venue, mode, ...details });
+    const html = renderAdminEmail({ booking, venue, mode, requestOrigin: requestOrigin(req), ...details });
     let sendError: string | null = null;
     let providerMessageId: string | null = null;
     const provider = getConfiguredEmailProviderName();
@@ -281,16 +281,17 @@ function renderAdminEmail(args: {
   booking: BookingRecord;
   venue: Venue;
   mode: string;
+  requestOrigin: string | null;
   shift: { name?: string; start_time?: string; end_time?: string } | null;
   table: { code?: string } | null;
 }) {
-  const { booking, venue, mode, shift, table } = args;
+  const { booking, venue, mode, requestOrigin, shift, table } = args;
   const customerName = `${booking.customer_first_name} ${booking.customer_last_name}`.trim();
   const phoneHref = `tel:${booking.customer_phone}`;
   const customerEmail = booking.customer_email || "-";
   const emailHref = booking.customer_email ? `mailto:${booking.customer_email}` : "";
   const shiftText = shift?.start_time ? `${shift.name || "Turno"} - ${formatTime(shift.start_time)}` : "-";
-  const actionUrl = adminDashboardUrl(adminUrl);
+  const actionUrl = adminDashboardUrl(adminUrl, requestOrigin);
   const preheader = mode === "waitlist" ? "Nuova richiesta in lista d'attesa" : "Nuova prenotazione pubblica";
 
   return `<!doctype html>
@@ -383,8 +384,21 @@ function formatTime(value: string) {
   return value.slice(0, 5);
 }
 
-function adminDashboardUrl(value: string) {
+function requestOrigin(req: Request) {
+  const origin = req.headers.get("origin");
+  if (origin) return origin;
+  const referer = req.headers.get("referer");
+  if (!referer) return null;
+  try {
+    return new URL(referer).origin;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function adminDashboardUrl(value: string, fallbackOrigin: string | null = null) {
   const raw = String(value || "").trim();
+  if (!raw && fallbackOrigin) return adminDashboardUrl(`${fallbackOrigin}/admin/dashboard.html`);
   if (!raw) return "#";
   try {
     const url = new URL(raw);
