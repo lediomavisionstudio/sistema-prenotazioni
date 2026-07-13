@@ -26,12 +26,12 @@
         <span class="topbar__venue" id="venueName">—</span>
         <span class="topbar__role" id="userRole"></span>
       </div>
-      <nav class="topbar__nav">
-        <a class="topbar__link" href="dashboard.html">Dashboard</a>
-        <a class="topbar__link is-active" href="upcoming.html">In arrivo</a>
-        <a class="topbar__link" href="stats.html">Statistiche</a>
-        <a class="topbar__link" href="settings.html">Impostazioni</a>
-        <button class="btn btn--ghost btn--sm" id="logoutBtn" type="button">Esci</button>
+      <nav class="topbar__nav" aria-label="Navigazione gestionale">
+        <a class="topbar__link" href="dashboard.html"><i data-lucide="layout-dashboard" aria-hidden="true"></i><span>Dashboard</span></a>
+        <a class="topbar__link is-active" href="upcoming.html"><i data-lucide="calendar-days" aria-hidden="true"></i><span>In arrivo</span></a>
+        <a class="topbar__link" href="stats.html"><i data-lucide="bar-chart-3" aria-hidden="true"></i><span>Statistiche</span></a>
+        <a class="topbar__link" href="settings.html"><i data-lucide="settings" aria-hidden="true"></i><span>Impostazioni</span></a>
+        <button class="btn btn--ghost btn--sm topbar__logout" id="logoutBtn" type="button"><i data-lucide="log-out" aria-hidden="true"></i><span>Esci</span></button>
       </nav>
     </div>
   </header>
@@ -40,6 +40,13 @@
     <div class="section__head">
       <h1 class="section__title" style="font-size:1.3rem">Prossime prenotazioni</h1>
       <span class="pill" id="pendingCount"></span>
+    </div>
+
+    <div class="admin-toolbar admin-toolbar--compact">
+      <label class="searchbox" for="upcomingSearch">
+        <i data-lucide="search" aria-hidden="true"></i>
+        <input id="upcomingSearch" type="search" placeholder="Cerca prenotazioni" autocomplete="off" aria-label="Cerca prenotazioni in arrivo" />
+      </label>
     </div>
 
     <!-- Filtri stato -->
@@ -56,6 +63,8 @@
 
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/pwa.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script>window.addEventListener('DOMContentLoaded', function () { if (window.lucide) window.lucide.createIcons(); });</script>
   <script type="module" src="./upcoming.js"></script>
 </body>
 </html>

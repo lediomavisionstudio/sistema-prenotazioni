@@ -4,8 +4,10 @@
 import {
   supabase, requireSession, signOut, loadCurrentVenue,
   todayISO, formatLong, hhmm, escapeHtml, toast, STATUS_LABEL,
+  notifyOperator, setRealtimeUpdating,
 } from './app.js';
 import { statusRank, reservationCardHtml, wireRowActions, wireTableAssignment } from './resui.js';
+import { initCustomerCrm, wireCustomerCards } from './customer-crm.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -15,6 +17,7 @@ const state = {
   tablesById: new Map(),
   reservations: [],
   filter: 'attive',
+  search: '',
 };
 
 const FILTERS = {
@@ -37,6 +40,7 @@ async function init() {
     $('userRole').textContent = (current.role === 'owner' ? 'Titolare' : 'Staff') + ' · ' + (state.session.user.email || '');
 
     await loadConfig();
+    initCustomerCrm({ supabase, state, toast });
     wireFilters();
     subscribeRealtime();
     await load();
@@ -103,11 +107,15 @@ function render() {
   const pending = state.reservations.filter((r) => r.status === 'in_attesa').length;
   $('pendingCount').textContent = pending ? `${pending} da confermare` : 'nessuna da confermare';
 
-  const rows = state.reservations.filter(FILTERS[state.filter]);
+  const rows = state.reservations
+    .filter(FILTERS[state.filter])
+    .filter((r) => matchesReservationSearch(r, state.search));
   const box = $('upcoming');
 
   if (rows.length === 0) {
-    box.innerHTML = '<div class="res-empty">Nessuna prenotazione in arrivo per questo filtro.</div>';
+    box.innerHTML = state.search
+      ? '<div class="res-empty">Nessuna prenotazione corrisponde alla ricerca.</div>'
+      : '<div class="res-empty">Nessuna prenotazione in arrivo per questo filtro.</div>';
     return;
   }
 
@@ -153,6 +161,25 @@ function render() {
 
   wireRowActions(box, changeStatus);
   wireTableAssignment(box, assignTable);
+  wireCustomerCards(box, state.reservations);
+}
+
+function matchesReservationSearch(reservation, query) {
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) return true;
+  const tableCode = reservation.table_id ? state.tablesById.get(reservation.table_id)?.code : '';
+  const shift = reservation.shift_id ? state.shiftsById.get(reservation.shift_id) : null;
+  return [
+    reservation.customer_first_name,
+    reservation.customer_last_name,
+    reservation.customer_phone,
+    reservation.customer_email,
+    reservation.notes,
+    reservation.status,
+    reservation.reservation_date,
+    tableCode,
+    shift?.name,
+  ].some((value) => String(value || '').toLowerCase().includes(q));
 }
 
 async function changeStatus(id, to) {
@@ -267,6 +294,14 @@ function wireFilters() {
       $('filters').querySelectorAll('.tab').forEach((t) => t.classList.toggle('is-active', t === b));
       render();
     }));
+
+  const search = $('upcomingSearch');
+  if (search) {
+    search.addEventListener('input', () => {
+      state.search = search.value;
+      render();
+    });
+  }
 }
 
 let reloadTimer;
@@ -277,9 +312,16 @@ function subscribeRealtime() {
       (payload) => {
         const rowDate = payload.new?.reservation_date || payload.old?.reservation_date;
         if (rowDate && rowDate >= todayISO()) {
-          if (payload.eventType === 'INSERT' && payload.new?.source === 'widget') toast('Nuova prenotazione dal widget');
+          if (payload.eventType === 'INSERT' && payload.new?.source === 'widget') {
+            notifyOperator('Nuova prenotazione', `${payload.new.customer_last_name || 'Cliente'} · ${payload.new.party_size || 0} coperti`, { icon: '+', tag: 'new-reservation' });
+          }
           clearTimeout(reloadTimer);
-          reloadTimer = setTimeout(() => load().catch(console.error), 250);
+          setRealtimeUpdating(true);
+          reloadTimer = setTimeout(async () => {
+            try { await load(); }
+            catch (error) { console.error(error); }
+            finally { setRealtimeUpdating(false); }
+          }, 250);
         }
       })
     .subscribe();

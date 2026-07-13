@@ -36,6 +36,7 @@ export function reservationCardHtml(r, opts = {}) {
           ${opts.shiftName ? `<span>${escapeHtml(opts.shiftName)}</span>` : ''}
           ${emailBadge}
         </div>
+        <button class="customer-link" type="button" data-customer-card="${escapeHtml(r.id)}">Scheda cliente</button>
         ${tableControl}
         ${r.notes ? `<div class="res__notes">${escapeHtml(r.notes)}</div>` : ''}
       </div>
