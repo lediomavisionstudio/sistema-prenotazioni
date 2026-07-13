@@ -649,6 +649,10 @@
     .recap__k { color: var(--ink-soft); font-size: 0.9rem; }
     .recap__v { font-weight: 700; text-align: right; }
     .recap__v.cap { text-transform: capitalize; }
+    .recap.is-updating,
+    .confirm__lead.is-updating {
+      animation: statusRefresh 260ms ease both;
+    }
     .status-badge {
       display: inline-flex;
       align-items: center;
@@ -686,6 +690,10 @@
       color: #982f25;
       background: #fde4df;
       border-color: #f2b5ad;
+    }
+    @keyframes statusRefresh {
+      from { opacity: .52; transform: translateY(3px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     .modal {
@@ -1150,6 +1158,10 @@
       submitting: false,
       completed: false,
       requestId: null,
+      currentSummary: null,
+      statusChannel: null,
+      statusPollingTimer: null,
+      realtimeActive: false,
       otp: {
         email: null,
         verifiedRequestId: null,
@@ -1194,8 +1206,28 @@
     };
 
     function statusMeta(status) {
-      const key = String(status || '').toLowerCase();
+      const key = normalizeReservationStatus(status);
       return reservationStatusUi[key] || { label: status || 'Stato non disponibile', icon: 'clock', className: 'pending' };
+    }
+
+    function normalizeReservationStatus(status) {
+      const key = String(status || '').toLowerCase();
+      if (key === 'pending') return 'in_attesa';
+      if (key === 'confirmed') return 'confermata';
+      if (key === 'rejected' || key === 'cancelled' || key === 'rifiutata') return 'annullata';
+      return key;
+    }
+
+    function isFinalReservationStatus(status) {
+      return ['confermata', 'annullata', 'confirmed', 'rejected', 'cancelled', 'rifiutata']
+        .includes(String(status || '').toLowerCase());
+    }
+
+    function statusLeadHtml(status) {
+      const key = normalizeReservationStatus(status);
+      if (key === 'confermata') return 'La tua prenotazione è stata confermata. Ti aspettiamo!';
+      if (key === 'annullata') return 'La richiesta non è stata accettata. Contatta il locale per maggiori informazioni.';
+      return 'La tua richiesta è stata inviata ed è in attesa di conferma.';
     }
 
     function statusBadgeHtml(status) {
@@ -1587,11 +1619,28 @@
       return `booking-summary:${venueSlug}`;
     }
 
+    function trackingStorageKey() {
+      return `booking-status-watch:${venueSlug}`;
+    }
+
     function saveBookingSummary(summary) {
       try {
         sessionStorage.setItem(summaryStorageKey(), JSON.stringify(summary));
       } catch (err) {
         console.error('[booking] impossibile salvare riepilogo prenotazione:', err);
+      }
+    }
+
+    function saveBookingTracking(summary) {
+      if (!summary || !summary.reservationId || summary.waitlist) return;
+      try {
+        localStorage.setItem(trackingStorageKey(), JSON.stringify({
+          reservation_id: summary.reservationId,
+          venue_slug: venueSlug,
+          created_at: summary.createdAt || new Date().toISOString(),
+        }));
+      } catch (err) {
+        console.error('[booking-status] impossibile salvare tracking locale:', err);
       }
     }
 
@@ -1605,10 +1654,29 @@
       }
     }
 
+    function readBookingTracking() {
+      try {
+        const raw = localStorage.getItem(trackingStorageKey());
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || parsed.venue_slug !== venueSlug || !parsed.reservation_id) return null;
+        const createdAt = new Date(parsed.created_at || 0).getTime();
+        if (!createdAt || Date.now() - createdAt > 7 * 24 * 60 * 60 * 1000) {
+          localStorage.removeItem(trackingStorageKey());
+          return null;
+        }
+        return parsed;
+      } catch (err) {
+        console.error('[booking-status] tracking locale non leggibile:', err);
+        return null;
+      }
+    }
+
     function clearCompletedBooking() {
       try {
         sessionStorage.removeItem(`booking-completed:${venueSlug}`);
         sessionStorage.removeItem(summaryStorageKey());
+        localStorage.removeItem(trackingStorageKey());
       } catch (err) {
         console.error('[booking] impossibile pulire stato prenotazione completata:', err);
       }
@@ -1620,14 +1688,133 @@
         p_reservation_id: reservationId,
       });
       if (error) {
-        console.warn('[booking] stato prenotazione non aggiornato:', error);
+        console.error('[booking-status] errore recupero stato:', error);
         return null;
       }
       return typeof data === 'string' ? data : (data && data.status) || null;
     }
 
+    function stopStatusPolling() {
+      if (state.statusPollingTimer) {
+        window.clearInterval(state.statusPollingTimer);
+        state.statusPollingTimer = null;
+      }
+    }
+
+    function startStatusPolling(reason = 'fallback') {
+      if (!state.currentSummary || !state.currentSummary.reservationId || state.currentSummary.waitlist) return;
+      if (isFinalReservationStatus(state.currentSummary.status)) return;
+      if (state.statusPollingTimer) return;
+      console.info('[booking-status] fallback polling attivato:', reason);
+      state.statusPollingTimer = window.setInterval(async () => {
+        if (!state.currentSummary || !state.currentSummary.reservationId) return;
+        try {
+          const status = await fetchReservationStatus(state.currentSummary.reservationId);
+          if (status) applyReservationStatus(status, { source: 'polling' });
+        } catch (err) {
+          console.error('[booking-status] errore polling stato:', err);
+        }
+      }, 25000);
+    }
+
+    function stopReservationStatusWatch() {
+      stopStatusPolling();
+      state.realtimeActive = false;
+      if (state.statusChannel && supabase) {
+        console.info('[booking-status] chiudo subscription Realtime');
+        try {
+          supabase.removeChannel(state.statusChannel);
+        } catch (err) {
+          console.error('[booking-status] errore chiusura subscription:', err);
+        }
+        state.statusChannel = null;
+      }
+    }
+
+    function startReservationStatusWatch(summary) {
+      if (!summary || !summary.reservationId || summary.waitlist || !supabase) return;
+      stopReservationStatusWatch();
+      state.currentSummary = summary;
+      if (isFinalReservationStatus(summary.status)) return;
+
+      const reservationId = summary.reservationId;
+      console.info('[booking-status] subscription avviata', { reservation_id: reservationId });
+      state.statusChannel = supabase
+        .channel(`public-reservation-status:${reservationId}`)
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'reservations',
+          filter: `id=eq.${reservationId}`,
+        }, (payload) => {
+          const status = payload && payload.new && payload.new.status;
+          console.info('[booking-status] aggiornamento ricevuto', { reservation_id: reservationId, status });
+          if (status) applyReservationStatus(status, { source: 'realtime' });
+        })
+        .subscribe((status, err) => {
+          console.info('[booking-status] stato Realtime:', status);
+          if (status === 'SUBSCRIBED') {
+            state.realtimeActive = true;
+            console.info('[booking-status] Realtime connesso', { reservation_id: reservationId });
+            stopStatusPolling();
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            state.realtimeActive = false;
+            console.error('[booking-status] Realtime disconnesso o in errore', { status, error: err || null });
+            startStatusPolling(status);
+          }
+        });
+      window.setTimeout(() => {
+        if (state.currentSummary &&
+            state.currentSummary.reservationId === reservationId &&
+            !state.realtimeActive &&
+            !isFinalReservationStatus(state.currentSummary.status)) {
+          startStatusPolling('REALTIME_NOT_READY');
+        }
+      }, 8000);
+    }
+
+    function applyReservationStatus(status, { source = 'manual' } = {}) {
+      if (!state.currentSummary || state.currentSummary.waitlist) return;
+      const normalized = normalizeReservationStatus(status);
+      if (normalizeReservationStatus(state.currentSummary.status) === normalized) return;
+      console.info('[booking-status] applico nuovo stato', { source, status: normalized });
+      state.currentSummary.status = normalized;
+      saveBookingSummary(state.currentSummary);
+      renderConfirmSummary(state.currentSummary, { animate: true });
+      if (isFinalReservationStatus(normalized)) {
+        stopReservationStatusWatch();
+      }
+    }
+
+    async function refreshCurrentReservationStatus(source = 'refresh') {
+      if (!state.currentSummary || !state.currentSummary.reservationId || state.currentSummary.waitlist) return;
+      if (isFinalReservationStatus(state.currentSummary.status)) return;
+      try {
+        const status = await fetchReservationStatus(state.currentSummary.reservationId);
+        if (status) applyReservationStatus(status, { source });
+      } catch (err) {
+        console.error('[booking-status] errore refresh stato:', err);
+      }
+    }
+
     async function restoreCompletedSummary() {
-      const summary = readBookingSummary();
+      let summary = readBookingSummary();
+      if (!summary) {
+        const tracking = readBookingTracking();
+        if (tracking) {
+          summary = {
+            reservationId: tracking.reservation_id,
+            waitlist: false,
+            venueName: state.venue ? state.venue.name : 'Locale',
+            dateText: 'Prenotazione recente',
+            shiftText: 'Stato aggiornato in tempo reale',
+            partySize: '-',
+            status: 'in_attesa',
+            createdAt: tracking.created_at,
+            restoredFromTracking: true,
+          };
+        }
+      }
       if (!summary) return false;
       state.completed = true;
       $('stateForm').classList.add('form-lock');
@@ -1646,8 +1833,10 @@
           bootError('stato prenotazione non recuperato, uso riepilogo salvato', err);
         }
       }
+      state.currentSummary = summary;
       renderConfirmSummary(summary);
       showState('Confirm');
+      startReservationStatusWatch(summary);
       return true;
     }
 
@@ -2357,7 +2546,7 @@
     // -------------------------------------------------------------------
     // Conferma
     // -------------------------------------------------------------------
-    function renderConfirmSummary(summary) {
+    function renderConfirmSummary(summary, options = {}) {
       const rows = [
         ['Locale', summary.venueName],
         ['Data', summary.dateText, true],
@@ -2373,19 +2562,27 @@
           'Se si libera un tavolo ti contatteremo al numero indicato.';
         if (summary.queuePosition != null) rows.push(['Posizione in coda', '#' + summary.queuePosition]);
       } else {
-        $('confirmBadge').textContent = '✓';
-        $('confirmTitle').textContent = 'Grazie per averci scelto!';
-        $('confirmLead').innerHTML =
-          'Abbiamo ricevuto correttamente la tua richiesta di prenotazione.<br><br>' +
-          'La pizzeria la prenderà in carico il prima possibile.<br>' +
-          'Riceverai una mail non appena la tua prenotazione verrà confermata oppure rifiutata.<br><br>' +
-          'Ti ringraziamo per la fiducia e ti aspettiamo!';
+        const status = normalizeReservationStatus(summary.status);
+        $('confirmBadge').textContent = status === 'confermata' ? '✓' : status === 'annullata' ? '×' : '✓';
+        $('confirmTitle').textContent = status === 'confermata'
+          ? 'Prenotazione confermata'
+          : status === 'annullata'
+            ? 'Richiesta non accettata'
+            : 'Grazie per averci scelto!';
+        $('confirmLead').textContent = statusLeadHtml(status);
         rows.push(['Stato', statusBadgeHtml(summary.status), false, true]);
       }
 
       $('confirmRecap').innerHTML = rows.map(([k, v, isCap, isHtml]) =>
         `<div class="recap__row"><span class="recap__k">${escapeHtml(k)}</span>` +
         `<span class="recap__v${isCap ? ' cap' : ''}">${isHtml ? v : escapeHtml(v)}</span></div>`).join('');
+      if (options.animate) {
+        $('confirmLead').classList.remove('is-updating');
+        $('confirmRecap').classList.remove('is-updating');
+        void $('confirmLead').offsetWidth;
+        $('confirmLead').classList.add('is-updating');
+        $('confirmRecap').classList.add('is-updating');
+      }
     }
 
     function showConfirm(res, waitlist = false) {
@@ -2402,13 +2599,18 @@
         partySize: state.coperti,
         status: res && res.status,
         queuePosition: res && res.queue_position,
+        createdAt: new Date().toISOString(),
       };
       saveBookingSummary(summary);
+      saveBookingTracking(summary);
+      state.currentSummary = summary;
       renderConfirmSummary(summary);
       showState('Confirm');
+      startReservationStatusWatch(summary);
     }
 
     function reset() {
+      stopReservationStatusWatch();
       if (state.completed) {
         clearCompletedBooking();
         location.href = withLocale('index.html');
@@ -2485,6 +2687,21 @@
     });
     window.addEventListener('popstate', () => {
       if (state.completed) showState('Confirm');
+    });
+    window.addEventListener('online', () => {
+      console.info('[booking-status] connessione ripristinata');
+      refreshCurrentReservationStatus('online');
+      if (state.currentSummary && !state.realtimeActive) startStatusPolling('online');
+    });
+    window.addEventListener('offline', () => {
+      console.info('[booking-status] Realtime disconnesso: browser offline');
+      startStatusPolling('offline');
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        console.info('[booking-status] app tornata visibile');
+        refreshCurrentReservationStatus('visibility');
+      }
     });
     for (const step of progressSteps) {
       $(step.el).addEventListener('click', () => goToProgressStep(step.key));
