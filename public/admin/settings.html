@@ -10,6 +10,98 @@
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../assets/css/theme.css" />
   <link rel="stylesheet" href="../assets/css/panel.css" />
+  <style>
+    /* Fix sezione Tavoli: override locale per evitare stili/cache precedenti. */
+    .tables-grid,
+    #tableRows > .table-row {
+      display: grid !important;
+      grid-template-columns: 200px 74px 200px 78px 110px !important;
+      column-gap: 12px !important;
+      align-items: center !important;
+    }
+
+    .tables-header {
+      display: grid !important;
+      grid-template-columns: 200px 74px 200px 78px 110px !important;
+      column-gap: 12px !important;
+      align-items: center !important;
+      padding: 0 16px 8px !important;
+    }
+
+    .tables-header > div {
+      display: block !important;
+      white-space: nowrap !important;
+      text-align: left !important;
+    }
+
+    #tableRows > .table-row {
+      width: 100% !important;
+      padding: 14px 16px !important;
+    }
+
+    #tableRows > .table-row > .table-cell {
+      min-width: 0 !important;
+    }
+
+    #tableRows > .table-row input:not([type="checkbox"]),
+    #tableRows > .table-row select {
+      width: 100% !important;
+      min-width: 0 !important;
+      box-sizing: border-box !important;
+    }
+
+    #tableRows > .table-row .table-cell--actions {
+      display: flex !important;
+      justify-content: flex-start !important;
+    }
+
+    #tableSaveBar.tables-save-bar {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 24px !important;
+      width: 100% !important;
+    }
+
+    #tableSaveBar[hidden] {
+      display: none !important;
+    }
+
+    #tableSaveBar .tables-save-message {
+      display: flex !important;
+      align-items: center !important;
+      min-width: 0 !important;
+    }
+
+    #tableSaveBar .tables-save-actions {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: flex-end !important;
+      gap: 12px !important;
+      margin-left: auto !important;
+      flex-wrap: nowrap !important;
+    }
+
+    @media (max-width: 700px) {
+      .tables-header {
+        display: none !important;
+      }
+
+      #tableRows > .table-row {
+        grid-template-columns: 1fr !important;
+      }
+
+      #tableSaveBar.tables-save-bar {
+        align-items: flex-start !important;
+        flex-direction: column !important;
+      }
+
+      #tableSaveBar .tables-save-actions {
+        align-self: flex-end !important;
+      }
+    }
+  </style>
 
   <!-- PWA: gestionale installabile -->
   <link rel="manifest" href="manifest.json" />
