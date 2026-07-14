@@ -26,6 +26,7 @@ const state = {
   tables: [],          // restaurant_tables attivi (con zona)
   tablesById: new Map(),
   reservations: [],    // prenotazioni del giorno (tutti i turni)
+  tableAssignments: new Map(),
   waitlist: [],        // voci in coda del giorno (status in_coda, tutti i turni)
   capacity: 0,         // somma seats_max tavoli attivi
 };
@@ -105,9 +106,37 @@ async function loadDay() {
   ]);
   if (error) throw error;
 
-  state.reservations = await withEmailVerificationStatus(data || []);
+  state.reservations = await withTableAssignments(await withEmailVerificationStatus(data || []));
   state.waitlist = waitlist;
   render();
+}
+
+async function withTableAssignments(rows) {
+  if (!rows.length) {
+    state.tableAssignments = new Map();
+    return rows;
+  }
+  try {
+    const { data, error } = await supabase
+      .from('reservation_tables')
+      .select('reservation_id, table_id')
+      .in('reservation_id', rows.map((r) => r.id));
+    if (error) throw error;
+    const byReservation = new Map();
+    (data || []).forEach((row) => {
+      if (!byReservation.has(row.reservation_id)) byReservation.set(row.reservation_id, []);
+      byReservation.get(row.reservation_id).push(row.table_id);
+    });
+    state.tableAssignments = byReservation;
+    return rows.map((row) => {
+      const ids = byReservation.get(row.id);
+      return { ...row, table_ids: ids?.length ? ids : (row.table_id ? [row.table_id] : []) };
+    });
+  } catch (error) {
+    console.warn('[tables] assegnazioni multiple non disponibili:', error.message || error);
+    state.tableAssignments = new Map();
+    return rows.map((row) => ({ ...row, table_ids: row.table_id ? [row.table_id] : [] }));
+  }
 }
 
 async function withEmailVerificationStatus(rows) {
@@ -272,7 +301,7 @@ function renderList() {
 
   list.innerHTML = rows.map((r) => reservationCardHtml(r, {
     timeLabel: shift ? hhmm(shift.start_time) : '',
-    tableCode: r.table_id ? state.tablesById.get(r.table_id)?.code : null,
+    tableCode: tableCodes(r),
     tableOptions: tableOptionsForReservation(r),
   })).join('');
 
@@ -282,7 +311,7 @@ function renderList() {
 
 async function changeStatus(id, to) {
   const res = state.reservations.find((r) => r.id === id);
-  if (to === 'confermata' && res && !res.table_id) {
+  if (to === 'confermata' && res && !reservationTableIds(res).length) {
     toast('Assegna un tavolo prima di confermare la prenotazione.', true);
     return;
   }
@@ -309,32 +338,35 @@ function tableOptionsForReservation(reservation) {
   const occupied = new Set(state.reservations
     .filter((r) =>
       r.id !== reservation.id &&
-      r.table_id &&
       r.reservation_date === reservation.reservation_date &&
       r.shift_id === reservation.shift_id &&
       r.status !== 'annullata' &&
       r.status !== 'no_show')
-    .map((r) => r.table_id));
+    .flatMap(reservationTableIds));
+  const selected = new Set(reservationTableIds(reservation));
 
   return state.tables.map((table) => {
-    const fits = reservation.party_size <= table.seats_max;
     const busy = occupied.has(table.id);
     return {
       id: table.id,
-      disabled: (!fits || busy) && table.id !== reservation.table_id,
-      label: `${table.code} (${table.seats_max})${fits ? '' : ' - non adatto'}${busy ? ' - occupato' : ''}`,
+      code: table.code,
+      seatsMax: table.seats_max,
+      busy,
+      disabled: busy && !selected.has(table.id),
+      label: `${table.code} (${table.seats_max})${busy ? ' - occupato' : ''}`,
     };
   });
 }
 
-async function assignTable(id, tableId) {
+async function assignTable(id, tableIds) {
   try {
-    const { error } = await supabase.rpc('assign_reservation_table', {
+    const ids = Array.isArray(tableIds) ? tableIds : (tableIds ? [tableIds] : []);
+    const { error } = await supabase.rpc('assign_reservation_tables', {
       p_reservation_id: id,
-      p_table_id: tableId,
+      p_table_ids: ids,
     });
     if (error) throw error;
-    toast(tableId ? 'Tavolo assegnato' : 'Tavolo rimosso');
+    toast(ids.length > 1 ? 'Tavoli assegnati' : ids.length ? 'Tavolo assegnato' : 'Tavolo rimosso');
     await loadDay();
   } catch (error) {
     console.error('[tables] assegnazione tavolo fallita:', error);
@@ -344,10 +376,21 @@ async function assignTable(id, tableId) {
 
 function tableAssignmentError(error) {
   const raw = `${error?.message || ''} ${error?.details || ''}`;
+  if (raw.includes('CAPIENZA_INSUFFICIENTE')) return 'Seleziona altri tavoli: la capienza attuale non è sufficiente.';
   if (raw.includes('TAVOLO_NON_COMPATIBILE')) return 'Il tavolo non è compatibile con il numero di persone.';
   if (raw.includes('TAVOLO_GIA_ASSEGNATO')) return 'Questo tavolo è già assegnato nello stesso turno.';
   if (raw.includes('TAVOLO_NON_VALIDO')) return 'Tavolo non valido.';
   return 'Impossibile assegnare il tavolo.';
+}
+
+function reservationTableIds(reservation) {
+  if (Array.isArray(reservation.table_ids) && reservation.table_ids.length) return reservation.table_ids;
+  return reservation.table_id ? [reservation.table_id] : [];
+}
+
+function tableCodes(reservation) {
+  const codes = reservationTableIds(reservation).map((id) => state.tablesById.get(id)?.code).filter(Boolean);
+  return codes.length ? codes.join(' + ') : null;
 }
 
 async function notifyCustomerStatusEmail(reservation, status) {
@@ -453,12 +496,22 @@ function renderMap() {
   // Per ogni tavolo, lo stato "più forte" tra le prenotazioni del turno.
   const rank = { arrivato: 3, confermata: 2, in_attesa: 1 };
   const occ = new Map(); // tableId -> { status, guest }
+  const joinedGroups = [];
+  const joinedTableIds = new Set();
   for (const r of state.reservations) {
-    if (r.shift_id !== state.shiftId || !r.table_id) continue;
+    const ids = reservationTableIds(r);
+    if (r.shift_id !== state.shiftId || !ids.length) continue;
     if (!rank[r.status]) continue;
-    const prev = occ.get(r.table_id);
-    if (!prev || rank[r.status] > rank[prev.status]) {
-      occ.set(r.table_id, { status: r.status, guest: r.customer_last_name });
+    const tables = ids.map((id) => state.tablesById.get(id)).filter(Boolean);
+    if (tables.length > 1) {
+      joinedGroups.push({ reservation: r, tables });
+      tables.forEach((table) => joinedTableIds.add(table.id));
+    }
+    for (const tableId of ids) {
+      const prev = occ.get(tableId);
+      if (!prev || rank[r.status] > rank[prev.status]) {
+        occ.set(tableId, { status: r.status, guest: `${r.customer_first_name} ${r.customer_last_name}`.trim() });
+      }
     }
   }
 
@@ -481,7 +534,20 @@ function renderMap() {
     <div class="zone">
       <p class="zone__name">${escapeHtml(z.name)}</p>
       <div class="table-grid">
+        ${joinedGroups.filter((group) => (group.tables[0]?.zone?.id || 'z') === (z.tables[0]?.zone?.id || 'z')).map((group) => {
+          const r = group.reservation;
+          const seats = group.tables.reduce((sum, table) => sum + (table.seats_max || 0), 0);
+          const codes = group.tables.map((table) => table.code).join(' + ');
+          const cls = r.status === 'arrivato' ? 'tbl--arrivato' : r.status === 'confermata' ? 'tbl--occupato' : 'tbl--attesa';
+          return `<div class="tbl tbl--joined ${cls}" style="grid-column: span ${Math.min(group.tables.length, 4)}">
+            <span class="tbl__code">${escapeHtml(codes)}</span>
+            <span class="tbl__seats">${seats} posti</span>
+            <span class="tbl__guest">${escapeHtml(`${r.customer_first_name} ${r.customer_last_name}`.trim())}</span>
+            <span class="tbl__seats">${escapeHtml(STATUS_LABEL[r.status] || r.status)}</span>
+          </div>`;
+        }).join('')}
         ${z.tables.map((t) => {
+          if (joinedTableIds.has(t.id)) return '';
           const o = occ.get(t.id);
           const cls = o ? (o.status === 'arrivato' ? 'tbl--arrivato' : o.status === 'confermata' ? 'tbl--occupato' : 'tbl--attesa') : 'tbl--libero';
           return `<div class="tbl ${cls}">
@@ -597,6 +663,9 @@ function subscribeRealtime() {
           scheduleReload();
         }
       })
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'reservation_tables' },
+      () => scheduleReload())
     .subscribe();
 }
 

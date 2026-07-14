@@ -46,17 +46,40 @@ export function reservationCardHtml(r, opts = {}) {
 
 function tableAssignmentHtml(r, opts = {}) {
   if (!Array.isArray(opts.tableOptions)) return '';
-  const options = [
-    `<option value="">Tavolo non assegnato</option>`,
-    ...opts.tableOptions.map((table) => {
-      const selected = table.id === r.table_id ? ' selected' : '';
-      const disabled = table.disabled ? ' disabled' : '';
-      return `<option value="${escapeHtml(table.id)}"${selected}${disabled}>${escapeHtml(table.label)}</option>`;
-    }),
-  ].join('');
-  return `<div class="res__table-assign">
-    <select data-table-select="${escapeHtml(r.id)}" aria-label="Assegna tavolo">${options}</select>
-    <button class="act act--mute" type="button" data-table-save="${escapeHtml(r.id)}">Assegna tavolo</button>
+  const selectedIds = new Set(Array.isArray(r.table_ids) && r.table_ids.length ? r.table_ids : [r.table_id].filter(Boolean));
+  const selectedTables = opts.tableOptions.filter((table) => selectedIds.has(table.id));
+  const selectedCodes = selectedTables.map((table) => table.code).filter(Boolean);
+  const selectedSeats = selectedTables.reduce((sum, table) => sum + (table.seatsMax || 0), 0);
+  const summary = selectedCodes.length ? selectedCodes.join(' + ') : 'Tavolo non assegnato';
+  const options = opts.tableOptions.map((table) => {
+    const selected = selectedIds.has(table.id);
+    const disabled = table.disabled && !selected;
+    const status = table.busy && !selected ? 'Occupato' : table.disabled && !selected ? 'Fuori servizio' : 'Disponibile';
+    return `<label class="table-picker__option${disabled ? ' is-disabled' : ''}">
+      <input type="checkbox" data-table-choice="${escapeHtml(table.id)}" ${selected ? 'checked' : ''} ${disabled ? 'disabled' : ''} />
+      <span class="table-picker__check" aria-hidden="true"></span>
+      <span class="table-picker__main">
+        <strong>${escapeHtml(table.code)}</strong>
+        <small>${escapeHtml(table.seatsMax)} posti</small>
+      </span>
+      <span class="table-picker__status">${escapeHtml(status)}</span>
+    </label>`;
+  }).join('');
+  return `<div class="res__table-assign" data-party-size="${escapeHtml(r.party_size || 0)}">
+    <div class="table-picker" data-table-picker="${escapeHtml(r.id)}">
+      <button class="table-picker__button" type="button" data-table-picker-toggle aria-expanded="false">
+        <span data-table-picker-label>${escapeHtml(summary)}</span>
+        <span aria-hidden="true">▾</span>
+      </button>
+      <div class="table-picker__menu" data-table-picker-menu hidden>${options}</div>
+    </div>
+    <button class="act act--mute" type="button" data-table-save="${escapeHtml(r.id)}">Assegna tavoli</button>
+    <div class="table-picker__summary" data-table-summary>
+      <span>Tavoli selezionati: <strong data-table-summary-codes>${escapeHtml(selectedCodes.join(' + ') || '—')}</strong></span>
+      <span>Capienza totale: <strong data-table-summary-seats>${selectedSeats}</strong> posti</span>
+      <span>Prenotazione: <strong>${escapeHtml(r.party_size || 0)}</strong> persone</span>
+      <span class="table-picker__error" data-table-summary-error hidden>Seleziona altri tavoli: la capienza attuale non è sufficiente.</span>
+    </div>
   </div>`;
 }
 
@@ -73,12 +96,60 @@ export function wireRowActions(container, onChange) {
 }
 
 export function wireTableAssignment(container, onAssign) {
+  container.querySelectorAll('[data-table-picker]').forEach((picker) => {
+    refreshTablePicker(picker);
+    const toggle = picker.querySelector('[data-table-picker-toggle]');
+    const menu = picker.querySelector('[data-table-picker-menu]');
+    toggle?.addEventListener('click', () => {
+      const open = menu.hidden;
+      menu.hidden = !open;
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    picker.querySelectorAll('[data-table-choice]').forEach((choice) =>
+      choice.addEventListener('change', () => refreshTablePicker(picker)));
+  });
   container.querySelectorAll('[data-table-save]').forEach((button) =>
     button.addEventListener('click', () => {
       const id = button.dataset.tableSave;
-      const select = button.closest('.res')?.querySelector('[data-table-select]');
-      onAssign(id, select ? select.value || null : null);
+      const box = button.closest('.res__table-assign');
+      const picker = box?.querySelector('[data-table-picker]');
+      const ids = picker ? selectedTableIds(picker) : [];
+      const totalSeats = tablePickerSeats(picker);
+      const partySize = parseInt(box?.dataset.partySize || '0', 10) || 0;
+      const error = box?.querySelector('[data-table-summary-error]');
+      if (ids.length && totalSeats < partySize) {
+        if (error) error.hidden = false;
+        return;
+      }
+      onAssign(id, ids);
     }));
+}
+
+function selectedTableIds(picker) {
+  return [...picker.querySelectorAll('[data-table-choice]:checked')].map((input) => input.dataset.tableChoice).filter(Boolean);
+}
+
+function tablePickerSeats(picker) {
+  return [...picker.querySelectorAll('[data-table-choice]:checked')].reduce((sum, input) => {
+    const seats = parseInt(input.closest('.table-picker__option')?.querySelector('small')?.textContent || '0', 10);
+    return sum + (Number.isFinite(seats) ? seats : 0);
+  }, 0);
+}
+
+function refreshTablePicker(picker) {
+  const box = picker.closest('.res__table-assign');
+  const checked = [...picker.querySelectorAll('[data-table-choice]:checked')];
+  const codes = checked.map((input) => input.closest('.table-picker__option')?.querySelector('strong')?.textContent || '').filter(Boolean);
+  const seats = tablePickerSeats(picker);
+  const partySize = parseInt(box?.dataset.partySize || '0', 10) || 0;
+  const label = picker.querySelector('[data-table-picker-label]');
+  const codesEl = box?.querySelector('[data-table-summary-codes]');
+  const seatsEl = box?.querySelector('[data-table-summary-seats]');
+  const error = box?.querySelector('[data-table-summary-error]');
+  if (label) label.textContent = codes.length <= 2 ? (codes.join(' + ') || 'Tavolo non assegnato') : `${codes.length} tavoli selezionati`;
+  if (codesEl) codesEl.textContent = codes.join(' + ') || '—';
+  if (seatsEl) seatsEl.textContent = String(seats);
+  if (error) error.hidden = !codes.length || seats >= partySize;
 }
 
 // HTML di una voce della lista d'attesa. `position` è la posizione in coda
