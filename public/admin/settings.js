@@ -43,7 +43,7 @@ async function init() {
 async function reloadAll() {
   const [z, t, s] = await Promise.all([
     supabase.from('zones').select('id, name, sort_order').eq('venue_id', state.venue.id).order('sort_order'),
-    supabase.from('restaurant_tables').select('id, code, seats_min, seats_max, zone_id, active').eq('venue_id', state.venue.id).order('code'),
+    supabase.from('restaurant_tables').select('id, code, seats_max, zone_id, active').eq('venue_id', state.venue.id).order('code'),
     supabase.from('service_shifts').select('id, code, name, start_time, end_time, days_of_week, sort_order').eq('venue_id', state.venue.id).order('sort_order'),
   ]);
   if (z.error) throw z.error; if (t.error) throw t.error; if (s.error) throw s.error;
@@ -177,7 +177,6 @@ function renderTables() {
         </select>
       </div>
       <div class="table-cell" data-label="Posti max">
-        <input type="hidden" value="${t.seats_min}" data-tid="${t.id}" data-f="seats_min" />
         <input class="table-row__seats" type="number" min="1" value="${t.seats_max}" data-tid="${t.id}" data-f="seats_max" ${dis()} aria-label="Posti massimi" />
       </div>
       <div class="table-cell" data-label="Stato">
@@ -203,7 +202,6 @@ function tablePatchFromRow(id) {
   return {
     code: g('code').value.trim(),
     zone_id: g('zone_id').value,
-    seats_min: parseInt(g('seats_min').value, 10),
     seats_max: parseInt(g('seats_max').value, 10),
     active: g('active').checked,
   };
@@ -217,7 +215,6 @@ function markTableDirty(id) {
   const changed =
     patch.code !== original.code ||
     patch.zone_id !== original.zone_id ||
-    patch.seats_min !== original.seats_min ||
     patch.seats_max !== original.seats_max ||
     patch.active !== original.active;
   if (changed) state.dirtyTables.add(id);
@@ -248,7 +245,7 @@ async function saveTableChanges() {
   if (!state.dirtyTables.size) return;
   const ids = [...state.dirtyTables];
   const patches = ids.map((id) => ({ id, patch: tablePatchFromRow(id) }));
-  const invalid = patches.find(({ patch }) => !patch.code || !(patch.seats_max >= patch.seats_min && patch.seats_min > 0));
+  const invalid = patches.find(({ patch }) => !patch.code || !(patch.seats_max > 0));
   if (invalid) { toast('Dati tavolo non validi.', true); return; }
 
   $('saveTableChanges').disabled = true;
@@ -335,11 +332,10 @@ function wire() {
       venue_id: state.venue.id,
       code: $('tCode').value.trim(),
       zone_id: $('tZone').value,
-      seats_min: parseInt($('tMin').value, 10),
       seats_max: parseInt($('tMax').value, 10),
     };
     if (!patch.code || !patch.zone_id) { toast('Inserisci codice e zona.', true); return; }
-    if (!(patch.seats_max >= patch.seats_min && patch.seats_min > 0)) { toast('Posti non validi.', true); return; }
+    if (!(patch.seats_max > 0)) { toast('Posti non validi.', true); return; }
     run(supabase.from('restaurant_tables').insert(patch), 'Tavolo aggiunto').then((ok) => { if (ok) $('tCode').value = ''; });
   });
 

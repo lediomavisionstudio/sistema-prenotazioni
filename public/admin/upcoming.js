@@ -53,7 +53,7 @@ async function init() {
 async function loadConfig() {
   const [{ data: shifts, error: e1 }, { data: tables, error: e2 }] = await Promise.all([
     supabase.from('service_shifts').select('id, name, start_time, end_time, sort_order').eq('venue_id', state.venue.id).order('sort_order'),
-    supabase.from('restaurant_tables').select('id, code, seats_min, seats_max').eq('venue_id', state.venue.id),
+    supabase.from('restaurant_tables').select('id, code, seats_max').eq('venue_id', state.venue.id),
   ]);
   if (e1) throw e1;
   if (e2) throw e2;
@@ -180,12 +180,12 @@ function tableOptionsForReservation(reservation) {
     .map((r) => r.table_id));
 
   return [...state.tablesById.values()].map((table) => {
-    const fits = reservation.party_size >= table.seats_min && reservation.party_size <= table.seats_max;
+    const fits = reservation.party_size <= table.seats_max;
     const busy = occupied.has(table.id);
     return {
       id: table.id,
       disabled: (!fits || busy) && table.id !== reservation.table_id,
-      label: `${table.code} (${table.seats_min}-${table.seats_max})${fits ? '' : ' - non adatto'}${busy ? ' - occupato' : ''}`,
+      label: `${table.code} (${table.seats_max})${fits ? '' : ' - non adatto'}${busy ? ' - occupato' : ''}`,
     };
   });
 }

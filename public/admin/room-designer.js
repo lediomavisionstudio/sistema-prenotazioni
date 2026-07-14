@@ -31,7 +31,7 @@ export function initRoomDesigner(context) {
   ctx.$('rdStage').addEventListener('pointerdown', onStagePointerDown);
   ctx.$('rdStage').addEventListener('wheel', onWheel, { passive: false });
 
-  ['rdCode', 'rdZone', 'rdSeatsMin', 'rdSeatsMax', 'rdShape', 'rdColor', 'rdRotation', 'rdWidth', 'rdHeight', 'rdActive', 'rdLocked']
+  ['rdCode', 'rdZone', 'rdSeatsMax', 'rdShape', 'rdColor', 'rdRotation', 'rdWidth', 'rdHeight', 'rdActive', 'rdLocked']
     .forEach((id) => ctx.$(id).addEventListener('input', updateSelectedFromInspector));
 
   renderDesigner();
@@ -101,7 +101,7 @@ function tableHtml(table, index) {
       data-table-id="${ctx.escapeHtml(table.id)}"
       style="left:${layout.layout_x}px;top:${layout.layout_y}px;width:${width}px;height:${height}px;transform:rotate(${layout.layout_rotation}deg);--table-color:${ctx.escapeHtml(layout.layout_color)}">
       <span class="room-table__code">${ctx.escapeHtml(table.code)}</span>
-      <span class="room-table__seats">${table.seats_min}-${table.seats_max}</span>
+      <span class="room-table__seats">${table.seats_max}</span>
       <span class="room-table__status">${table.active ? '' : 'Fuori servizio'}</span>
       <i class="room-table__lock">${layout.layout_locked ? 'Bloccato' : ''}</i>
       <span class="room-table__handle room-table__handle--rotate" data-rd-handle="rotate" aria-hidden="true"></span>
@@ -120,7 +120,6 @@ function renderInspector() {
     `<option value="${ctx.escapeHtml(zone.id)}">${ctx.escapeHtml(zone.name)}</option>`).join('');
   ctx.$('rdCode').value = table.code || '';
   ctx.$('rdZone').value = table.zone_id || ctx.state.zones[0]?.id || '';
-  ctx.$('rdSeatsMin').value = table.seats_min || 1;
   ctx.$('rdSeatsMax').value = table.seats_max || 2;
   ctx.$('rdShape').value = layout.layout_shape;
   ctx.$('rdColor').value = normalizeColor(layout.layout_color);
@@ -262,12 +261,10 @@ function updateSelectedFromInspector() {
   const table = selectedTable();
   if (!table || !ctx.state.canEdit) return;
   pushHistory();
-  const min = parseInt(ctx.$('rdSeatsMin').value, 10) || 1;
-  const max = parseInt(ctx.$('rdSeatsMax').value, 10) || min;
+  const max = parseInt(ctx.$('rdSeatsMax').value, 10) || 1;
   table.code = ctx.$('rdCode').value.trim() || table.code;
   table.zone_id = ctx.$('rdZone').value || table.zone_id;
-  table.seats_min = Math.max(1, min);
-  table.seats_max = Math.max(table.seats_min, max);
+  table.seats_max = Math.max(1, max);
   table.layout_shape = ctx.$('rdShape').value;
   table.layout_color = ctx.$('rdColor').value || DEFAULT_COLOR;
   table.layout_rotation = clamp(parseInt(ctx.$('rdRotation').value, 10) || 0, -180, 180);
@@ -292,7 +289,6 @@ async function addTable() {
     venue_id: ctx.state.venue.id,
     code,
     zone_id: ctx.state.zones[0].id,
-    seats_min: 1,
     seats_max: 4,
     active: true,
     layout_x: 120,
@@ -325,7 +321,6 @@ async function duplicateSelected() {
     venue_id: ctx.state.venue.id,
     code: nextTableCode(source.code),
     zone_id: source.zone_id,
-    seats_min: source.seats_min,
     seats_max: source.seats_max,
     active: source.active,
     layout_x: layout.layout_x + GRID,
@@ -390,8 +385,7 @@ function sanitizeTablePatch(table) {
   return {
     code: String(table.code || '').trim(),
     zone_id: table.zone_id,
-    seats_min: Math.max(1, parseInt(table.seats_min, 10) || 1),
-    seats_max: Math.max(parseInt(table.seats_min, 10) || 1, parseInt(table.seats_max, 10) || 1),
+    seats_max: Math.max(1, parseInt(table.seats_max, 10) || 1),
     active: table.active !== false,
     layout_x: layout.layout_x,
     layout_y: layout.layout_y,

@@ -47,7 +47,7 @@ policy RLS non includono affatto una policy `for delete` sulla tabella.
 | `venues` | Un locale pilota (pizzeria/pub). `slug` è l'identificatore pubblico usato dal widget, `active` disattiva tutto (widget e login) senza cancellare dati. `closed_weekdays` (array ISO dow) è la chiusura settimanale ricorrente: quei giorni sono esclusi dal widget. |
 | `venue_staff` | Chi (utente Supabase Auth) gestisce quale locale, con ruolo `owner` (configura zone/tavoli/turni/staff) o `staff` (gestisce solo il servizio). Un utente può stare su più locali. |
 | `zones` | Aree del locale (Sala, Dehors...), per raggruppare i tavoli nella mappa visuale. |
-| `restaurant_tables` | Tavolo fisico: `seats_min`/`seats_max` definiscono per quali coperti è adatto, usati dal suggerimento automatico. |
+| `restaurant_tables` | Tavolo fisico: `seats_max` definisce il numero massimo di coperti gestibili dal tavolo. |
 | `service_shifts` | Turni configurabili per locale (es. Turno I 19-21, Turno II 21-23), con `days_of_week` (ISO: 1=lunedì..7=domenica) per gestire orari diversi nel weekend. |
 | `venue_closures` | Date di chiusura _straordinaria_ (singole date: ferie, eventi). Diverse da `venues.closed_weekdays`, che è la chiusura _ricorrente_ per giorno della settimana. |
 | `reservations` | Cuore del sistema. Stato: `in_attesa → confermata → arrivato / no_show / annullata`. `table_id` è il tavolo suggerito/assegnato (nullable). `source` distingue `widget` da `manuale`. |
