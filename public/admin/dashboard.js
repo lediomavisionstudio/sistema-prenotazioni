@@ -491,7 +491,7 @@ async function removeWaitlist(id) {
 // ---------------------------------------------------------------------------
 // Mappa tavoli (turno selezionato)
 // ---------------------------------------------------------------------------
-function renderMap() {
+function renderLegacyTableMap() {
   const shift = currentShift();
   $('mapShiftName').textContent = shift ? shift.name : '';
 
