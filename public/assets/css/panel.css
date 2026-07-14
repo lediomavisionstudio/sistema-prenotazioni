@@ -82,39 +82,8 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
   display: grid; place-items: center;
 }
 .datebar__nav:hover { border-color: var(--tomato); background: var(--tomato-soft); }
-.datebar__label { position: relative; text-align: center; min-width: 220px; }
+.datebar__label { text-align: center; min-width: 220px; }
 .datebar__date { font-family: var(--font-title); font-weight: 700; font-size: 1.15rem; text-transform: capitalize; }
-.datebar__dateBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--ink);
-  cursor: pointer;
-  padding: 7px 12px;
-  transition: border-color .2s ease, background .2s ease, transform .2s ease;
-}
-.datebar__dateBtn:hover {
-  border-color: var(--line);
-  background: var(--surface-soft);
-  transform: translateY(-1px);
-}
-.datebar__cal {
-  color: var(--tomato-dark);
-  font-family: var(--font-body);
-  font-size: .95rem;
-  line-height: 1;
-}
-.datebar__picker {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
 .datebar__today { font-size: 0.75rem; color: var(--ink-soft); }
 .datebar__today a { cursor: pointer; }
 

@@ -8,7 +8,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
   <link rel="stylesheet" href="../assets/css/theme.css" />
   <link rel="stylesheet" href="../assets/css/panel.css" />
 
@@ -43,11 +42,7 @@
     <div class="datebar">
       <button class="datebar__nav" id="prevDay" type="button" aria-label="Giorno precedente">‹</button>
       <div class="datebar__label">
-        <button class="datebar__date datebar__dateBtn" id="datePickerBtn" type="button" aria-label="Scegli data">
-          <span id="dateLabel">—</span>
-          <span class="datebar__cal" aria-hidden="true">▦</span>
-        </button>
-        <input class="datebar__picker" id="datePickerInput" type="text" aria-hidden="true" tabindex="-1" />
+        <div class="datebar__date" id="dateLabel">—</div>
         <div class="datebar__today"><a id="goToday">Oggi</a></div>
       </div>
       <button class="datebar__nav" id="nextDay" type="button" aria-label="Giorno successivo">›</button>
@@ -119,8 +114,6 @@
 
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/pwa.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/it.js"></script>
   <script type="module" src="./dashboard.js"></script>
 </body>
 </html>

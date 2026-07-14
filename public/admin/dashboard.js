@@ -12,7 +12,6 @@ import {
 } from './resui.js';
 
 const $ = (id) => document.getElementById(id);
-let datePicker = null;
 
 const state = {
   session: null,
@@ -150,7 +149,6 @@ async function loadWaitlist() {
 
 function render() {
   $('dateLabel').textContent = formatLong(state.date);
-  if (datePicker) datePicker.setDate(state.date, false);
   renderKpis();
   renderTabs();
   renderList();
@@ -543,37 +541,10 @@ function subscribeRealtime() {
 // ---------------------------------------------------------------------------
 // Controlli
 // ---------------------------------------------------------------------------
-function setDashboardDate(date) {
-  if (!date || date === state.date) return;
-  state.date = date;
-  loadDay().catch(console.error);
-}
-
-function wireDatePicker() {
-  if (!window.flatpickr) {
-    console.warn('[dashboard] Flatpickr non disponibile: restano attive le frecce data.');
-    return;
-  }
-
-  datePicker = window.flatpickr($('datePickerInput'), {
-    defaultDate: state.date,
-    dateFormat: 'Y-m-d',
-    locale: window.flatpickr.l10ns?.it || 'it',
-    disableMobile: false,
-    clickOpens: false,
-    allowInput: false,
-    positionElement: $('datePickerBtn'),
-    onChange: (_dates, value) => setDashboardDate(value),
-  });
-
-  $('datePickerBtn').addEventListener('click', () => datePicker.open());
-}
-
 function wireControls() {
-  $('prevDay').addEventListener('click', () => setDashboardDate(addDays(state.date, -1)));
-  $('nextDay').addEventListener('click', () => setDashboardDate(addDays(state.date, +1)));
-  $('goToday').addEventListener('click', () => setDashboardDate(todayISO()));
-  wireDatePicker();
+  $('prevDay').addEventListener('click', () => { state.date = addDays(state.date, -1); loadDay().catch(console.error); });
+  $('nextDay').addEventListener('click', () => { state.date = addDays(state.date, +1); loadDay().catch(console.error); });
+  $('goToday').addEventListener('click', () => { state.date = todayISO(); loadDay().catch(console.error); });
 
   $('addBtn').addEventListener('click', () => ($('manualForm').hidden ? openManual() : closeManual()));
   $('mCancel').addEventListener('click', closeManual);
