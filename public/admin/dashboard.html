@@ -10,6 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../assets/css/theme.css" />
   <link rel="stylesheet" href="../assets/css/panel.css" />
+  <link rel="stylesheet" href="./dashboard-layout.css" />
 
   <!-- PWA: gestionale installabile -->
   <link rel="manifest" href="manifest.json" />
@@ -36,15 +37,29 @@
     </div>
   </header>
 
-  <main class="page" id="page" hidden>
+  <main class="page dashboard-page" id="page" hidden>
 
-    <section class="dashboard-hero" aria-label="Intestazione dashboard">
-      <div class="dashboard-hero__copy">
-        <p class="crm-eyebrow">Dashboard operativa</p>
-        <h1>Schermata principale</h1>
-        <p>Vista live della giornata, dei tavoli e delle richieste del ristorante.</p>
+    <section class="dashboard-command" aria-label="Intestazione dashboard">
+      <div class="dashboard-command__title">
+        <p class="crm-eyebrow">Gestionale ristorante</p>
+        <h1>Dashboard</h1>
       </div>
-      <div class="dashboard-hero__actions">
+
+      <div class="dashboard-command__date">
+        <button class="datebar__nav" id="prevDay" type="button" aria-label="Giorno precedente">‹</button>
+        <div class="datebar__label">
+          <div class="datebar__date" id="dateLabel">—</div>
+          <div class="datebar__today"><a id="goToday">Oggi</a></div>
+        </div>
+        <button class="datebar__nav" id="nextDay" type="button" aria-label="Giorno successivo">›</button>
+      </div>
+
+      <label class="searchbox dashboard-command__search" for="resSearch">
+        <i data-lucide="search" aria-hidden="true"></i>
+        <input id="resSearch" type="search" placeholder="Cerca prenotazioni" autocomplete="off" aria-label="Cerca prenotazioni" />
+      </label>
+
+      <div class="dashboard-command__actions">
         <button class="dashboard-icon-btn" id="notificationToggle" type="button" aria-label="Notifiche" title="Notifiche">
           <i data-lucide="bell" aria-hidden="true"></i>
           <span class="dashboard-icon-btn__dot" aria-hidden="true"></span>
@@ -63,55 +78,45 @@
       </div>
     </section>
 
-    <!-- Selettore data -->
-    <div class="datebar">
-      <button class="datebar__nav" id="prevDay" type="button" aria-label="Giorno precedente">‹</button>
-      <div class="datebar__label">
-        <div class="datebar__date" id="dateLabel">—</div>
-        <div class="datebar__today"><a id="goToday">Oggi</a></div>
-      </div>
-      <button class="datebar__nav" id="nextDay" type="button" aria-label="Giorno successivo">›</button>
-    </div>
+    <section class="dashboard-kpis" aria-label="Indicatori principali">
+      <div class="dash-metric"><span>Coperti oggi</span><strong id="dashCoversToday">0</strong></div>
+      <div class="dash-metric"><span>Coperti turno</span><strong id="dashCoversShift">0</strong></div>
+      <div class="dash-metric"><span>Occupazione</span><strong id="dashOccupancy">0%</strong></div>
+      <div class="dash-metric"><span>Tavoli liberi</span><strong id="dashTablesFree">0</strong></div>
+      <div class="dash-metric"><span>Tavoli occupati</span><strong id="dashTablesBusy">0</strong></div>
+      <div class="dash-metric"><span>Richieste in attesa</span><strong id="dashPending">0</strong></div>
+      <div class="dash-metric"><span>Confermate</span><strong id="dashConfirmed">0</strong></div>
+      <div class="dash-metric"><span>Lista attesa</span><strong id="dashWaitlist">0</strong></div>
+    </section>
 
-    <div class="admin-toolbar">
-      <label class="searchbox" for="resSearch">
-        <i data-lucide="search" aria-hidden="true"></i>
-        <input id="resSearch" type="search" placeholder="Cerca prenotazioni" autocomplete="off" aria-label="Cerca prenotazioni" />
-      </label>
-      <div class="export-toolbar" id="exportToolbar">
-        <button class="btn btn--ghost btn--sm" type="button" data-export="room">Stampa sala</button>
-        <button class="btn btn--ghost btn--sm" type="button" data-export="kitchen">Stampa cucina</button>
-        <button class="btn btn--ghost btn--sm" type="button" data-export="pdf">PDF</button>
-        <button class="btn btn--ghost btn--sm" type="button" data-export="csv">CSV</button>
-      </div>
-    </div>
-
-    <!-- Schermata principale ristorante -->
-    <section class="restaurant-home" aria-label="Panoramica ristorante">
-      <div class="restaurant-home__hero">
-        <p class="crm-eyebrow">Prossimo arrivo</p>
-        <div id="nextArrival" class="next-arrival"></div>
-      </div>
-      <div class="restaurant-home__metrics">
-        <div class="dash-metric"><span>Coperti oggi</span><strong id="dashCoversToday">0</strong></div>
-        <div class="dash-metric"><span>Coperti turno</span><strong id="dashCoversShift">0</strong></div>
-        <div class="dash-metric"><span>Occupazione</span><strong id="dashOccupancy">0%</strong></div>
-        <div class="dash-metric"><span>Tavoli liberi</span><strong id="dashTablesFree">0</strong></div>
-        <div class="dash-metric"><span>Tavoli occupati</span><strong id="dashTablesBusy">0</strong></div>
-        <div class="dash-metric"><span>Richieste in attesa</span><strong id="dashPending">0</strong></div>
-        <div class="dash-metric"><span>Confermate</span><strong id="dashConfirmed">0</strong></div>
-        <div class="dash-metric"><span>Lista attesa</span><strong id="dashWaitlist">0</strong></div>
-      </div>
-      <div class="restaurant-home__insights">
-        <div class="day-chart">
-          <div class="section__head"><h2 class="section__title">Grafico giornata</h2></div>
-          <div id="dayChart"></div>
-        </div>
-        <div class="day-timeline">
-          <div class="section__head"><h2 class="section__title">Timeline</h2></div>
-          <div id="dayTimeline"></div>
+    <section class="dashboard-card dashboard-next-arrival" aria-label="Prossimo arrivo">
+      <div class="dashboard-card__head">
+        <div>
+          <p class="crm-eyebrow">Live desk</p>
+          <h2 class="section__title">Prossimo arrivo</h2>
         </div>
       </div>
+      <div id="nextArrival" class="next-arrival"></div>
+    </section>
+
+    <section class="dashboard-card dashboard-timeline" aria-label="Timeline giornata">
+      <div class="dashboard-card__head">
+        <div>
+          <p class="crm-eyebrow">Turni</p>
+          <h2 class="section__title">Timeline della giornata</h2>
+        </div>
+      </div>
+      <div id="dayTimeline"></div>
+    </section>
+
+    <section class="dashboard-card dashboard-chart" aria-label="Grafico occupazione">
+      <div class="dashboard-card__head">
+        <div>
+          <p class="crm-eyebrow">Occupazione</p>
+          <h2 class="section__title">Grafico giornata</h2>
+        </div>
+      </div>
+      <div id="dayChart"></div>
     </section>
 
     <!-- KPI -->
@@ -121,32 +126,16 @@
       <div class="kpi"><div class="kpi__val" id="kpiOcc">0%</div><div class="kpi__label">Occupazione</div></div>
     </div>
 
-    <!-- Tab turni -->
-    <div class="tabs" id="shiftTabs"></div>
-
-    <!-- Calendario -->
-    <section class="section">
-      <div class="section__head">
-        <h2 class="section__title">Calendario prenotazioni</h2>
-        <div class="calendar-toolbar" id="calendarToolbar">
-          <button class="btn btn--ghost btn--sm" type="button" data-cal-nav="prev">Indietro</button>
-          <span class="pill" id="calendarTitle">Calendario</span>
-          <button class="btn btn--ghost btn--sm" type="button" data-cal-nav="next">Avanti</button>
-          <button class="btn btn--ghost btn--sm" type="button" data-cal-mode="day">Giorno</button>
-          <button class="btn btn--ghost btn--sm" type="button" data-cal-mode="week">Settimana</button>
-          <button class="btn btn--ghost btn--sm" type="button" data-cal-mode="month">Mese</button>
-          <button class="btn btn--ghost btn--sm" type="button" data-cal-mode="agenda">Agenda</button>
-        </div>
-      </div>
-      <div class="calendar-shell" id="reservationCalendar"></div>
-    </section>
-
     <!-- Lista prenotazioni -->
-    <section class="section">
-      <div class="section__head">
-        <h2 class="section__title">Prenotazioni</h2>
+    <section class="dashboard-card dashboard-reservations">
+      <div class="dashboard-card__head">
+        <div>
+          <p class="crm-eyebrow">Arrivi</p>
+          <h2 class="section__title">Prenotazioni imminenti</h2>
+        </div>
         <button class="btn btn--primary btn--sm" id="addBtn" type="button">+ Prenotazione manuale</button>
       </div>
+      <div class="tabs" id="shiftTabs"></div>
 
       <!-- Mini form inline -->
       <div class="card" id="manualForm" hidden style="margin-bottom:14px">
@@ -172,11 +161,47 @@
     </section>
 
     <!-- Lista d'attesa -->
-    <section class="section">
-      <div class="section__head">
-        <h2 class="section__title">Lista d'attesa <span class="pill" id="wlCount">0</span></h2>
+    <section class="dashboard-card dashboard-waitlist">
+      <div class="dashboard-card__head">
+        <div>
+          <p class="crm-eyebrow">Coda</p>
+          <h2 class="section__title">Lista attesa</h2>
+        </div>
+        <span class="pill" id="wlCount">0</span>
       </div>
       <div class="res-list" id="wlList"></div>
+    </section>
+
+    <section class="dashboard-card dashboard-secondary">
+      <div class="dashboard-card__head">
+        <div>
+          <p class="crm-eyebrow">Strumenti</p>
+          <h2 class="section__title">Operatività</h2>
+        </div>
+        <div class="export-toolbar" id="exportToolbar">
+          <button class="btn btn--ghost btn--sm" type="button" data-export="room">Stampa sala</button>
+          <button class="btn btn--ghost btn--sm" type="button" data-export="kitchen">Stampa cucina</button>
+          <button class="btn btn--ghost btn--sm" type="button" data-export="pdf">PDF</button>
+          <button class="btn btn--ghost btn--sm" type="button" data-export="csv">CSV</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Calendario -->
+    <section class="dashboard-card dashboard-support">
+      <div class="dashboard-card__head">
+        <h2 class="section__title">Calendario prenotazioni</h2>
+        <div class="calendar-toolbar" id="calendarToolbar">
+          <button class="btn btn--ghost btn--sm" type="button" data-cal-nav="prev">Indietro</button>
+          <span class="pill" id="calendarTitle">Calendario</span>
+          <button class="btn btn--ghost btn--sm" type="button" data-cal-nav="next">Avanti</button>
+          <button class="btn btn--ghost btn--sm" type="button" data-cal-mode="day">Giorno</button>
+          <button class="btn btn--ghost btn--sm" type="button" data-cal-mode="week">Settimana</button>
+          <button class="btn btn--ghost btn--sm" type="button" data-cal-mode="month">Mese</button>
+          <button class="btn btn--ghost btn--sm" type="button" data-cal-mode="agenda">Agenda</button>
+        </div>
+      </div>
+      <div class="calendar-shell" id="reservationCalendar"></div>
     </section>
 
     <!-- Servizio live -->
