@@ -94,98 +94,19 @@ export const WEEKDAYS = [
   { n: 7, short: 'Dom', long: 'Domenica' },
 ];
 
-// --- Feedback operatore ----------------------------------------------------
-let toastWrap;
-let audioCtx;
-let notificationPrimed = false;
-
-export function toast(msg, isError = false, options = {}) {
-  if (!toastWrap) {
-    toastWrap = document.createElement('div');
-    toastWrap.className = 'toast-stack';
-    toastWrap.setAttribute('aria-live', 'polite');
-    toastWrap.setAttribute('aria-atomic', 'false');
-    document.body.appendChild(toastWrap);
+// --- Toast ----------------------------------------------------------------
+let toastEl;
+export function toast(msg, isError = false) {
+  if (!toastEl) {
+    toastEl = document.createElement('div');
+    toastEl.className = 'toast';
+    document.body.appendChild(toastEl);
   }
-  const el = document.createElement('div');
-  el.className = 'toast' + (isError ? ' toast--err' : '');
-  el.setAttribute('role', isError ? 'alert' : 'status');
-  el.innerHTML = `
-    <span class="toast__icon">${isError ? '!' : options.icon || '✓'}</span>
-    <span class="toast__body">
-      ${options.title ? `<strong>${escapeHtml(options.title)}</strong>` : ''}
-      <span>${escapeHtml(msg)}</span>
-    </span>`;
-  toastWrap.appendChild(el);
-  requestAnimationFrame(() => el.classList.add('is-show'));
-  clearTimeout(el._t);
-  el._t = setTimeout(() => {
-    el.classList.remove('is-show');
-    setTimeout(() => el.remove(), 220);
-  }, options.duration || 3200);
-}
-
-export function notifyOperator(title, body, options = {}) {
-  toast(body || title, false, { title: body ? title : '', icon: options.icon || '•' });
-  playAlert(options.tone || 'soft');
-  showDesktopNotification(title, body, options);
-}
-
-export function setRealtimeUpdating(active) {
-  document.body.classList.toggle('is-realtime-updating', !!active);
-}
-
-function playAlert(tone = 'soft') {
-  try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    if (!audioCtx) audioCtx = new AudioContext();
-    if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
-    const now = audioCtx.currentTime;
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(tone === 'urgent' ? 740 : 520, now);
-    osc.frequency.exponentialRampToValueAtTime(tone === 'urgent' ? 880 : 660, now + 0.12);
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.06, now + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
-    osc.connect(gain).connect(audioCtx.destination);
-    osc.start(now);
-    osc.stop(now + 0.24);
-  } catch (error) {
-    console.debug('[operator-feedback] audio non disponibile:', error);
-  }
-}
-
-function showDesktopNotification(title, body, options = {}) {
-  if (!('Notification' in window)) return;
-  if (Notification.permission === 'granted') {
-    const n = new Notification(title, {
-      body,
-      tag: options.tag || 'restaurant-operator',
-      renotify: true,
-      silent: true,
-    });
-    setTimeout(() => n.close(), 7000);
-    return;
-  }
-  if (Notification.permission === 'default') primeDesktopNotifications();
-}
-
-function primeDesktopNotifications() {
-  if (notificationPrimed || !('Notification' in window)) return;
-  notificationPrimed = true;
-  const ask = () => {
-    if (Notification.permission === 'default') {
-      const request = Notification.requestPermission();
-      if (request && typeof request.catch === 'function') request.catch(() => {});
-    }
-    window.removeEventListener('click', ask);
-    window.removeEventListener('keydown', ask);
-  };
-  window.addEventListener('click', ask, { once: true });
-  window.addEventListener('keydown', ask, { once: true });
+  toastEl.textContent = msg;
+  toastEl.classList.toggle('toast--err', isError);
+  toastEl.classList.add('is-show');
+  clearTimeout(toastEl._t);
+  toastEl._t = setTimeout(() => toastEl.classList.remove('is-show'), 2600);
 }
 
 export function escapeHtml(s) {

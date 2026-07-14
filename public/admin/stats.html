@@ -7,7 +7,7 @@
   <title>Statistiche — Pannello gestionale</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../assets/css/theme.css" />
   <link rel="stylesheet" href="../assets/css/panel.css" />
 
@@ -26,12 +26,12 @@
         <span class="topbar__venue" id="venueName">—</span>
         <span class="topbar__role" id="userRole"></span>
       </div>
-      <nav class="topbar__nav" aria-label="Navigazione gestionale">
-        <a class="topbar__link" href="dashboard.html"><i data-lucide="layout-dashboard" aria-hidden="true"></i><span>Dashboard</span></a>
-        <a class="topbar__link" href="upcoming.html"><i data-lucide="calendar-days" aria-hidden="true"></i><span>In arrivo</span></a>
-        <a class="topbar__link is-active" href="stats.html"><i data-lucide="bar-chart-3" aria-hidden="true"></i><span>Statistiche</span></a>
-        <a class="topbar__link" href="settings.html"><i data-lucide="settings" aria-hidden="true"></i><span>Impostazioni</span></a>
-        <button class="btn btn--ghost btn--sm topbar__logout" id="logoutBtn" type="button"><i data-lucide="log-out" aria-hidden="true"></i><span>Esci</span></button>
+      <nav class="topbar__nav">
+        <a class="topbar__link" href="dashboard.html">Dashboard</a>
+        <a class="topbar__link" href="upcoming.html">In arrivo</a>
+        <a class="topbar__link is-active" href="stats.html">Statistiche</a>
+        <a class="topbar__link" href="settings.html">Impostazioni</a>
+        <button class="btn btn--ghost btn--sm" id="logoutBtn" type="button">Esci</button>
       </nav>
     </div>
   </header>
@@ -96,8 +96,6 @@
 
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/pwa.js"></script>
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <script>window.addEventListener('DOMContentLoaded', function () { if (window.lucide) window.lucide.createIcons(); });</script>
   <!-- Chart.js (libreria leggera per i grafici) via CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <script type="module" src="./stats.js"></script>

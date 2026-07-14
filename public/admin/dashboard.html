@@ -7,10 +7,9 @@
   <title>Dashboard — Pannello gestionale</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../assets/css/theme.css" />
   <link rel="stylesheet" href="../assets/css/panel.css" />
-  <link rel="stylesheet" href="./dashboard-layout.css" />
 
   <!-- PWA: gestionale installabile -->
   <link rel="manifest" href="manifest.json" />
@@ -27,97 +26,27 @@
         <span class="topbar__venue" id="venueName">—</span>
         <span class="topbar__role" id="userRole"></span>
       </div>
-      <nav class="topbar__nav" aria-label="Navigazione gestionale">
-        <a class="topbar__link is-active" href="dashboard.html" aria-label="Dashboard" title="Dashboard"><i data-lucide="layout-dashboard" aria-hidden="true"></i><span>Dashboard</span></a>
-        <a class="topbar__link" href="upcoming.html" aria-label="In arrivo" title="In arrivo"><i data-lucide="calendar-days" aria-hidden="true"></i><span>In arrivo</span></a>
-        <a class="topbar__link" href="stats.html" aria-label="Statistiche" title="Statistiche"><i data-lucide="bar-chart-3" aria-hidden="true"></i><span>Statistiche</span></a>
-        <a class="topbar__link" href="settings.html" aria-label="Impostazioni" title="Impostazioni"><i data-lucide="settings" aria-hidden="true"></i><span>Impostazioni</span></a>
-        <button class="btn btn--ghost btn--sm topbar__logout" id="logoutBtn" type="button" aria-label="Esci" title="Esci"><i data-lucide="log-out" aria-hidden="true"></i><span>Esci</span></button>
+      <nav class="topbar__nav">
+        <a class="topbar__link is-active" href="dashboard.html">Dashboard</a>
+        <a class="topbar__link" href="upcoming.html">In arrivo</a>
+        <a class="topbar__link" href="stats.html">Statistiche</a>
+        <a class="topbar__link" href="settings.html">Impostazioni</a>
+        <button class="btn btn--ghost btn--sm" id="logoutBtn" type="button">Esci</button>
       </nav>
     </div>
   </header>
 
-  <main class="page dashboard-page" id="page" hidden>
+  <main class="page" id="page" hidden>
 
-    <section class="dashboard-command" aria-label="Intestazione dashboard">
-      <div class="dashboard-command__title">
-        <p class="crm-eyebrow">Gestionale ristorante</p>
-        <h1>Dashboard</h1>
+    <!-- Selettore data -->
+    <div class="datebar">
+      <button class="datebar__nav" id="prevDay" type="button" aria-label="Giorno precedente">‹</button>
+      <div class="datebar__label">
+        <div class="datebar__date" id="dateLabel">—</div>
+        <div class="datebar__today"><a id="goToday">Oggi</a></div>
       </div>
-
-      <div class="dashboard-command__date">
-        <button class="datebar__nav" id="prevDay" type="button" aria-label="Giorno precedente">‹</button>
-        <div class="datebar__label">
-          <div class="datebar__date" id="dateLabel">—</div>
-          <div class="datebar__today"><a id="goToday">Oggi</a></div>
-        </div>
-        <button class="datebar__nav" id="nextDay" type="button" aria-label="Giorno successivo">›</button>
-      </div>
-
-      <label class="searchbox dashboard-command__search" for="resSearch">
-        <i data-lucide="search" aria-hidden="true"></i>
-        <input id="resSearch" type="search" placeholder="Cerca prenotazioni" autocomplete="off" aria-label="Cerca prenotazioni" />
-      </label>
-
-      <div class="dashboard-command__actions">
-        <button class="dashboard-icon-btn" id="notificationToggle" type="button" aria-label="Notifiche" title="Notifiche">
-          <i data-lucide="bell" aria-hidden="true"></i>
-          <span class="dashboard-icon-btn__dot" aria-hidden="true"></span>
-        </button>
-        <label class="theme-switch" for="themeToggle" title="Dark mode">
-          <input id="themeToggle" type="checkbox" aria-label="Dark mode" />
-          <span><i data-lucide="moon" aria-hidden="true"></i></span>
-        </label>
-        <div class="operator-profile" aria-label="Profilo operatore">
-          <span class="operator-profile__avatar"><i data-lucide="user-round" aria-hidden="true"></i></span>
-          <span class="operator-profile__meta">
-            <strong id="operatorProfileLabel">Staff</strong>
-            <small>Operatore</small>
-          </span>
-        </div>
-      </div>
-    </section>
-
-    <section class="dashboard-kpis" aria-label="Indicatori principali">
-      <div class="dash-metric"><span>Coperti oggi</span><strong id="dashCoversToday">0</strong></div>
-      <div class="dash-metric"><span>Coperti turno</span><strong id="dashCoversShift">0</strong></div>
-      <div class="dash-metric"><span>Occupazione</span><strong id="dashOccupancy">0%</strong></div>
-      <div class="dash-metric"><span>Tavoli liberi</span><strong id="dashTablesFree">0</strong></div>
-      <div class="dash-metric"><span>Tavoli occupati</span><strong id="dashTablesBusy">0</strong></div>
-      <div class="dash-metric"><span>Richieste in attesa</span><strong id="dashPending">0</strong></div>
-      <div class="dash-metric"><span>Confermate</span><strong id="dashConfirmed">0</strong></div>
-      <div class="dash-metric"><span>Lista attesa</span><strong id="dashWaitlist">0</strong></div>
-    </section>
-
-    <section class="dashboard-card dashboard-next-arrival" aria-label="Prossimo arrivo">
-      <div class="dashboard-card__head">
-        <div>
-          <p class="crm-eyebrow">Live desk</p>
-          <h2 class="section__title">Prossimo arrivo</h2>
-        </div>
-      </div>
-      <div id="nextArrival" class="next-arrival"></div>
-    </section>
-
-    <section class="dashboard-card dashboard-timeline" aria-label="Timeline giornata">
-      <div class="dashboard-card__head">
-        <div>
-          <p class="crm-eyebrow">Turni</p>
-          <h2 class="section__title">Timeline della giornata</h2>
-        </div>
-      </div>
-      <div id="dayTimeline"></div>
-    </section>
-
-    <section class="dashboard-card dashboard-chart" aria-label="Grafico occupazione">
-      <div class="dashboard-card__head">
-        <div>
-          <p class="crm-eyebrow">Occupazione</p>
-          <h2 class="section__title">Grafico giornata</h2>
-        </div>
-      </div>
-      <div id="dayChart"></div>
-    </section>
+      <button class="datebar__nav" id="nextDay" type="button" aria-label="Giorno successivo">›</button>
+    </div>
 
     <!-- KPI -->
     <div class="kpis">
@@ -126,16 +55,15 @@
       <div class="kpi"><div class="kpi__val" id="kpiOcc">0%</div><div class="kpi__label">Occupazione</div></div>
     </div>
 
+    <!-- Tab turni -->
+    <div class="tabs" id="shiftTabs"></div>
+
     <!-- Lista prenotazioni -->
-    <section class="dashboard-card dashboard-reservations">
-      <div class="dashboard-card__head">
-        <div>
-          <p class="crm-eyebrow">Arrivi</p>
-          <h2 class="section__title">Prenotazioni imminenti</h2>
-        </div>
+    <section class="section">
+      <div class="section__head">
+        <h2 class="section__title">Prenotazioni</h2>
         <button class="btn btn--primary btn--sm" id="addBtn" type="button">+ Prenotazione manuale</button>
       </div>
-      <div class="tabs" id="shiftTabs"></div>
 
       <!-- Mini form inline -->
       <div class="card" id="manualForm" hidden style="margin-bottom:14px">
@@ -161,74 +89,23 @@
     </section>
 
     <!-- Lista d'attesa -->
-    <section class="dashboard-card dashboard-waitlist">
-      <div class="dashboard-card__head">
-        <div>
-          <p class="crm-eyebrow">Coda</p>
-          <h2 class="section__title">Lista attesa</h2>
-        </div>
-        <span class="pill" id="wlCount">0</span>
+    <section class="section">
+      <div class="section__head">
+        <h2 class="section__title">Lista d'attesa <span class="pill" id="wlCount">0</span></h2>
       </div>
       <div class="res-list" id="wlList"></div>
     </section>
 
-    <section class="dashboard-card dashboard-secondary">
-      <div class="dashboard-card__head">
-        <div>
-          <p class="crm-eyebrow">Strumenti</p>
-          <h2 class="section__title">Operatività</h2>
-        </div>
-        <div class="export-toolbar" id="exportToolbar">
-          <button class="btn btn--ghost btn--sm" type="button" data-export="room">Stampa sala</button>
-          <button class="btn btn--ghost btn--sm" type="button" data-export="kitchen">Stampa cucina</button>
-          <button class="btn btn--ghost btn--sm" type="button" data-export="pdf">PDF</button>
-          <button class="btn btn--ghost btn--sm" type="button" data-export="csv">CSV</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- Calendario -->
-    <section class="dashboard-card dashboard-support">
-      <div class="dashboard-card__head">
-        <h2 class="section__title">Calendario prenotazioni</h2>
-        <div class="calendar-toolbar" id="calendarToolbar">
-          <button class="btn btn--ghost btn--sm" type="button" data-cal-nav="prev">Indietro</button>
-          <span class="pill" id="calendarTitle">Calendario</span>
-          <button class="btn btn--ghost btn--sm" type="button" data-cal-nav="next">Avanti</button>
-          <button class="btn btn--ghost btn--sm" type="button" data-cal-mode="day">Giorno</button>
-          <button class="btn btn--ghost btn--sm" type="button" data-cal-mode="week">Settimana</button>
-          <button class="btn btn--ghost btn--sm" type="button" data-cal-mode="month">Mese</button>
-          <button class="btn btn--ghost btn--sm" type="button" data-cal-mode="agenda">Agenda</button>
-        </div>
-      </div>
-      <div class="calendar-shell" id="reservationCalendar"></div>
-    </section>
-
-    <!-- Servizio live -->
+    <!-- Mappa tavoli -->
     <section class="section">
       <div class="section__head"><h2 class="section__title">Mappa tavoli — <span id="mapShiftName"></span></h2></div>
-      <div class="legend" hidden>
+      <div class="legend">
         <span><i class="l-libero"></i> Libero</span>
         <span><i class="l-attesa"></i> In attesa</span>
         <span><i class="l-occupato"></i> Confermato</span>
         <span><i class="l-arrivato"></i> Arrivato</span>
       </div>
-      <div class="live-service-head">
-        <strong>Servizio LIVE</strong>
-        <span>Monitoraggio tavoli in tempo reale</span>
-      </div>
-      <div class="legend legend--ops">
-        <span><i class="l-free"></i> Libero</span>
-        <span><i class="l-imminent"></i> Prenotazione imminente</span>
-        <span><i class="l-seated"></i> Cliente seduto</span>
-        <span><i class="l-paying"></i> Sta pagando</span>
-        <span><i class="l-too-long"></i> Occupato troppo</span>
-        <span><i class="l-dirty"></i> Da sparecchiare</span>
-        <span><i class="l-off"></i> Fuori servizio</span>
-      </div>
-      <div class="ops-reservations" id="opsReservations"></div>
       <div id="tableMap"></div>
-      <div class="ops-panel" id="opsPanel" hidden></div>
     </section>
 
   </main>
@@ -237,9 +114,6 @@
 
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/pwa.js"></script>
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-  <script>window.addEventListener('DOMContentLoaded', function () { if (window.lucide) window.lucide.createIcons(); });</script>
   <script type="module" src="./dashboard.js"></script>
 </body>
 </html>

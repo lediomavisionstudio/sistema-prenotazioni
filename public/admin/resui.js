@@ -36,7 +36,6 @@ export function reservationCardHtml(r, opts = {}) {
           ${opts.shiftName ? `<span>${escapeHtml(opts.shiftName)}</span>` : ''}
           ${emailBadge}
         </div>
-        <button class="customer-link" type="button" data-customer-card="${escapeHtml(r.id)}">Scheda cliente</button>
         ${tableControl}
         ${r.notes ? `<div class="res__notes">${escapeHtml(r.notes)}</div>` : ''}
       </div>
@@ -47,39 +46,18 @@ export function reservationCardHtml(r, opts = {}) {
 
 function tableAssignmentHtml(r, opts = {}) {
   if (!Array.isArray(opts.tableOptions)) return '';
-  const cards = opts.tableOptions.map((table) => tableChoiceCardHtml(table, r)).join('');
+  const options = [
+    `<option value="">Tavolo non assegnato</option>`,
+    ...opts.tableOptions.map((table) => {
+      const selected = table.id === r.table_id ? ' selected' : '';
+      const disabled = table.disabled ? ' disabled' : '';
+      return `<option value="${escapeHtml(table.id)}"${selected}${disabled}>${escapeHtml(table.label)}</option>`;
+    }),
+  ].join('');
   return `<div class="res__table-assign">
-    <div class="table-picker" role="group" aria-label="Assegna tavolo">
-      <button class="table-picker__card table-picker__card--clear${r.table_id ? '' : ' is-selected'}" type="button" data-table-choice="${escapeHtml(r.id)}" data-table-id="">
-        <span class="table-picker__swatch"></span>
-        <strong>Nessun tavolo</strong>
-        <small>Non assegnato</small>
-        <em>Libera</em>
-        <span>Rimuovi</span>
-      </button>
-      ${cards}
-    </div>
+    <select data-table-select="${escapeHtml(r.id)}" aria-label="Assegna tavolo">${options}</select>
+    <button class="act act--mute" type="button" data-table-save="${escapeHtml(r.id)}">Assegna tavolo</button>
   </div>`;
-}
-
-function tableChoiceCardHtml(table, reservation) {
-  const selected = table.id === reservation.table_id;
-  const unavailable = !!table.disabled && !selected;
-  const raw = String(table.label || '');
-  const name = raw.split('(')[0].trim() || 'Tavolo';
-  const seats = raw.match(/\(([^)]+)\)/)?.[1] || 'coperti';
-  const busy = raw.toLowerCase().includes('occupato');
-  const unsuitable = raw.toLowerCase().includes('non adatto');
-  const status = selected ? 'Assegnato' : busy ? 'Occupato' : unsuitable ? 'Non adatto' : 'Libero';
-  const tone = selected ? 'selected' : busy ? 'busy' : unsuitable ? 'warn' : 'free';
-  const occupancy = busy ? 'Occupato' : selected ? 'In uso' : 'Disponibile';
-  return `<button class="table-picker__card table-picker__card--${tone}${selected ? ' is-selected' : ''}" type="button" data-table-choice="${escapeHtml(reservation.id)}" data-table-id="${escapeHtml(table.id)}"${unavailable ? ' disabled aria-disabled="true"' : ''}>
-    <span class="table-picker__swatch"></span>
-    <strong>${escapeHtml(name)}</strong>
-    <small>${escapeHtml(seats)} coperti</small>
-    <em>${escapeHtml(status)}</em>
-    <span>${escapeHtml(occupancy)}</span>
-  </button>`;
 }
 
 function emailVerificationBadgeHtml(r) {
@@ -95,10 +73,11 @@ export function wireRowActions(container, onChange) {
 }
 
 export function wireTableAssignment(container, onAssign) {
-  container.querySelectorAll('[data-table-choice]').forEach((button) =>
+  container.querySelectorAll('[data-table-save]').forEach((button) =>
     button.addEventListener('click', () => {
-      if (button.disabled) return;
-      onAssign(button.dataset.tableChoice, button.dataset.tableId || null);
+      const id = button.dataset.tableSave;
+      const select = button.closest('.res')?.querySelector('[data-table-select]');
+      onAssign(id, select ? select.value || null : null);
     }));
 }
 

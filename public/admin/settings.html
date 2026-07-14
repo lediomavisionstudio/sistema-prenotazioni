@@ -7,7 +7,7 @@
   <title>Impostazioni — Pannello gestionale</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../assets/css/theme.css" />
   <link rel="stylesheet" href="../assets/css/panel.css" />
 
@@ -26,12 +26,12 @@
         <span class="topbar__venue" id="venueName">—</span>
         <span class="topbar__role" id="userRole"></span>
       </div>
-      <nav class="topbar__nav" aria-label="Navigazione gestionale">
-        <a class="topbar__link" href="dashboard.html"><i data-lucide="layout-dashboard" aria-hidden="true"></i><span>Dashboard</span></a>
-        <a class="topbar__link" href="upcoming.html"><i data-lucide="calendar-days" aria-hidden="true"></i><span>In arrivo</span></a>
-        <a class="topbar__link" href="stats.html"><i data-lucide="bar-chart-3" aria-hidden="true"></i><span>Statistiche</span></a>
-        <a class="topbar__link is-active" href="settings.html"><i data-lucide="settings" aria-hidden="true"></i><span>Impostazioni</span></a>
-        <button class="btn btn--ghost btn--sm topbar__logout" id="logoutBtn" type="button"><i data-lucide="log-out" aria-hidden="true"></i><span>Esci</span></button>
+      <nav class="topbar__nav">
+        <a class="topbar__link" href="dashboard.html">Dashboard</a>
+        <a class="topbar__link" href="upcoming.html">In arrivo</a>
+        <a class="topbar__link" href="stats.html">Statistiche</a>
+        <a class="topbar__link is-active" href="settings.html">Impostazioni</a>
+        <button class="btn btn--ghost btn--sm" id="logoutBtn" type="button">Esci</button>
       </nav>
     </div>
   </header>
@@ -72,62 +72,6 @@
         <input class="row-item__grow" id="zoneName" placeholder="Nome zona (es. Dehors)" maxlength="60" required />
         <button class="btn btn--primary btn--sm" type="submit">+ Aggiungi zona</button>
       </form>
-    </section>
-
-    <!-- Designer sala -->
-    <section class="section">
-      <div class="section__head">
-        <h2 class="section__title">Designer sala</h2>
-        <button class="btn btn--primary btn--sm" id="editRoomBtn" type="button">Modifica sala</button>
-      </div>
-      <div class="room-designer" id="roomDesigner" hidden>
-        <div class="room-designer__toolbar">
-          <button class="btn btn--ghost btn--sm" id="rdAdd" type="button">+ Tavolo</button>
-          <button class="btn btn--ghost btn--sm" id="rdDuplicate" type="button">Duplica</button>
-          <button class="act act--warn" id="rdDelete" type="button">Elimina</button>
-          <span class="room-designer__split"></span>
-          <button class="btn btn--ghost btn--sm" id="rdUndo" type="button">Undo</button>
-          <button class="btn btn--ghost btn--sm" id="rdRedo" type="button">Redo</button>
-          <label class="pill room-designer__toggle"><input id="rdSnap" type="checkbox" checked /> snap griglia</label>
-          <span class="room-designer__zoom">
-            <button class="btn btn--ghost btn--sm" id="rdZoomOut" type="button">-</button>
-            <span id="rdZoomLabel">100%</span>
-            <button class="btn btn--ghost btn--sm" id="rdZoomIn" type="button">+</button>
-          </span>
-          <span class="pill" id="rdSaveState">Salvataggio automatico</span>
-        </div>
-        <div class="room-designer__body">
-          <div class="room-stage" id="rdStage">
-            <div class="room-surface" id="rdSurface"></div>
-          </div>
-          <aside class="room-inspector" id="rdInspector">
-            <p class="room-inspector__empty">Seleziona un tavolo per modificarlo.</p>
-            <div class="room-inspector__form" id="rdInspectorForm" hidden>
-              <div class="field"><label>Nome tavolo</label><input id="rdCode" maxlength="20" /></div>
-              <div class="field"><label>Zona</label><select id="rdZone"></select></div>
-              <div class="form-grid">
-                <div class="field"><label>Posti min</label><input id="rdSeatsMin" type="number" min="1" /></div>
-                <div class="field"><label>Posti max</label><input id="rdSeatsMax" type="number" min="1" /></div>
-              </div>
-              <div class="field"><label>Forma</label><select id="rdShape">
-                <option value="square">Quadrato</option>
-                <option value="rectangle">Rettangolare</option>
-                <option value="round">Rotondo</option>
-              </select></div>
-              <div class="form-grid">
-                <div class="field"><label>Colore</label><input id="rdColor" type="color" /></div>
-                <div class="field"><label>Rotazione</label><input id="rdRotation" type="number" min="-180" max="180" step="5" /></div>
-              </div>
-              <div class="form-grid">
-                <div class="field"><label>Larghezza</label><input id="rdWidth" type="number" min="56" max="360" /></div>
-                <div class="field"><label>Altezza</label><input id="rdHeight" type="number" min="56" max="260" /></div>
-              </div>
-              <label class="pill room-designer__check"><input id="rdActive" type="checkbox" /> disponibile</label>
-              <label class="pill room-designer__check"><input id="rdLocked" type="checkbox" /> bloccato</label>
-            </div>
-          </aside>
-        </div>
-      </div>
     </section>
 
     <!-- Tavoli -->
@@ -175,8 +119,6 @@
 
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/pwa.js"></script>
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <script>window.addEventListener('DOMContentLoaded', function () { if (window.lucide) window.lucide.createIcons(); });</script>
   <script type="module" src="./settings.js"></script>
 </body>
 </html>

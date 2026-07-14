@@ -4,10 +4,8 @@
 import {
   supabase, requireSession, signOut, loadCurrentVenue,
   todayISO, formatLong, hhmm, escapeHtml, toast, STATUS_LABEL,
-  notifyOperator, setRealtimeUpdating,
 } from './app.js';
-import { TRANSITIONS, statusRank, wireRowActions, wireTableAssignment } from './resui.js';
-import { initCustomerCrm, wireCustomerCards } from './customer-crm.js';
+import { statusRank, reservationCardHtml, wireRowActions, wireTableAssignment } from './resui.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -17,7 +15,6 @@ const state = {
   tablesById: new Map(),
   reservations: [],
   filter: 'attive',
-  search: '',
 };
 
 const FILTERS = {
@@ -40,7 +37,6 @@ async function init() {
     $('userRole').textContent = (current.role === 'owner' ? 'Titolare' : 'Staff') + ' · ' + (state.session.user.email || '');
 
     await loadConfig();
-    initCustomerCrm({ supabase, state, toast });
     wireFilters();
     subscribeRealtime();
     await load();
@@ -107,15 +103,11 @@ function render() {
   const pending = state.reservations.filter((r) => r.status === 'in_attesa').length;
   $('pendingCount').textContent = pending ? `${pending} da confermare` : 'nessuna da confermare';
 
-  const rows = state.reservations
-    .filter(FILTERS[state.filter])
-    .filter((r) => matchesReservationSearch(r, state.search));
+  const rows = state.reservations.filter(FILTERS[state.filter]);
   const box = $('upcoming');
 
   if (rows.length === 0) {
-    box.innerHTML = state.search
-      ? '<div class="res-empty">Nessuna prenotazione corrisponde alla ricerca.</div>'
-      : '<div class="res-empty">Nessuna prenotazione in arrivo per questo filtro.</div>';
+    box.innerHTML = '<div class="res-empty">Nessuna prenotazione in arrivo per questo filtro.</div>';
     return;
   }
 
@@ -141,7 +133,7 @@ function render() {
 
     const cards = dayRows.map((r) => {
       const shift = state.shiftsById.get(r.shift_id);
-      return upcomingReservationCardHtml(r, {
+      return reservationCardHtml(r, {
         timeLabel: shift ? hhmm(shift.start_time) : '',
         tableCode: r.table_id ? state.tablesById.get(r.table_id)?.code : null,
         shiftName: shift ? shift.name : '',
@@ -161,123 +153,6 @@ function render() {
 
   wireRowActions(box, changeStatus);
   wireTableAssignment(box, assignTable);
-  wireCustomerCards(box, state.reservations);
-  if (window.lucide) window.lucide.createIcons();
-}
-
-function upcomingReservationCardHtml(r, opts = {}) {
-  const acts = (TRANSITIONS[r.status] || []).map((t) =>
-    `<button class="act ${t.cls}" data-id="${escapeHtml(r.id)}" data-to="${escapeHtml(t.to)}">${escapeHtml(t.label)}</button>`).join('');
-  const fullName = `${r.customer_last_name || ''} ${r.customer_first_name || ''}`.trim();
-  const tableControl = upcomingTableAssignmentHtml(r, opts);
-  const emailBadge = upcomingEmailBadgeHtml(r);
-  const timelineLabel = opts.shiftName
-    ? `${escapeHtml(opts.shiftName)} Â· ${escapeHtml(opts.timeLabel || '--:--')}`
-    : escapeHtml(opts.timeLabel || '--:--');
-
-  return `
-    <article class="res upcoming-card upcoming-card--${escapeHtml(r.status)}">
-      <div class="upcoming-card__time">
-        <time>${escapeHtml(opts.timeLabel || '--:--')}</time>
-        <span>${opts.shiftName ? escapeHtml(opts.shiftName) : 'Turno'}</span>
-      </div>
-
-      <div class="upcoming-card__body">
-        <div class="upcoming-card__identity">
-          <div>
-            <h3>${escapeHtml(fullName || 'Cliente')}</h3>
-            ${r.source === 'widget' ? '<span class="pill">widget</span>' : ''}
-          </div>
-          <button class="customer-link" type="button" data-customer-card="${escapeHtml(r.id)}">Scheda cliente</button>
-        </div>
-
-        <div class="upcoming-card__details">
-          <a href="tel:${escapeHtml(r.customer_phone || '')}"><i data-lucide="phone" aria-hidden="true"></i>${escapeHtml(r.customer_phone || 'Telefono non disponibile')}</a>
-          <a href="mailto:${escapeHtml(r.customer_email || '')}"><i data-lucide="mail" aria-hidden="true"></i>${escapeHtml(r.customer_email || 'Email non inserita')}</a>
-          <span><i data-lucide="users" aria-hidden="true"></i>${Number(r.party_size || 0)} coperti</span>
-          <span><i data-lucide="table-2" aria-hidden="true"></i>${opts.tableCode ? 'Tavolo ' + escapeHtml(opts.tableCode) : 'Tavolo non assegnato'}</span>
-          ${emailBadge}
-        </div>
-
-        ${r.notes ? `<div class="upcoming-card__notes"><i data-lucide="notebook-text" aria-hidden="true"></i><span>${escapeHtml(r.notes)}</span></div>` : ''}
-      </div>
-
-      <aside class="upcoming-card__side">
-        <span class="badge badge--${escapeHtml(r.status)}">${escapeHtml(STATUS_LABEL[r.status] || r.status)}</span>
-        ${acts ? `<div class="res__actions upcoming-card__actions">${acts}</div>` : '<div class="upcoming-card__actions"></div>'}
-      </aside>
-
-      <footer class="upcoming-card__footer">
-        ${tableControl}
-        <div class="upcoming-card__footer-actions">
-          <button class="customer-link" type="button" data-customer-card="${escapeHtml(r.id)}">Storico</button>
-          <button class="customer-link" type="button" data-customer-card="${escapeHtml(r.id)}">Timeline</button>
-          <span class="upcoming-card__timeline">${timelineLabel}</span>
-        </div>
-      </footer>
-    </article>`;
-}
-
-function upcomingTableAssignmentHtml(r, opts = {}) {
-  if (!Array.isArray(opts.tableOptions)) return '';
-  const cards = opts.tableOptions.map((table) => upcomingTableChoiceCardHtml(table, r)).join('');
-  return `<div class="res__table-assign upcoming-card__table">
-    <label>Assegna tavolo</label>
-    <div class="table-picker" role="group" aria-label="Assegna tavolo">
-      <button class="table-picker__card table-picker__card--clear${r.table_id ? '' : ' is-selected'}" type="button" data-table-choice="${escapeHtml(r.id)}" data-table-id="">
-        <span class="table-picker__swatch"></span>
-        <strong>Nessun tavolo</strong>
-        <small>Non assegnato</small>
-        <em>Libera</em>
-        <span>Rimuovi</span>
-      </button>
-      ${cards}
-    </div>
-  </div>`;
-}
-
-function upcomingTableChoiceCardHtml(table, reservation) {
-  const selected = table.id === reservation.table_id;
-  const unavailable = !!table.disabled && !selected;
-  const raw = String(table.label || '');
-  const name = raw.split('(')[0].trim() || 'Tavolo';
-  const seats = raw.match(/\(([^)]+)\)/)?.[1] || 'coperti';
-  const busy = raw.toLowerCase().includes('occupato');
-  const unsuitable = raw.toLowerCase().includes('non adatto');
-  const status = selected ? 'Assegnato' : busy ? 'Occupato' : unsuitable ? 'Non adatto' : 'Libero';
-  const tone = selected ? 'selected' : busy ? 'busy' : unsuitable ? 'warn' : 'free';
-  const occupancy = busy ? 'Occupato' : selected ? 'In uso' : 'Disponibile';
-  return `<button class="table-picker__card table-picker__card--${tone}${selected ? ' is-selected' : ''}" type="button" data-table-choice="${escapeHtml(reservation.id)}" data-table-id="${escapeHtml(table.id)}"${unavailable ? ' disabled aria-disabled="true"' : ''}>
-    <span class="table-picker__swatch"></span>
-    <strong>${escapeHtml(name)}</strong>
-    <small>${escapeHtml(seats)} coperti</small>
-    <em>${escapeHtml(status)}</em>
-    <span>${escapeHtml(occupancy)}</span>
-  </button>`;
-}
-
-function upcomingEmailBadgeHtml(r) {
-  if (!r.customer_email) return '<span class="email-badge email-badge--none"><i data-lucide="mail-x" aria-hidden="true"></i>Nessuna email</span>';
-  if (r.email_verified) return '<span class="email-badge email-badge--verified"><i data-lucide="badge-check" aria-hidden="true"></i>Email verificata</span>';
-  return '<span class="email-badge email-badge--unverified"><i data-lucide="mail-warning" aria-hidden="true"></i>Email non verificata</span>';
-}
-
-function matchesReservationSearch(reservation, query) {
-  const q = String(query || '').trim().toLowerCase();
-  if (!q) return true;
-  const tableCode = reservation.table_id ? state.tablesById.get(reservation.table_id)?.code : '';
-  const shift = reservation.shift_id ? state.shiftsById.get(reservation.shift_id) : null;
-  return [
-    reservation.customer_first_name,
-    reservation.customer_last_name,
-    reservation.customer_phone,
-    reservation.customer_email,
-    reservation.notes,
-    reservation.status,
-    reservation.reservation_date,
-    tableCode,
-    shift?.name,
-  ].some((value) => String(value || '').toLowerCase().includes(q));
 }
 
 async function changeStatus(id, to) {
@@ -392,14 +267,6 @@ function wireFilters() {
       $('filters').querySelectorAll('.tab').forEach((t) => t.classList.toggle('is-active', t === b));
       render();
     }));
-
-  const search = $('upcomingSearch');
-  if (search) {
-    search.addEventListener('input', () => {
-      state.search = search.value;
-      render();
-    });
-  }
 }
 
 let reloadTimer;
@@ -410,16 +277,9 @@ function subscribeRealtime() {
       (payload) => {
         const rowDate = payload.new?.reservation_date || payload.old?.reservation_date;
         if (rowDate && rowDate >= todayISO()) {
-          if (payload.eventType === 'INSERT' && payload.new?.source === 'widget') {
-            notifyOperator('Nuova prenotazione', `${payload.new.customer_last_name || 'Cliente'} · ${payload.new.party_size || 0} coperti`, { icon: '+', tag: 'new-reservation' });
-          }
+          if (payload.eventType === 'INSERT' && payload.new?.source === 'widget') toast('Nuova prenotazione dal widget');
           clearTimeout(reloadTimer);
-          setRealtimeUpdating(true);
-          reloadTimer = setTimeout(async () => {
-            try { await load(); }
-            catch (error) { console.error(error); }
-            finally { setRealtimeUpdating(false); }
-          }, 250);
+          reloadTimer = setTimeout(() => load().catch(console.error), 250);
         }
       })
     .subscribe();

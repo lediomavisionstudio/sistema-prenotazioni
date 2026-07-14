@@ -4,20 +4,14 @@
 import {
   supabase, requireSession, signOut, loadCurrentVenue,
   todayISO, addDays, isoDow, formatLong, hhmm, escapeHtml, toast,
-  STATUS_LABEL, notifyOperator, setRealtimeUpdating,
+  STATUS_LABEL,
 } from './app.js';
 import {
   statusRank, reservationCardHtml, wireRowActions, wireTableAssignment,
   waitlistCardHtml, wireWaitlistActions,
 } from './resui.js';
-import { initCustomerCrm, wireCustomerCards } from './customer-crm.js';
-import { initReservationCalendar, refreshReservationCalendar } from './reservation-calendar.js';
-import { initPrintExport } from './print-export.js';
 
 const $ = (id) => document.getElementById(id);
-const LIVE_IMMINENT_MINUTES = 45;
-const LIVE_TOO_LONG_MINUTES = 120;
-let dayChartInstance = null;
 
 const state = {
   session: null,
@@ -31,8 +25,6 @@ const state = {
   reservations: [],    // prenotazioni del giorno (tutti i turni)
   waitlist: [],        // voci in coda del giorno (status in_coda, tutti i turni)
   capacity: 0,         // somma seats_max tavoli attivi
-  search: '',
-  selectedTableId: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -57,15 +49,9 @@ async function init() {
     $('venueName').textContent = current.venue.name;
     $('userRole').textContent = (current.role === 'owner' ? 'Titolare' : 'Staff') + ' · ' + (state.session.user.email || '');
 
-    initDashboardChrome();
-
     await loadConfig();
-    initCustomerCrm({ supabase, state, toast });
-    initReservationCalendar({ supabase, state, $, toast, escapeHtml, formatLong, hhmm, addDays, reloadDay: loadDay });
-    initPrintExport({ state, $, toast, escapeHtml, formatLong, hhmm, STATUS_LABEL });
     wireControls();
     subscribeRealtime();
-    setInterval(() => renderMap(), 60000);
     await loadDay();
 
     $('pageSpinner').hidden = true;
@@ -82,8 +68,8 @@ async function loadConfig() {
   const [{ data: shifts, error: e1 }, { data: tables, error: e2 }] = await Promise.all([
     supabase.from('service_shifts').select('id, code, name, start_time, end_time, days_of_week, sort_order')
       .eq('venue_id', state.venue.id).eq('active', true).order('sort_order'),
-    supabase.from('restaurant_tables').select('id, code, seats_min, seats_max, active, layout_x, layout_y, layout_width, layout_height, layout_rotation, layout_shape, layout_color, layout_locked, operational_status, operational_updated_at, service_group_id, zone:zones(id, name, sort_order)')
-      .eq('venue_id', state.venue.id),
+    supabase.from('restaurant_tables').select('id, code, seats_min, seats_max, zone:zones(id, name, sort_order)')
+      .eq('venue_id', state.venue.id).eq('active', true),
   ]);
   if (e1) throw e1;
   if (e2) throw e2;
@@ -92,7 +78,7 @@ async function loadConfig() {
   state.tables = (tables || []).sort((a, b) =>
     (a.zone?.sort_order - b.zone?.sort_order) || a.code.localeCompare(b.code, 'it', { numeric: true }));
   state.tablesById = new Map(state.tables.map((t) => [t.id, t]));
-  state.capacity = state.tables.filter((t) => t.active !== false).reduce((s, t) => s + (t.seats_max || 0), 0);
+  state.capacity = state.tables.reduce((s, t) => s + (t.seats_max || 0), 0);
 
   if (!state.shiftId && state.shifts.length) state.shiftId = state.shifts[0].id;
   populateManualShiftSelect();
@@ -163,13 +149,11 @@ async function loadWaitlist() {
 
 function render() {
   $('dateLabel').textContent = formatLong(state.date);
-  renderRestaurantHome();
   renderKpis();
   renderTabs();
   renderList();
   renderWaitlist();
   renderMap();
-  refreshReservationCalendar();
 }
 
 // ---------------------------------------------------------------------------
@@ -189,128 +173,6 @@ function renderKpis() {
   $('kpiOcc').textContent = occ + '%';
 }
 
-function renderRestaurantHome() {
-  const active = state.reservations.filter((r) => r.status !== 'annullata' && r.status !== 'no_show');
-  const confirmed = state.reservations.filter((r) => r.status === 'confermata' || r.status === 'arrivato');
-  const shiftRows = active.filter((r) => r.shift_id === state.shiftId);
-  const occupiedTableIds = new Set(active.filter((r) => r.table_id).map((r) => r.table_id));
-  const activeTables = state.tables.filter((t) => t.active !== false);
-  const denom = state.capacity * Math.max(1, state.shifts.length);
-  const coversToday = active.reduce((sum, r) => sum + (r.party_size || 0), 0);
-  const coversShift = shiftRows.reduce((sum, r) => sum + (r.party_size || 0), 0);
-  const coversConfirmed = confirmed.reduce((sum, r) => sum + (r.party_size || 0), 0);
-  const occupancy = denom > 0 ? Math.round((coversConfirmed / denom) * 100) : 0;
-
-  $('dashCoversToday').textContent = coversToday;
-  $('dashCoversShift').textContent = coversShift;
-  $('dashOccupancy').textContent = occupancy + '%';
-  $('dashTablesFree').textContent = Math.max(0, activeTables.length - occupiedTableIds.size);
-  $('dashTablesBusy').textContent = occupiedTableIds.size;
-  $('dashPending').textContent = state.reservations.filter((r) => r.status === 'in_attesa').length;
-  const confirmedMetric = $('dashConfirmed');
-  if (confirmedMetric) confirmedMetric.textContent = confirmed.length;
-  $('dashWaitlist').textContent = state.waitlist.length;
-
-  renderNextArrival(active);
-  renderDayChart(active);
-  renderDayTimeline(active);
-}
-
-function renderNextArrival(activeRows) {
-  const now = new Date();
-  const today = todayISO();
-  const rows = activeRows
-    .map((r) => ({ ...r, shift: state.shifts.find((s) => s.id === r.shift_id) }))
-    .filter((r) => r.shift)
-    .sort((a, b) => (a.reservation_date + a.shift.start_time).localeCompare(b.reservation_date + b.shift.start_time));
-  const next = rows.find((r) => {
-    if (r.reservation_date > today) return true;
-    if (r.reservation_date < today) return false;
-    const [h, m] = String(r.shift.start_time || '00:00').split(':').map(Number);
-    const d = new Date(); d.setHours(h || 0, m || 0, 0, 0);
-    return d >= now;
-  }) || rows[0];
-
-  $('nextArrival').innerHTML = next
-    ? `<div><strong>${escapeHtml(next.customer_last_name)} ${escapeHtml(next.customer_first_name || '')}</strong>
-        <span>${escapeHtml(formatLong(next.reservation_date))} · ${hhmm(next.shift.start_time)} · ${next.party_size} coperti</span></div>
-       <span class="badge badge--${next.status}">${escapeHtml(STATUS_LABEL[next.status] || next.status)}</span>`
-    : '<div><strong>Nessun arrivo previsto</strong><span>La giornata è libera o non ci sono prenotazioni attive.</span></div>';
-}
-
-function renderDayChart(activeRows) {
-  const target = $('dayChart');
-  const rows = state.shifts.map((s) => ({
-    label: s.name,
-    covers: activeRows.filter((r) => r.shift_id === s.id).reduce((sum, r) => sum + (r.party_size || 0), 0),
-  }));
-
-  if (!rows.length) {
-    if (dayChartInstance) dayChartInstance.destroy();
-    dayChartInstance = null;
-    target.innerHTML = '<div class="res-empty">Nessun turno configurato.</div>';
-    return;
-  }
-
-  if (window.Chart) {
-    if (dayChartInstance) dayChartInstance.destroy();
-    target.innerHTML = '<canvas id="dayChartCanvas" aria-label="Grafico coperti per turno" role="img"></canvas>';
-    const ctx = $('dayChartCanvas');
-    dayChartInstance = new window.Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: rows.map((row) => row.label),
-        datasets: [{
-          label: 'Coperti',
-          data: rows.map((row) => row.covers),
-          borderRadius: 12,
-          borderSkipped: false,
-          backgroundColor: ['#c8402a', '#2f8f72', '#2d74d6', '#e6a23c'],
-        }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: { duration: 260, easing: 'easeOutQuart' },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: 'rgba(18, 21, 19, .92)',
-            padding: 12,
-            cornerRadius: 12,
-            displayColors: false,
-          },
-        },
-        scales: {
-          x: { grid: { display: false }, ticks: { color: '#7b8279', font: { weight: 700 } } },
-          y: { beginAtZero: true, grid: { color: 'rgba(127, 135, 127, .14)' }, ticks: { precision: 0, color: '#7b8279' } },
-        },
-      },
-    });
-    return;
-  }
-
-  const max = Math.max(1, ...rows.map((row) => row.covers));
-  target.innerHTML = rows.map((row) => `<div class="day-chart__row">
-    <span>${escapeHtml(row.label)}</span>
-    <div><i style="width:${Math.max(4, Math.round((row.covers / max) * 100))}%"></i></div>
-    <strong>${row.covers}</strong>
-  </div>`).join('');
-}
-
-function renderDayTimeline(activeRows) {
-  const rows = activeRows
-    .map((r) => ({ ...r, shift: state.shifts.find((s) => s.id === r.shift_id) }))
-    .sort((a, b) => String(a.shift?.start_time || '').localeCompare(String(b.shift?.start_time || '')));
-  $('dayTimeline').innerHTML = rows.length
-    ? rows.map((r) => `<div class="timeline-item timeline-item--${escapeHtml(r.status)}">
-        <time>${r.shift ? hhmm(r.shift.start_time) : '--:--'}</time>
-        <div><strong>${escapeHtml(r.customer_last_name)} ${escapeHtml(r.customer_first_name || '')}</strong>
-        <span>${r.party_size} coperti · ${escapeHtml(STATUS_LABEL[r.status] || r.status)}${r.table_id ? ' · Tavolo ' + escapeHtml(state.tablesById.get(r.table_id)?.code || '') : ''}</span></div>
-      </div>`).join('')
-    : '<div class="res-empty">Nessuna prenotazione attiva nella timeline.</div>';
-}
-
 // ---------------------------------------------------------------------------
 // Tab turni
 // ---------------------------------------------------------------------------
@@ -324,7 +186,7 @@ function renderTabs() {
     btn.innerHTML =
       `<span class="tab__name">${escapeHtml(s.name)}</span>` +
       `<span class="tab__meta">${hhmm(s.start_time)}–${hhmm(s.end_time)} · ${n} pren.</span>`;
-    btn.addEventListener('click', () => { state.shiftId = s.id; state.selectedTableId = null; render(); });
+    btn.addEventListener('click', () => { state.shiftId = s.id; render(); });
     box.appendChild(btn);
   }
 }
@@ -339,13 +201,10 @@ function renderList() {
   const shift = currentShift();
   const rows = state.reservations
     .filter((r) => r.shift_id === state.shiftId)
-    .filter((r) => matchesReservationSearch(r, state.search))
     .sort((a, b) => statusRank(a.status) - statusRank(b.status) || a.customer_last_name.localeCompare(b.customer_last_name, 'it'));
 
   if (rows.length === 0) {
-    list.innerHTML = state.search
-      ? '<div class="res-empty">Nessuna prenotazione corrisponde alla ricerca.</div>'
-      : '<div class="res-empty">Nessuna prenotazione per questo turno.</div>';
+    list.innerHTML = '<div class="res-empty">Nessuna prenotazione per questo turno.</div>';
     return;
   }
 
@@ -357,22 +216,6 @@ function renderList() {
 
   wireRowActions(list, changeStatus);
   wireTableAssignment(list, assignTable);
-  wireCustomerCards(list, state.reservations);
-}
-
-function matchesReservationSearch(reservation, query) {
-  const q = String(query || '').trim().toLowerCase();
-  if (!q) return true;
-  const tableCode = reservation.table_id ? state.tablesById.get(reservation.table_id)?.code : '';
-  return [
-    reservation.customer_first_name,
-    reservation.customer_last_name,
-    reservation.customer_phone,
-    reservation.customer_email,
-    reservation.notes,
-    reservation.status,
-    tableCode,
-  ].some((value) => String(value || '').toLowerCase().includes(q));
 }
 
 async function changeStatus(id, to) {
@@ -411,7 +254,7 @@ function tableOptionsForReservation(reservation) {
       r.status !== 'no_show')
     .map((r) => r.table_id));
 
-  return state.tables.filter((table) => table.active !== false).map((table) => {
+  return state.tables.map((table) => {
     const fits = reservation.party_size >= table.seats_min && reservation.party_size <= table.seats_max;
     const busy = occupied.has(table.id);
     return {
@@ -541,7 +384,7 @@ async function removeWaitlist(id) {
 // ---------------------------------------------------------------------------
 // Mappa tavoli (turno selezionato)
 // ---------------------------------------------------------------------------
-function renderLegacyTableMap() {
+function renderMap() {
   const shift = currentShift();
   $('mapShiftName').textContent = shift ? shift.name : '';
 
@@ -587,336 +430,6 @@ function renderLegacyTableMap() {
         }).join('')}
       </div>
     </div>`).join('');
-}
-
-// ---------------------------------------------------------------------------
-// Sala operativa
-// ---------------------------------------------------------------------------
-function renderMap() {
-  const shift = currentShift();
-  $('mapShiftName').textContent = shift ? shift.name : '';
-
-  const map = $('tableMap');
-  if (state.tables.length === 0) {
-    map.innerHTML = '<div class="res-empty">Nessun tavolo configurato. Aggiungili in Impostazioni.</div>';
-    $('opsReservations').innerHTML = '';
-    return;
-  }
-
-  const occupancy = tableOccupancy();
-  renderReservationTray(occupancy);
-  const positioned = state.tables.some((t) => t.layout_x !== null && t.layout_x !== undefined);
-  map.className = positioned ? 'ops-map ops-map--floor' : 'ops-map';
-  map.innerHTML = positioned
-    ? `<div class="ops-floor">${state.tables.map((t, i) => liveTableHtml(t, occupancy.get(t.id), i)).join('')}</div>`
-    : `<div class="table-grid">${state.tables.map((t, i) => liveTableHtml(t, occupancy.get(t.id), i)).join('')}</div>`;
-
-  map.querySelectorAll('[data-table-id]').forEach((node) => {
-    node.addEventListener('click', () => openTablePanel(node.dataset.tableId));
-    node.addEventListener('dragover', (event) => {
-      event.preventDefault();
-      node.classList.add('is-drop');
-    });
-    node.addEventListener('dragleave', () => node.classList.remove('is-drop'));
-    node.addEventListener('drop', (event) => {
-      event.preventDefault();
-      node.classList.remove('is-drop');
-      const reservationId = event.dataTransfer.getData('text/reservation-id');
-      if (reservationId) assignReservationToTable(reservationId, node.dataset.tableId);
-    });
-  });
-
-  map.querySelectorAll('[data-live-status]').forEach((button) =>
-    button.addEventListener('click', (event) => {
-      event.stopPropagation();
-      const table = state.tablesById.get(button.dataset.tableId);
-      const reservation = occupancy.get(button.dataset.tableId);
-      if (!table) return;
-      const status = button.dataset.liveStatus || null;
-      if (status === 'clear') clearTable(table, reservation);
-      else setTableOperationalStatus(table.id, status, reservation);
-    }));
-
-  wireReservationDrag(map);
-  renderTablePanel();
-}
-
-function tableOccupancy() {
-  const rank = { arrivato: 3, confermata: 2, in_attesa: 1 };
-  const occ = new Map();
-  for (const r of state.reservations) {
-    if (r.shift_id !== state.shiftId || !r.table_id || !rank[r.status]) continue;
-    const prev = occ.get(r.table_id);
-    if (!prev || rank[r.status] > rank[prev.status]) occ.set(r.table_id, r);
-  }
-  return occ;
-}
-
-function renderReservationTray(occupancy) {
-  const assigned = new Set([...occupancy.values()].map((r) => r.id));
-  const rows = state.reservations
-    .filter((r) => r.shift_id === state.shiftId && r.status !== 'annullata' && r.status !== 'no_show')
-    .sort((a, b) => statusRank(a.status) - statusRank(b.status) || a.customer_last_name.localeCompare(b.customer_last_name, 'it'));
-  $('opsReservations').innerHTML = rows.length
-    ? rows.map((r) => `<button class="ops-chip ${assigned.has(r.id) ? 'is-assigned' : ''}" draggable="true" data-res-drag="${escapeHtml(r.id)}" type="button">
-        <strong>${escapeHtml(r.customer_last_name)} ${escapeHtml(r.customer_first_name || '')}</strong>
-        <span>${r.party_size} pax${r.table_id ? ' · T ' + escapeHtml(state.tablesById.get(r.table_id)?.code || '') : ' · senza tavolo'}</span>
-      </button>`).join('')
-    : '<div class="res-empty">Nessuna prenotazione attiva per questo turno.</div>';
-  wireReservationDrag($('opsReservations'));
-}
-
-function wireReservationDrag(container) {
-  container.querySelectorAll('[data-res-drag]').forEach((node) => {
-    node.addEventListener('dragstart', (event) => {
-      event.dataTransfer.setData('text/reservation-id', node.dataset.resDrag);
-      event.dataTransfer.effectAllowed = 'move';
-    });
-  });
-}
-
-function operationalTableHtml(table, reservation, index) {
-  const layout = tableLayout(table, index);
-  const status = tableOperationalStatus(table, reservation);
-  const selected = table.id === state.selectedTableId ? ' is-selected' : '';
-  const joined = table.service_group_id ? ' is-joined' : '';
-  const style = layout.positioned
-    ? `style="left:${layout.x}px;top:${layout.y}px;width:${layout.w}px;height:${layout.h}px;transform:rotate(${layout.rotation}deg);--table-color:${escapeHtml(table.layout_color || '#f4c7bb')}"`
-    : `style="--table-color:${escapeHtml(table.layout_color || '#f4c7bb')}"`;
-  return `<button class="ops-table ops-table--${status.key} ops-table--${escapeHtml(layout.shape)}${selected}${joined}" type="button" data-table-id="${escapeHtml(table.id)}" ${style}>
-    <span class="ops-table__code">${escapeHtml(table.code)}</span>
-    <span class="ops-table__seats">${table.seats_min}–${table.seats_max} posti</span>
-    <span class="ops-table__state">${escapeHtml(status.label)}</span>
-    ${reservation ? `<span class="ops-table__guest" draggable="true" data-res-drag="${escapeHtml(reservation.id)}">${escapeHtml(reservation.customer_last_name)} · ${reservation.party_size}</span>` : ''}
-    ${table.service_group_id ? '<span class="ops-table__group">unito</span>' : ''}
-  </button>`;
-}
-
-function liveTableHtml(table, reservation, index) {
-  const layout = tableLayout(table, index);
-  const status = tableOperationalStatus(table, reservation);
-  const selected = table.id === state.selectedTableId ? ' is-selected' : '';
-  const joined = table.service_group_id ? ' is-joined' : '';
-  const style = layout.positioned
-    ? `style="left:${layout.x}px;top:${layout.y}px;width:${layout.w}px;height:${layout.h}px;transform:rotate(${layout.rotation}deg);--table-color:${escapeHtml(table.layout_color || '#f4c7bb')}"`
-    : `style="--table-color:${escapeHtml(table.layout_color || '#f4c7bb')}"`;
-  const guestName = reservation ? `${reservation.customer_last_name || ''} ${reservation.customer_first_name || ''}`.trim() : 'Tavolo libero';
-  const meta = reservation ? `${shiftTimeLabel(reservation)} · ${reservation.party_size} coperti` : `${table.seats_min}-${table.seats_max} posti`;
-  return `<button class="ops-table ops-table--${status.key} ops-table--${escapeHtml(layout.shape)}${selected}${joined}" type="button" data-table-id="${escapeHtml(table.id)}" ${style}>
-    <span class="ops-table__state">${escapeHtml(status.label)}</span>
-    <span class="ops-table__code">${escapeHtml(table.code)}</span>
-    <span class="ops-table__guest" ${reservation ? `draggable="true" data-res-drag="${escapeHtml(reservation.id)}"` : ''}>${escapeHtml(guestName)}</span>
-    <span class="ops-table__meta">${escapeHtml(meta)}</span>
-    <span class="ops-table__elapsed">${escapeHtml(status.elapsed)}</span>
-    <span class="ops-table__quick" aria-label="Azioni rapide tavolo">
-      <span data-live-status="seated" data-table-id="${escapeHtml(table.id)}">Seduto</span>
-      <span data-live-status="paying" data-table-id="${escapeHtml(table.id)}">Paga</span>
-      <span data-live-status="dirty" data-table-id="${escapeHtml(table.id)}">Sparecchia</span>
-      <span data-live-status="clear" data-table-id="${escapeHtml(table.id)}">Libero</span>
-    </span>
-    ${table.service_group_id ? '<span class="ops-table__group">unito</span>' : ''}
-  </button>`;
-}
-
-function tableLayout(table, index) {
-  const positioned = table.layout_x !== null && table.layout_x !== undefined;
-  const x = Number(table.layout_x ?? (80 + (index % 5) * 150));
-  const y = Number(table.layout_y ?? (80 + Math.floor(index / 5) * 130));
-  const rawW = Number(table.layout_width || 120);
-  const rawH = Number(table.layout_height || 90);
-  const shape = table.layout_shape || 'rectangle';
-  const w = shape === 'square' ? Math.max(rawW, rawH) : rawW;
-  const h = shape === 'square' ? w : rawH;
-  return { positioned, x, y, w, h, rotation: Number(table.layout_rotation || 0), shape };
-}
-
-function tableOperationalStatus(table, reservation) {
-  if (table.active === false) return { key: 'off', label: 'Fuori servizio', elapsed: 'Non operativo' };
-  const elapsed = liveElapsed(table, reservation);
-  if (table.operational_status === 'dirty') return { key: 'dirty', label: 'Da sparecchiare', elapsed };
-  if (table.operational_status === 'paying') return { key: 'paying', label: 'Sta pagando', elapsed };
-  if ((table.operational_status === 'seated' || reservation?.status === 'arrivato') && elapsedMinutes(table, reservation) >= LIVE_TOO_LONG_MINUTES) {
-    return { key: 'too-long', label: 'Occupato troppo', elapsed };
-  }
-  if (table.operational_status === 'seated' || reservation?.status === 'arrivato') return { key: 'seated', label: 'Cliente seduto', elapsed };
-  const until = reservation ? minutesUntilReservation(reservation) : Number.POSITIVE_INFINITY;
-  if (reservation && until >= 0 && until <= LIVE_IMMINENT_MINUTES) return { key: 'imminent', label: 'Prenotazione imminente', elapsed };
-  if (reservation) return { key: 'reserved', label: 'Prenotato', elapsed };
-  return { key: 'free', label: 'Libero', elapsed: 'Disponibile ora' };
-}
-
-function shiftTimeLabel(reservation) {
-  const shift = state.shifts.find((s) => s.id === reservation?.shift_id);
-  return shift ? hhmm(shift.start_time) : '--:--';
-}
-
-function reservationDateTime(reservation) {
-  const shift = state.shifts.find((s) => s.id === reservation?.shift_id);
-  if (!reservation || !shift?.start_time) return null;
-  const [h, m] = shift.start_time.split(':').map(Number);
-  const [y, mo, d] = reservation.reservation_date.split('-').map(Number);
-  return new Date(y, mo - 1, d, h || 0, m || 0, 0, 0);
-}
-
-function minutesUntilReservation(reservation) {
-  const dt = reservationDateTime(reservation);
-  if (!dt) return Number.POSITIVE_INFINITY;
-  return Math.round((dt.getTime() - Date.now()) / 60000);
-}
-
-function elapsedMinutes(table, reservation) {
-  const startedAt = table.operational_updated_at ? new Date(table.operational_updated_at) : reservationDateTime(reservation);
-  if (!startedAt || Number.isNaN(startedAt.getTime())) return 0;
-  return Math.max(0, Math.floor((Date.now() - startedAt.getTime()) / 60000));
-}
-
-function liveElapsed(table, reservation) {
-  if (!reservation && !table.operational_status) return 'Disponibile ora';
-  if (reservation && !['seated', 'paying', 'dirty'].includes(table.operational_status)) {
-    const until = minutesUntilReservation(reservation);
-    if (until > 0) return `Tra ${until} min`;
-  }
-  const mins = elapsedMinutes(table, reservation);
-  if (mins < 60) return `${mins} min`;
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return `${h}h ${String(m).padStart(2, '0')}m`;
-}
-
-function openTablePanel(tableId) {
-  state.selectedTableId = tableId;
-  renderMap();
-}
-
-function renderTablePanel() {
-  const panel = $('opsPanel');
-  const table = state.tablesById.get(state.selectedTableId);
-  if (!table) { panel.hidden = true; return; }
-  const occupancy = tableOccupancy();
-  const reservation = occupancy.get(table.id);
-  const activeRows = state.reservations
-    .filter((r) => r.shift_id === state.shiftId && r.status !== 'annullata' && r.status !== 'no_show');
-  const mergeOptions = state.tables
-    .filter((t) => t.id !== table.id)
-    .map((t) => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.code)}</option>`).join('');
-  panel.hidden = false;
-  panel.innerHTML = `
-    <div class="ops-panel__head">
-      <div><strong>Tavolo ${escapeHtml(table.code)}</strong><span>${table.seats_min}–${table.seats_max} posti</span></div>
-      <button class="act act--mute" type="button" data-ops-close>Chiudi</button>
-    </div>
-    <div class="ops-panel__grid">
-      <label class="field"><span>Prenotazione</span><select id="opsAssignSelect">
-        <option value="">— nessuna —</option>
-        ${activeRows.map((r) => `<option value="${escapeHtml(r.id)}" ${reservation?.id === r.id ? 'selected' : ''}>${escapeHtml(r.customer_last_name)} ${escapeHtml(r.customer_first_name || '')} · ${r.party_size} pax</option>`).join('')}
-      </select></label>
-      <button class="btn btn--primary btn--sm" type="button" data-ops-assign="${escapeHtml(table.id)}">Assegna</button>
-      <button class="btn btn--ghost btn--sm" type="button" data-ops-status="seated">Cliente seduto</button>
-      <button class="btn btn--ghost btn--sm" type="button" data-ops-status="paying">Sta pagando</button>
-      <button class="btn btn--ghost btn--sm" type="button" data-ops-status="dirty">Da sparecchiare</button>
-      <button class="btn btn--ghost btn--sm" type="button" data-ops-clear>Libero</button>
-      <button class="btn btn--ghost btn--sm" type="button" data-ops-off>${table.active === false ? 'Rimetti in servizio' : 'Fuori servizio'}</button>
-      <label class="field"><span>Unisci con</span><select id="opsMergeSelect">${mergeOptions}</select></label>
-      <button class="btn btn--ghost btn--sm" type="button" data-ops-merge="${escapeHtml(table.id)}">Unisci</button>
-      <button class="btn btn--ghost btn--sm" type="button" data-ops-split="${escapeHtml(table.id)}">Dividi</button>
-    </div>`;
-  wireTablePanel(panel, table, reservation);
-}
-
-function wireTablePanel(panel, table, reservation) {
-  panel.querySelector('[data-ops-close]').addEventListener('click', () => { state.selectedTableId = null; renderMap(); });
-  panel.querySelector('[data-ops-assign]').addEventListener('click', () => {
-    const reservationId = $('opsAssignSelect').value;
-    if (reservationId) assignReservationToTable(reservationId, table.id);
-  });
-  panel.querySelectorAll('[data-ops-status]').forEach((button) =>
-    button.addEventListener('click', () => setTableOperationalStatus(table.id, button.dataset.opsStatus, reservation)));
-  panel.querySelector('[data-ops-clear]').addEventListener('click', () => clearTable(table, reservation));
-  panel.querySelector('[data-ops-off]').addEventListener('click', () => setTableOutOfService(table));
-  panel.querySelector('[data-ops-merge]').addEventListener('click', () => mergeTables(table.id, $('opsMergeSelect').value));
-  panel.querySelector('[data-ops-split]').addEventListener('click', () => splitTable(table.id));
-}
-
-async function assignReservationToTable(reservationId, tableId) {
-  const reservation = state.reservations.find((r) => r.id === reservationId);
-  if (!reservation) return;
-  const { error } = await supabase.rpc('assign_reservation_table', {
-    p_reservation_id: reservationId,
-    p_table_id: tableId,
-  });
-  if (error) { console.error('[ops-room] assegnazione drag/drop fallita:', error); toast(tableAssignmentError(error), true); return; }
-  toast('Prenotazione assegnata al tavolo');
-  await setTableOperationalStatus(tableId, null, null, { silent: true });
-  await loadDay();
-}
-
-async function setTableOperationalStatus(tableId, status, reservation, options = {}) {
-  const patch = { operational_status: status, operational_updated_at: new Date().toISOString() };
-  const { error } = await supabase.from('restaurant_tables').update(patch).eq('id', tableId);
-  if (error) { console.error('[ops-room] stato tavolo non aggiornato:', error); toast('Impossibile aggiornare il tavolo.', true); return; }
-  if (status === 'seated' && reservation && reservation.status !== 'arrivato') {
-    await changeStatus(reservation.id, 'arrivato');
-    return;
-  }
-  if (!options.silent) toast('Sala aggiornata');
-  await loadConfig();
-  render();
-}
-
-async function clearTable(table, reservation) {
-  if (reservation) {
-    const { error } = await supabase.rpc('assign_reservation_table', {
-      p_reservation_id: reservation.id,
-      p_table_id: null,
-    });
-    if (error) { console.error('[ops-room] rimozione tavolo fallita:', error); toast('Impossibile liberare il tavolo.', true); return; }
-  }
-  await setTableOperationalStatus(table.id, null, null);
-}
-
-async function setTableOutOfService(table) {
-  const patch = {
-    active: table.active === false,
-    operational_status: null,
-    operational_updated_at: new Date().toISOString(),
-  };
-  const { error } = await supabase.from('restaurant_tables').update(patch).eq('id', table.id);
-  if (error) { console.error('[ops-room] fuori servizio fallito:', error); toast('Impossibile aggiornare il tavolo.', true); return; }
-  toast(patch.active ? 'Tavolo rimesso in servizio' : 'Tavolo fuori servizio');
-  await loadConfig();
-  render();
-}
-
-async function mergeTables(tableId, otherTableId) {
-  if (!tableId || !otherTableId) return;
-  const first = state.tablesById.get(tableId);
-  const second = state.tablesById.get(otherTableId);
-  const group = first?.service_group_id || second?.service_group_id || randomId();
-  const { error } = await supabase.from('restaurant_tables')
-    .update({ service_group_id: group, operational_updated_at: new Date().toISOString() })
-    .in('id', [tableId, otherTableId]);
-  if (error) { console.error('[ops-room] unione tavoli fallita:', error); toast('Impossibile unire i tavoli.', true); return; }
-  toast('Tavoli uniti');
-  await loadConfig();
-  render();
-}
-
-async function splitTable(tableId) {
-  const { error } = await supabase.from('restaurant_tables')
-    .update({ service_group_id: null, operational_updated_at: new Date().toISOString() })
-    .eq('id', tableId);
-  if (error) { console.error('[ops-room] divisione tavolo fallita:', error); toast('Impossibile dividere il tavolo.', true); return; }
-  toast('Tavolo diviso');
-  await loadConfig();
-  render();
-}
-
-function randomId() {
-  return crypto?.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1000,30 +513,7 @@ async function submitManual(e) {
 // Realtime
 // ---------------------------------------------------------------------------
 let reloadTimer;
-function scheduleReload() {
-  clearTimeout(reloadTimer);
-  setRealtimeUpdating(true);
-  reloadTimer = setTimeout(async () => {
-    try { await loadDay(); }
-    catch (error) { console.error(error); }
-    finally { setRealtimeUpdating(false); }
-  }, 250);
-}
-let configReloadTimer;
-function scheduleConfigReload() {
-  clearTimeout(configReloadTimer);
-  setRealtimeUpdating(true);
-  configReloadTimer = setTimeout(async () => {
-    try {
-      await loadConfig();
-      await loadDay();
-    } catch (error) {
-      console.error('[ops-room] reload tavoli fallito:', error);
-    } finally {
-      setRealtimeUpdating(false);
-    }
-  }, 250);
-}
+function scheduleReload() { clearTimeout(reloadTimer); reloadTimer = setTimeout(() => loadDay().catch(console.error), 250); }
 
 function subscribeRealtime() {
   supabase.channel('res-' + state.venue.id)
@@ -1032,9 +522,7 @@ function subscribeRealtime() {
       (payload) => {
         const rowDate = payload.new?.reservation_date || payload.old?.reservation_date;
         if (rowDate === state.date) {
-          if (payload.eventType === 'INSERT' && payload.new?.source === 'widget') {
-            notifyOperator('Nuova prenotazione', `${payload.new.customer_last_name || 'Cliente'} · ${payload.new.party_size || 0} coperti`, { icon: '+', tag: 'new-reservation' });
-          }
+          if (payload.eventType === 'INSERT' && payload.new?.source === 'widget') toast('Nuova prenotazione dal widget');
           scheduleReload();
         }
       })
@@ -1043,15 +531,10 @@ function subscribeRealtime() {
       (payload) => {
         const rowDate = payload.new?.reservation_date || payload.old?.reservation_date;
         if (rowDate === state.date) {
-          if (payload.eventType === 'INSERT') {
-            notifyOperator('Lista d\'attesa', `${payload.new.customer_last_name || 'Cliente'} · ${payload.new.party_size || 0} coperti`, { icon: '!', tone: 'urgent', tag: 'waitlist' });
-          }
+          if (payload.eventType === 'INSERT') toast('Nuova richiesta in lista d\'attesa');
           scheduleReload();
         }
       })
-    .on('postgres_changes',
-      { event: '*', schema: 'public', table: 'restaurant_tables', filter: `venue_id=eq.${state.venue.id}` },
-      () => scheduleConfigReload())
     .subscribe();
 }
 
@@ -1068,75 +551,6 @@ function wireControls() {
   $('mForm').addEventListener('submit', submitManual);
   $('mShift').addEventListener('change', refreshManualTableSelect);
   $('mParty').addEventListener('change', refreshManualTableSelect);
-
-  const search = $('resSearch');
-  if (search) {
-    search.addEventListener('input', () => {
-      state.search = search.value;
-      renderList();
-    });
-  }
-}
-
-function initDashboardChrome() {
-  const profile = $('operatorProfileLabel');
-  if (profile) {
-    profile.textContent = state.session.user.email || (state.role === 'owner' ? 'Titolare' : 'Staff');
-  }
-
-  const root = document.documentElement;
-  const themeToggle = $('themeToggle');
-  const savedTheme = readAdminTheme();
-  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
-  root.dataset.adminTheme = initialTheme;
-
-  if (themeToggle) {
-    themeToggle.checked = initialTheme === 'dark';
-    themeToggle.addEventListener('change', () => {
-      const nextTheme = themeToggle.checked ? 'dark' : 'light';
-      root.dataset.adminTheme = nextTheme;
-      saveAdminTheme(nextTheme);
-    });
-  }
-
-  const notificationToggle = $('notificationToggle');
-  if (notificationToggle) {
-    notificationToggle.addEventListener('click', async () => {
-      if (!('Notification' in window)) {
-        toast('Notifiche desktop non supportate da questo browser.', true);
-        return;
-      }
-      if (Notification.permission === 'granted') {
-        toast('Notifiche gia attive');
-        return;
-      }
-      try {
-        const permission = await Notification.requestPermission();
-        toast(permission === 'granted' ? 'Notifiche attivate' : 'Notifiche non attivate', permission !== 'granted');
-      } catch (error) {
-        console.error('[dashboard-ui] permesso notifiche non disponibile:', error);
-        toast('Non posso attivare le notifiche su questo dispositivo.', true);
-      }
-    });
-  }
-}
-
-function readAdminTheme() {
-  try {
-    return localStorage.getItem('admin-theme');
-  } catch (error) {
-    console.warn('[dashboard-ui] preferenza tema non leggibile:', error);
-    return null;
-  }
-}
-
-function saveAdminTheme(theme) {
-  try {
-    localStorage.setItem('admin-theme', theme);
-  } catch (error) {
-    console.warn('[dashboard-ui] preferenza tema non salvata:', error);
-  }
 }
 
 init();

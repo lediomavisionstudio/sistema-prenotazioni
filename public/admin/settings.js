@@ -5,7 +5,6 @@ import {
   supabase, requireSession, signOut, loadCurrentVenue,
   hhmm, escapeHtml, toast, WEEKDAYS,
 } from './app.js';
-import { initRoomDesigner, syncRoomDesigner } from './room-designer.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -44,14 +43,14 @@ async function init() {
 async function reloadAll() {
   const [z, t, s] = await Promise.all([
     supabase.from('zones').select('id, name, sort_order').eq('venue_id', state.venue.id).order('sort_order'),
-    supabase.from('restaurant_tables').select('id, code, seats_min, seats_max, zone_id, active, layout_x, layout_y, layout_width, layout_height, layout_rotation, layout_shape, layout_color, layout_locked').eq('venue_id', state.venue.id).order('code'),
+    supabase.from('restaurant_tables').select('id, code, seats_min, seats_max, zone_id, active').eq('venue_id', state.venue.id).order('code'),
     supabase.from('service_shifts').select('id, code, name, start_time, end_time, days_of_week, sort_order').eq('venue_id', state.venue.id).order('sort_order'),
   ]);
   if (z.error) throw z.error; if (t.error) throw t.error; if (s.error) throw s.error;
   state.zones = z.data || [];
   state.tables = t.data || [];
   state.shifts = s.data || [];
-  renderZones(); renderTables(); renderShifts(); fillZoneSelect(); syncRoomDesigner();
+  renderZones(); renderTables(); renderShifts(); fillZoneSelect();
 }
 
 function dis() { return state.canEdit ? '' : 'disabled'; }
@@ -286,8 +285,6 @@ function wire() {
     const ok = await run(supabase.from('venues').update({ closed_weekdays: days }).eq('id', state.venue.id), 'Chiusure salvate');
     if (ok) state.venue.closed_weekdays = days;
   });
-
-  initRoomDesigner({ supabase, state, $, toast, escapeHtml, reloadAll });
 }
 
 init();
