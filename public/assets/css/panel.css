@@ -293,23 +293,17 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
 .toast--err { background: var(--tomato-dark); }
 
 /* Settings table bulk edit ------------------------------------------------ */
+.tables-grid-header,
 .table-row {
-  position: relative;
   display: grid;
   grid-template-columns: minmax(110px, .9fr) minmax(150px, 1fr) 104px minmax(100px, auto) auto;
-  gap: 10px;
+  column-gap: 12px;
   align-items: center;
-  padding: 14px;
-  border-radius: 20px;
-  transition: border-color .2s ease, box-shadow .2s ease, background .2s ease, transform .2s ease;
 }
 
-.table-row-header {
-  display: grid;
-  grid-template-columns: minmax(110px, .9fr) minmax(150px, 1fr) 104px minmax(100px, auto) auto;
-  gap: 10px;
-  align-items: center;
-  padding: 0 14px 8px;
+.tables-grid-header {
+  margin-top: 4px;
+  padding: 0 16px 9px;
   color: var(--ink-soft);
   font-size: .72rem;
   font-weight: 800;
@@ -317,8 +311,16 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
   text-transform: uppercase;
 }
 
-.table-row-header span:last-child {
+.tables-grid-header span:last-child {
   text-align: right;
+}
+
+.table-row {
+  position: relative;
+  width: 100%;
+  padding: 14px;
+  border-radius: 18px;
+  transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
 }
 
 .table-row.is-dirty {
@@ -330,9 +332,10 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
 .table-row__code,
 .table-row__seats,
 .table-row select {
+  width: 100%;
   min-height: 44px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--surface);
   color: var(--ink);
   padding: 9px 11px;
@@ -340,12 +343,9 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
   font-weight: 650;
 }
 
-.table-row__seats {
-  width: 100%;
-}
-
 .table-row__active {
   min-height: 42px;
+  width: fit-content;
   justify-content: center;
   cursor: pointer;
 }
@@ -354,84 +354,81 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
   justify-self: end;
 }
 
-.settings-savebar {
+.table-edit-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin: 12px 0 10px;
-  padding: 12px 14px;
-  border: 1px solid color-mix(in srgb, var(--tomato) 18%, var(--line));
+  gap: 18px;
+  width: 100%;
+  margin: 12px 0 12px;
+  padding: 18px;
+  border: 1px solid var(--line);
   border-radius: 18px;
-  background: color-mix(in srgb, var(--tomato) 4%, var(--surface));
+  background: var(--surface);
   box-shadow: 0 10px 28px rgba(15, 23, 42, .06);
   animation: savebarIn .22s ease both;
 }
 
-.settings-savebar[hidden] {
+.table-edit-bar[hidden] {
   display: none !important;
 }
 
-.settings-savebar__status {
+.table-edit-bar__message {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   min-width: 0;
 }
 
-.settings-savebar__status > div {
+.table-edit-bar__copy {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: 4px 8px;
+  gap: 5px 8px;
   min-width: 0;
 }
 
-.settings-savebar__icon {
+.table-edit-bar__icon {
   display: inline-grid;
   flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   place-items: center;
-  border-radius: 999px;
   color: var(--tomato-dark);
-  background: var(--tomato-soft);
-  font-size: .82rem;
+  font-size: 1rem;
   font-weight: 900;
   font-family: var(--font-title);
+  line-height: 1;
 }
 
-.settings-savebar__status strong {
+.table-edit-bar__copy strong {
   font-size: .98rem;
   font-weight: 800;
 }
 
-.settings-savebar__status span {
+.table-edit-bar__copy span {
   color: var(--ink-soft);
   font-size: .84rem;
   font-weight: 650;
 }
 
-.settings-savebar.is-saved .settings-savebar__status strong,
-.settings-savebar.is-saved .settings-savebar__status span {
+.table-edit-bar.is-saved .table-edit-bar__copy strong,
+.table-edit-bar.is-saved .table-edit-bar__copy span,
+.table-edit-bar.is-saved .table-edit-bar__icon {
   color: var(--st-confermata);
 }
 
-.settings-savebar.is-saved {
+.table-edit-bar.is-saved {
   border-color: color-mix(in srgb, var(--st-confermata) 28%, var(--line));
-  background: var(--st-confermata-bg);
+  background: var(--surface);
 }
 
-.settings-savebar.is-saved .settings-savebar__icon {
-  color: var(--surface);
-  background: var(--st-confermata);
-}
-
-.settings-savebar__actions {
+.table-edit-bar__actions {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  margin-left: auto;
 }
 
 @keyframes savebarIn {
@@ -442,9 +439,10 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
 @media (max-width: 760px) {
   .table-row {
     grid-template-columns: 1fr 1fr;
+    gap: 10px;
   }
 
-  .table-row-header {
+  .tables-grid-header {
     display: none;
   }
 
@@ -458,13 +456,13 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
     justify-self: end;
   }
 
-  .settings-savebar {
+  .table-edit-bar {
     align-items: stretch;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
   }
 
-  .settings-savebar__actions {
+  .table-edit-bar__actions {
     justify-content: flex-end;
   }
 }
