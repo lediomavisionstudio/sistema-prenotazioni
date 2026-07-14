@@ -78,6 +78,19 @@
     <section class="section">
       <div class="section__head"><h2 class="section__title">Tavoli</h2></div>
       <div class="rows" id="tableRows"></div>
+      <div class="settings-savebar" id="tableSaveBar" hidden>
+        <div class="settings-savebar__status">
+          <span class="settings-savebar__icon" aria-hidden="true">i</span>
+          <div>
+            <strong>Hai modifiche non salvate.</strong>
+            <span id="tableSaveHint">Controlla le righe evidenziate prima di salvare.</span>
+          </div>
+        </div>
+        <div class="settings-savebar__actions">
+          <button class="btn btn--ghost btn--sm" id="cancelTableChanges" type="button">Annulla modifiche</button>
+          <button class="btn btn--primary btn--sm" id="saveTableChanges" type="button">Salva modifiche</button>
+        </div>
+      </div>
       <form class="card" id="tableAdd" style="margin-top:10px">
         <div class="form-grid">
           <div class="field"><label>Codice</label><input id="tCode" placeholder="es. S7" maxlength="20" required /></div>
@@ -88,17 +101,6 @@
         <button class="btn btn--primary btn--sm" type="submit" style="margin-top:12px">+ Aggiungi tavolo</button>
       </form>
     </section>
-
-    <div class="settings-savebar" id="tableSaveBar" hidden>
-      <div class="settings-savebar__status">
-        <strong>Hai modifiche non salvate.</strong>
-        <span id="tableSaveHint">Controlla le righe evidenziate prima di salvare.</span>
-      </div>
-      <div class="settings-savebar__actions">
-        <button class="btn btn--ghost btn--sm" id="cancelTableChanges" type="button">Annulla modifiche</button>
-        <button class="btn btn--primary btn--sm" id="saveTableChanges" type="button">Salva modifiche</button>
-      </div>
-    </div>
 
     <!-- Turni -->
     <section class="section">
