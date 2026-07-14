@@ -10,8 +10,10 @@ import {
   statusRank, reservationCardHtml, wireRowActions, wireTableAssignment,
   waitlistCardHtml, wireWaitlistActions,
 } from './resui.js';
+import { createSharedCalendar } from '../assets/js/shared-calendar.js';
 
 const $ = (id) => document.getElementById(id);
+let dateCalendar = null;
 
 const state = {
   session: null,
@@ -545,6 +547,25 @@ function wireControls() {
   $('prevDay').addEventListener('click', () => { state.date = addDays(state.date, -1); loadDay().catch(console.error); });
   $('nextDay').addEventListener('click', () => { state.date = addDays(state.date, +1); loadDay().catch(console.error); });
   $('goToday').addEventListener('click', () => { state.date = todayISO(); loadDay().catch(console.error); });
+  dateCalendar = createSharedCalendar({
+    anchor: $('dateLabel'),
+    getDate: () => state.date,
+    onSelect: (date) => {
+      state.date = date;
+      loadDay().catch(console.error);
+    },
+  });
+  $('dateLabel').setAttribute('role', 'button');
+  $('dateLabel').setAttribute('tabindex', '0');
+  $('dateLabel').setAttribute('aria-label', 'Scegli data');
+  $('dateLabel').style.cursor = 'pointer';
+  $('dateLabel').addEventListener('click', () => dateCalendar.open());
+  $('dateLabel').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      dateCalendar.open();
+    }
+  });
 
   $('addBtn').addEventListener('click', () => ($('manualForm').hidden ? openManual() : closeManual()));
   $('mCancel').addEventListener('click', closeManual);
