@@ -305,13 +305,14 @@
 
       <div class="schedule-tab-panel" id="schedulePanelFree" hidden>
         <div class="rows" id="freeHoursRows"></div>
-        <form class="card" style="margin-top:10px">
+        <form class="card" id="freeHourAdd" style="margin-top:10px">
           <div class="form-grid">
-            <div class="field"><label>Inizio</label><input type="time" value="19:00" disabled /></div>
-            <div class="field"><label>Fine</label><input type="time" value="23:00" disabled /></div>
-            <div class="field"><label>Intervallo</label><input value="30 minuti" disabled /></div>
+            <div class="field"><label>Nome</label><input id="fName" placeholder="es. Orario libero" maxlength="40" required /></div>
+            <div class="field"><label>Codice</label><input id="fCode" placeholder="es. libero_1" maxlength="30" required /></div>
+            <div class="field"><label>Inizio</label><input id="fStart" type="time" value="19:00" required /></div>
+            <div class="field"><label>Fine</label><input id="fEnd" type="time" value="19:30" required /></div>
           </div>
-          <button class="btn btn--primary btn--sm" type="button" style="margin-top:12px" disabled>+ Aggiungi fascia</button>
+          <button class="btn btn--primary btn--sm" type="submit" style="margin-top:12px">+ Aggiungi fascia</button>
         </form>
       </div>
     </section>

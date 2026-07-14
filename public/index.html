@@ -1185,6 +1185,21 @@
     const isoDow = (d) => (d.getDay() === 0 ? 7 : d.getDay());
     const todayLocal = () => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate(), 12); };
     const hhmm = (t) => (t || '').slice(0, 5);
+    const isFreeHourShift = (shift) => String(shift?.code || '').startsWith('free_');
+    const normalizeBookingMode = (mode) => mode === 'free' ? 'free' : 'shifts';
+    const bookingModeForDate = (iso) => {
+      if (!state.venue || state.venue.booking_same_mode_all_days !== false) {
+        return normalizeBookingMode(state.venue && state.venue.booking_mode);
+      }
+      const modes = state.venue.booking_mode_by_weekday || {};
+      return normalizeBookingMode(modes[isoDow(isoToDate(iso))]);
+    };
+    const configuredShiftsForDate = (iso) => {
+      const dow = isoDow(isoToDate(iso));
+      const mode = bookingModeForDate(iso);
+      return state.shifts.filter((shift) =>
+        shift.days.has(dow) && (mode === 'free' ? isFreeHourShift(shift) : !isFreeHourShift(shift)));
+    };
     const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
     const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
       '&': '&amp;',
@@ -2051,8 +2066,8 @@
     // e non è una chiusura straordinaria. Nessun limite di finestra in avanti.
     function isSelectable(d) {
       if (d < todayLocal()) return false;
-      if (!state.openWeekdays.has(isoDow(d))) return false;
       if (state.closures.has(isoOf(d))) return false;
+      if (!configuredShiftsForDate(isoOf(d)).length) return false;
       return true;
     }
 
@@ -2078,7 +2093,8 @@
         p_date: state.selDate,
       });
       if (error) throw error;
-      state.dayShifts = data || [];
+      const allowedShiftIds = new Set(configuredShiftsForDate(state.selDate).map((shift) => shift.id));
+      state.dayShifts = (data || []).filter((shift) => allowedShiftIds.has(shift.shift_id));
       // Mantieni il turno selezionato se ancora presente (dati aggiornati).
       if (state.selShift) {
         state.selShift = state.dayShifts.find((s) => s.shift_id === state.selShift.shift_id) || null;

@@ -68,15 +68,18 @@ async function init() {
 
 // Config (turni + tavoli): cambia raramente, la carichiamo una volta.
 async function loadConfig() {
-  const [{ data: shifts, error: e1 }, { data: tables, error: e2 }] = await Promise.all([
+  const [{ data: venue, error: e0 }, { data: shifts, error: e1 }, { data: tables, error: e2 }] = await Promise.all([
+    supabase.from('venues').select('*').eq('id', state.venue.id).maybeSingle(),
     supabase.from('service_shifts').select('id, code, name, start_time, end_time, days_of_week, sort_order')
       .eq('venue_id', state.venue.id).eq('active', true).order('sort_order'),
     supabase.from('restaurant_tables').select('id, code, seats_max, zone:zones(id, name, sort_order)')
       .eq('venue_id', state.venue.id).eq('active', true),
   ]);
+  if (e0) throw e0;
   if (e1) throw e1;
   if (e2) throw e2;
 
+  if (venue) state.venue = { ...state.venue, ...venue };
   state.shifts = shifts || [];
   state.tables = (tables || []).sort((a, b) =>
     (a.zone?.sort_order - b.zone?.sort_order) || a.code.localeCompare(b.code, 'it', { numeric: true }));
@@ -186,7 +189,11 @@ function normalizeScheduleMode(mode) {
 }
 
 function bookingModeForDate(date) {
-  return normalizeScheduleMode('shifts');
+  if (state.venue?.booking_same_mode_all_days !== false) {
+    return normalizeScheduleMode(state.venue?.booking_mode);
+  }
+  const modes = state.venue?.booking_mode_by_weekday || {};
+  return normalizeScheduleMode(modes[isoDow(date)]);
 }
 
 function minutesOf(time) {
@@ -204,29 +211,16 @@ function shiftsForDate(date) {
 }
 
 function scheduleItemsForDate(date) {
-  const shifts = shiftsForDate(date);
+  const mode = bookingModeForDate(date);
+  const shifts = shiftsForDate(date).filter((shift) => mode === 'free' ? isFreeHourShift(shift) : !isFreeHourShift(shift));
   if (bookingModeForDate(date) !== 'free') {
     return shifts.map((shift) => ({ ...shift, key: shift.id, shift_id: shift.id, mode: 'shifts' }));
   }
-  const interval = 30;
-  return shifts.flatMap((shift) => {
-    const start = minutesOf(shift.start_time);
-    const end = minutesOf(shift.end_time);
-    const items = [];
-    for (let minute = start; minute < end; minute += interval) {
-      const next = Math.min(minute + interval, end);
-      items.push({
-        ...shift,
-        key: `${shift.id}|${minute}`,
-        shift_id: shift.id,
-        name: hhmm(timeOf(minute)),
-        start_time: timeOf(minute),
-        end_time: timeOf(next),
-        mode: 'free',
-      });
-    }
-    return items.length ? items : [{ ...shift, key: shift.id, shift_id: shift.id, mode: 'free' }];
-  });
+  return shifts.map((shift) => ({ ...shift, key: shift.id, shift_id: shift.id, mode: 'free' }));
+}
+
+function isFreeHourShift(shift) {
+  return String(shift?.code || '').startsWith('free_');
 }
 
 function ensureScheduleSelection() {

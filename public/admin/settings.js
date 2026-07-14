@@ -284,7 +284,8 @@ async function saveTableChanges() {
 
 // --- Turni ----------------------------------------------------------------
 function renderShifts() {
-  $('shiftRows').innerHTML = state.shifts.map((s) => `
+  const rows = state.shifts.filter((s) => !isFreeHourShift(s));
+  $('shiftRows').innerHTML = rows.map((s) => `
     <div class="card" style="padding:12px">
       <div class="row-item" style="border:none;padding:0;background:none">
         <input class="row-item__grow" value="${escapeHtml(s.name)}" data-sid="${s.id}" data-f="name" ${dis()} maxlength="40" />
@@ -315,6 +316,19 @@ function renderShifts() {
 }
 
 // --- Orari ----------------------------------------------------------------
+function isFreeHourShift(shift) {
+  return String(shift?.code || '').startsWith('free_');
+}
+
+function freeHourCode(value) {
+  const clean = String(value || '').trim().replace(/^free_/, '');
+  return `free_${clean}`;
+}
+
+function displayFreeHourCode(value) {
+  return String(value || '').replace(/^free_/, '');
+}
+
 function normalizeScheduleMode(mode) {
   return mode === 'free' ? 'free' : 'shifts';
 }
@@ -336,6 +350,17 @@ function scheduleStorageKey() {
 }
 
 function loadScheduleConfig() {
+  if ('booking_mode' in (state.venue || {}) || 'booking_same_mode_all_days' in (state.venue || {})) {
+    const mode = normalizeScheduleMode(state.venue.booking_mode);
+    return {
+      sameMode: state.venue.booking_same_mode_all_days !== false,
+      mode,
+      days: {
+        ...defaultScheduleDays(mode),
+        ...(state.venue.booking_mode_by_weekday || {}),
+      },
+    };
+  }
   try {
     const parsed = JSON.parse(localStorage.getItem(scheduleStorageKey()) || 'null');
     const base = defaultScheduleConfig();
@@ -390,19 +415,45 @@ function renderScheduleConfig() {
 function renderFreeHours() {
   const rows = $('freeHoursRows');
   if (!rows) return;
-  rows.innerHTML = `
+  const freeRows = state.shifts.filter(isFreeHourShift);
+  rows.innerHTML = freeRows.map((s) => `
     <div class="card" style="padding:12px">
       <div class="row-item" style="border:none;padding:0;background:none">
-        <input class="row-item__grow" value="Orari liberi" disabled />
-        <input type="time" value="19:00" disabled />
-        <input type="time" value="23:00" disabled />
-        <button class="btn btn--ghost btn--sm" type="button" disabled>Salva</button>
-        <button class="act act--warn" type="button" disabled>Elimina</button>
+        <input class="row-item__grow" value="${escapeHtml(s.name)}" data-fid="${s.id}" data-f="name" ${dis()} maxlength="40" />
+        <input value="${escapeHtml(displayFreeHourCode(s.code))}" data-fid="${s.id}" data-f="code" ${dis()} maxlength="30" />
+        <input type="time" value="${hhmm(s.start_time)}" data-fid="${s.id}" data-f="start" ${dis()} />
+        <input type="time" value="${hhmm(s.end_time)}" data-fid="${s.id}" data-f="end" ${dis()} />
+        <button class="btn btn--ghost btn--sm" data-save-free-hour="${s.id}" ${dis()}>Salva</button>
+        <button class="act act--warn" data-del-free-hour="${s.id}" ${dis()}>Elimina</button>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
-        ${WEEKDAYS.map((d) => `<label class="pill"><input type="checkbox" disabled /> ${d.short}</label>`).join('')}
+        ${WEEKDAYS.map((d) => `<label class="pill" style="cursor:pointer">
+          <input type="checkbox" data-fid="${s.id}" data-dow="${d.n}" ${(s.days_of_week || []).includes(d.n) ? 'checked' : ''} ${dis()} /> ${d.short}
+        </label>`).join('')}
       </div>
-    </div>`;
+    </div>`).join('') || '<div class="res-empty">Nessun orario libero.</div>';
+
+  rows.querySelectorAll('[data-save-free-hour]').forEach((b) => b.addEventListener('click', () => {
+    const id = b.dataset.saveFreeHour;
+    const g = (f) => rows.querySelector(`[data-fid="${id}"][data-f="${f}"]`);
+    const days = [...rows.querySelectorAll(`input[data-fid="${id}"][data-dow]`)].filter((c) => c.checked).map((c) => parseInt(c.dataset.dow, 10));
+    const patch = {
+      name: g('name').value.trim(),
+      code: freeHourCode(g('code').value),
+      start_time: g('start').value,
+      end_time: g('end').value,
+      days_of_week: days,
+    };
+    if (!patch.name || !displayFreeHourCode(patch.code) || !(patch.end_time > patch.start_time)) {
+      toast('Orario libero non valido (fine dopo inizio).', true);
+      return;
+    }
+    run(supabase.from('service_shifts').update(patch).eq('id', id), 'Orario libero aggiornato');
+  }));
+  rows.querySelectorAll('[data-del-free-hour]').forEach((b) => b.addEventListener('click', () => {
+    if (confirm('Eliminare l\'orario libero? Non deve avere prenotazioni collegate.'))
+      run(supabase.from('service_shifts').delete().eq('id', b.dataset.delFreeHour), 'Orario libero eliminato');
+  }));
 }
 
 function setScheduleTab(tab) {
@@ -421,14 +472,24 @@ async function saveScheduleConfig() {
     ? defaultScheduleDays(mode)
     : Object.fromEntries([...$('scheduleDayModes').querySelectorAll('[data-schedule-day]')]
       .map((select) => [select.dataset.scheduleDay, normalizeScheduleMode(select.value)]));
-  state.scheduleConfig = { sameMode, mode, days };
-  try {
-    localStorage.setItem(scheduleStorageKey(), JSON.stringify(state.scheduleConfig));
-  } catch (error) {
+  const patch = {
+    booking_same_mode_all_days: sameMode,
+    booking_mode: mode,
+    booking_mode_by_weekday: days,
+  };
+  const { data, error } = await supabase
+    .from('venues')
+    .update(patch)
+    .eq('id', state.venue.id)
+    .select('*')
+    .maybeSingle();
+  if (error) {
     console.error(error);
-    toast('Configurazione orari non salvata dal browser.', true);
+    toast('Configurazione orari non salvata. Applica prima la migration del database.', true);
     return;
   }
+  state.venue = { ...state.venue, ...(data || patch) };
+  state.scheduleConfig = null;
   renderScheduleConfig();
   toast('Configurazione orari salvata.');
 }
@@ -505,6 +566,22 @@ function wire() {
     if (!patch.name || !patch.code) { toast('Inserisci nome e codice.', true); return; }
     if (!(patch.end_time > patch.start_time)) { toast('La fine deve essere dopo l\'inizio.', true); return; }
     run(supabase.from('service_shifts').insert(patch), 'Turno aggiunto').then((ok) => { if (ok) { $('sName').value = ''; $('sCode').value = ''; } });
+  });
+
+  $('freeHourAdd').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const patch = {
+      venue_id: state.venue.id,
+      name: $('fName').value.trim(),
+      code: freeHourCode($('fCode').value),
+      start_time: $('fStart').value,
+      end_time: $('fEnd').value,
+      sort_order: state.shifts.length + 1,
+    };
+    if (!patch.name || !displayFreeHourCode(patch.code)) { toast('Inserisci nome e codice.', true); return; }
+    if (!(patch.end_time > patch.start_time)) { toast('La fine deve essere dopo l\'inizio.', true); return; }
+    run(supabase.from('service_shifts').insert(patch), 'Orario libero aggiunto')
+      .then((ok) => { if (ok) { $('fName').value = ''; $('fCode').value = ''; } });
   });
 
   $('saveClosure').addEventListener('click', async () => {
