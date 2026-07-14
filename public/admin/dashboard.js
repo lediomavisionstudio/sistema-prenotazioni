@@ -29,6 +29,8 @@ const state = {
   capacity: 0,         // somma seats_max tavoli attivi
 };
 
+const TABLE_BLOCKING_STATUSES = new Set(['in_attesa', 'confermata', 'arrivato']);
+
 // ---------------------------------------------------------------------------
 // Avvio
 // ---------------------------------------------------------------------------
@@ -70,7 +72,7 @@ async function loadConfig() {
   const [{ data: shifts, error: e1 }, { data: tables, error: e2 }] = await Promise.all([
     supabase.from('service_shifts').select('id, code, name, start_time, end_time, days_of_week, sort_order')
       .eq('venue_id', state.venue.id).eq('active', true).order('sort_order'),
-    supabase.from('restaurant_tables').select('id, code, seats_max, zone:zones(id, name, sort_order)')
+    supabase.from('restaurant_tables').select('id, code, seats_max, layout_x, layout_y, layout_width, layout_height, layout_rotation, layout_shape, layout_color, zone:zones(id, name, sort_order)')
       .eq('venue_id', state.venue.id).eq('active', true),
   ]);
   if (e1) throw e1;
@@ -101,9 +103,30 @@ async function loadDay() {
   ]);
   if (error) throw error;
 
-  state.reservations = await withEmailVerificationStatus(data || []);
+  state.reservations = await withTableAssignments(await withEmailVerificationStatus(data || []));
   state.waitlist = waitlist;
   render();
+}
+
+async function withTableAssignments(rows) {
+  if (!rows.length) return rows;
+  const { data, error } = await supabase
+    .from('reservation_tables')
+    .select('reservation_id, table_id')
+    .in('reservation_id', rows.map((r) => r.id));
+  if (error) {
+    console.warn('[tables] assegnazioni multiple non disponibili:', error.message || error);
+    return rows.map((r) => ({ ...r, table_ids: r.table_id ? [r.table_id] : [] }));
+  }
+  const byReservation = new Map();
+  for (const row of data || []) {
+    if (!byReservation.has(row.reservation_id)) byReservation.set(row.reservation_id, []);
+    byReservation.get(row.reservation_id).push(row.table_id);
+  }
+  return rows.map((r) => {
+    const ids = byReservation.get(r.id) || (r.table_id ? [r.table_id] : []);
+    return { ...r, table_ids: ids };
+  });
 }
 
 async function withEmailVerificationStatus(rows) {
@@ -212,7 +235,7 @@ function renderList() {
 
   list.innerHTML = rows.map((r) => reservationCardHtml(r, {
     timeLabel: shift ? hhmm(shift.start_time) : '',
-    tableCode: r.table_id ? state.tablesById.get(r.table_id)?.code : null,
+    tableCode: tableCodes(r),
     tableOptions: tableOptionsForReservation(r),
   })).join('');
 
@@ -222,7 +245,7 @@ function renderList() {
 
 async function changeStatus(id, to) {
   const res = state.reservations.find((r) => r.id === id);
-  if (to === 'confermata' && res && !res.table_id) {
+  if (to === 'confermata' && res && reservationTableIds(res).length === 0) {
     toast('Assegna un tavolo prima di confermare la prenotazione.', true);
     return;
   }
@@ -232,7 +255,7 @@ async function changeStatus(id, to) {
   if (res) await notifyCustomerStatusEmail(res, to);
 
   // Turno liberato: promuovi automaticamente il primo in lista d'attesa.
-  if ((to === 'annullata' || to === 'no_show') && res) {
+  if ((to === 'annullata' || to === 'no_show' || to === 'terminata') && res) {
     try {
       const { data, error: pe } = await supabase.rpc('promote_next_waitlist', {
         p_venue_id: state.venue.id, p_date: res.reservation_date, p_shift_id: res.shift_id,
@@ -246,22 +269,47 @@ async function changeStatus(id, to) {
 }
 
 function tableOptionsForReservation(reservation) {
-  const occupied = new Set(state.reservations
+  const occupiedByTable = new Map();
+  state.reservations
     .filter((r) =>
       r.id !== reservation.id &&
-      r.table_id &&
       r.reservation_date === reservation.reservation_date &&
       r.shift_id === reservation.shift_id &&
-      r.status !== 'annullata' &&
-      r.status !== 'no_show')
-    .map((r) => r.table_id));
+      TABLE_BLOCKING_STATUSES.has(r.status))
+    .forEach((r) => {
+      reservationTableIds(r).forEach((tableId) => {
+        occupiedByTable.set(tableId, r);
+      });
+    });
+  const occupied = new Set(occupiedByTable.keys());
+  const selected = new Set(reservationTableIds(reservation));
 
   return state.tables.map((table) => {
     const fits = reservation.party_size <= table.seats_max;
     const busy = occupied.has(table.id);
+    const tableReservation = occupiedByTable.get(table.id);
+    const tableShift = tableReservation ? state.shifts.find((shift) => shift.id === tableReservation.shift_id) : null;
     return {
       id: table.id,
-      disabled: (!fits || busy) && table.id !== reservation.table_id,
+      code: table.code,
+      seatsMax: table.seats_max,
+      busy,
+      busyStatus: tableReservation?.status || '',
+      busyReservation: tableReservation ? [
+        tableReservation.customer_last_name,
+        tableReservation.customer_first_name,
+      ].filter(Boolean).join(' ') : '',
+      busyTime: tableReservation?.reservation_time || tableReservation?.time || tableShift?.start_time || '',
+      fits,
+      layoutX: table.layout_x,
+      layoutY: table.layout_y,
+      layoutWidth: table.layout_width,
+      layoutHeight: table.layout_height,
+      layoutRotation: table.layout_rotation,
+      layoutShape: table.layout_shape,
+      layoutColor: table.layout_color,
+      previewDisabled: busy && !selected.has(table.id),
+      disabled: (!fits || busy) && !selected.has(table.id),
       label: `${table.code} (${table.seats_max})${fits ? '' : ' - non adatto'}${busy ? ' - occupato' : ''}`,
     };
   });
@@ -269,17 +317,30 @@ function tableOptionsForReservation(reservation) {
 
 async function assignTable(id, tableId) {
   try {
-    const { error } = await supabase.rpc('assign_reservation_table', {
+    const tableIds = Array.isArray(tableId) ? tableId : (tableId ? [tableId] : []);
+    const { error } = await supabase.rpc('assign_reservation_tables', {
       p_reservation_id: id,
-      p_table_id: tableId,
+      p_table_ids: tableIds,
     });
     if (error) throw error;
-    toast(tableId ? 'Tavolo assegnato' : 'Tavolo rimosso');
+    toast(tableIds.length > 1 ? 'Tavoli assegnati' : tableIds.length ? 'Tavolo assegnato' : 'Tavolo rimosso');
     await loadDay();
   } catch (error) {
     console.error('[tables] assegnazione tavolo fallita:', error);
     toast(tableAssignmentError(error), true);
   }
+}
+
+function reservationTableIds(reservation) {
+  if (Array.isArray(reservation.table_ids) && reservation.table_ids.length) return reservation.table_ids;
+  return reservation.table_id ? [reservation.table_id] : [];
+}
+
+function tableCodes(reservation) {
+  const codes = reservationTableIds(reservation)
+    .map((id) => state.tablesById.get(id)?.code)
+    .filter(Boolean);
+  return codes.length ? codes.join(' + ') : null;
 }
 
 function tableAssignmentError(error) {
@@ -394,11 +455,13 @@ function renderMap() {
   const rank = { arrivato: 3, confermata: 2, in_attesa: 1 };
   const occ = new Map(); // tableId -> { status, guest }
   for (const r of state.reservations) {
-    if (r.shift_id !== state.shiftId || !r.table_id) continue;
+    if (r.shift_id !== state.shiftId) continue;
     if (!rank[r.status]) continue;
-    const prev = occ.get(r.table_id);
-    if (!prev || rank[r.status] > rank[prev.status]) {
-      occ.set(r.table_id, { status: r.status, guest: r.customer_last_name });
+    for (const tableId of reservationTableIds(r)) {
+      const prev = occ.get(tableId);
+      if (!prev || rank[r.status] > rank[prev.status]) {
+        occ.set(tableId, { status: r.status, guest: r.customer_last_name });
+      }
     }
   }
 
@@ -536,6 +599,15 @@ function subscribeRealtime() {
           if (payload.eventType === 'INSERT') toast('Nuova richiesta in lista d\'attesa');
           scheduleReload();
         }
+      })
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'reservation_tables' },
+      () => scheduleReload())
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'restaurant_tables', filter: `venue_id=eq.${state.venue.id}` },
+      () => {
+        clearTimeout(reloadTimer);
+        reloadTimer = setTimeout(() => loadConfig().then(loadDay).catch(console.error), 250);
       })
     .subscribe();
 }
