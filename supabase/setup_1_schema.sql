@@ -92,15 +92,14 @@ create table restaurant_tables (
   venue_id    uuid not null references venues(id) on delete cascade,
   zone_id     uuid not null references zones(id) on delete restrict,
   code        text not null,                 -- es. 'T1', 'D3' - mostrato nella mappa
-  seats_min   int not null default 1,
   seats_max   int not null,
   active      boolean not null default true,  -- tavolo temporaneamente fuori uso
   created_at  timestamptz not null default now(),
   unique (venue_id, code),
-  check (seats_min > 0 and seats_max >= seats_min)
+  check (seats_max > 0)
 );
 
-comment on table restaurant_tables is 'Tavolo fisico di un locale. seats_min/seats_max definiscono per quali coperti il tavolo e'' adatto (usati dal suggerimento automatico di assegnazione).';
+comment on table restaurant_tables is 'Tavolo fisico di un locale. seats_max definisce il numero massimo di coperti.';
 
 create index restaurant_tables_zone_id_idx on restaurant_tables (zone_id);
 create index restaurant_tables_venue_capacity_idx on restaurant_tables (venue_id, seats_max);
@@ -497,7 +496,7 @@ as $$
   from restaurant_tables t
   where t.venue_id = p_venue_id
     and t.active
-    and p_party_size between t.seats_min and t.seats_max
+    and p_party_size <= t.seats_max
     and not exists (
       select 1
       from reservations r

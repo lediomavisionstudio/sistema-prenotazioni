@@ -106,15 +106,14 @@ create table restaurant_tables (
   venue_id    uuid not null references venues(id) on delete cascade,
   zone_id     uuid not null references zones(id) on delete restrict,
   code        text not null,                 -- es. 'T1', 'D3' - mostrato nella mappa
-  seats_min   int not null default 1,
   seats_max   int not null,
   active      boolean not null default true,  -- tavolo temporaneamente fuori uso
   created_at  timestamptz not null default now(),
   unique (venue_id, code),
-  check (seats_min > 0 and seats_max >= seats_min)
+  check (seats_max > 0)
 );
 
-comment on table restaurant_tables is 'Tavolo fisico di un locale. seats_min/seats_max definiscono per quali coperti il tavolo e'' adatto (usati dal suggerimento automatico di assegnazione).';
+comment on table restaurant_tables is 'Tavolo fisico di un locale. seats_max definisce il numero massimo di coperti.';
 
 create index restaurant_tables_zone_id_idx on restaurant_tables (zone_id);
 create index restaurant_tables_venue_capacity_idx on restaurant_tables (venue_id, seats_max);
@@ -521,7 +520,7 @@ as $$
   from restaurant_tables t
   where t.venue_id = p_venue_id
     and t.active
-    and p_party_size between t.seats_min and t.seats_max
+    and p_party_size <= t.seats_max
     and not exists (
       select 1
       from reservations r
@@ -782,16 +781,16 @@ insert into zones (id, venue_id, name, sort_order) values
   ('00000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000001', 'Sala',   1),
   ('00000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000001', 'Dehors', 2);
 
-insert into restaurant_tables (venue_id, zone_id, code, seats_min, seats_max) values
-  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000010', 'S1', 1, 2),
-  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000010', 'S2', 1, 2),
-  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000010', 'S3', 3, 4),
-  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000010', 'S4', 3, 4),
-  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000010', 'S5', 5, 6),
-  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000010', 'S6', 7, 8),
-  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000011', 'D1', 1, 2),
-  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000011', 'D2', 3, 4),
-  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000011', 'D3', 5, 6);
+insert into restaurant_tables (venue_id, zone_id, code, seats_max) values
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000010', 'S1', 2),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000010', 'S2', 2),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000010', 'S3', 4),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000010', 'S4', 4),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000010', 'S5', 6),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000010', 'S6', 8),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000011', 'D1', 2),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000011', 'D2', 4),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000011', 'D3', 6);
 
 insert into service_shifts (venue_id, code, name, start_time, end_time, sort_order) values
   ('00000000-0000-0000-0000-000000000001', 'turno_1', 'Turno I',  '19:00', '21:00', 1),
@@ -802,4 +801,3 @@ insert into service_shifts (venue_id, code, name, start_time, end_time, sort_ord
 --
 -- insert into venue_staff (venue_id, user_id, role)
 -- values ('00000000-0000-0000-0000-000000000001', '<uuid-utente-auth>', 'owner');
-

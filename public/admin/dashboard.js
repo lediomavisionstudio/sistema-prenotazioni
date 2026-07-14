@@ -69,7 +69,7 @@ async function loadConfig() {
   const [{ data: shifts, error: e1 }, { data: tables, error: e2 }] = await Promise.all([
     supabase.from('service_shifts').select('id, code, name, start_time, end_time, days_of_week, sort_order')
       .eq('venue_id', state.venue.id).eq('active', true).order('sort_order'),
-    supabase.from('restaurant_tables').select('id, code, seats_min, seats_max, zone:zones(id, name, sort_order)')
+    supabase.from('restaurant_tables').select('id, code, seats_max, zone:zones(id, name, sort_order)')
       .eq('venue_id', state.venue.id).eq('active', true),
   ]);
   if (e1) throw e1;
@@ -257,12 +257,12 @@ function tableOptionsForReservation(reservation) {
     .map((r) => r.table_id));
 
   return state.tables.map((table) => {
-    const fits = reservation.party_size >= table.seats_min && reservation.party_size <= table.seats_max;
+    const fits = reservation.party_size <= table.seats_max;
     const busy = occupied.has(table.id);
     return {
       id: table.id,
       disabled: (!fits || busy) && table.id !== reservation.table_id,
-      label: `${table.code} (${table.seats_min}-${table.seats_max})${fits ? '' : ' - non adatto'}${busy ? ' - occupato' : ''}`,
+      label: `${table.code} (${table.seats_max})${fits ? '' : ' - non adatto'}${busy ? ' - occupato' : ''}`,
     };
   });
 }
@@ -426,7 +426,7 @@ function renderMap() {
           const cls = o ? (o.status === 'arrivato' ? 'tbl--arrivato' : o.status === 'confermata' ? 'tbl--occupato' : 'tbl--attesa') : 'tbl--libero';
           return `<div class="tbl ${cls}">
             <span class="tbl__code">${escapeHtml(t.code)}</span>
-            <span class="tbl__seats">${t.seats_min}–${t.seats_max} posti</span>
+            <span class="tbl__seats">${t.seats_max} posti</span>
             <span class="tbl__guest">${o ? escapeHtml(o.guest) : 'Libero'}</span>
           </div>`;
         }).join('')}
@@ -461,8 +461,8 @@ async function refreshManualTableSelect() {
 
   const opts = ['<option value="">— nessun tavolo —</option>'];
   for (const t of state.tables) {
-    const fit = party >= t.seats_min && party <= t.seats_max;
-    const label = `${t.code} (${t.seats_min}–${t.seats_max})${fit ? '' : ' · non adatto'}`;
+    const fit = party <= t.seats_max;
+    const label = `${t.code} (${t.seats_max})${fit ? '' : ' · non adatto'}`;
     opts.push(`<option value="${t.id}" ${t.id === suggestedId ? 'selected' : ''}>${label}</option>`);
   }
   sel.innerHTML = opts.join('');

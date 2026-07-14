@@ -51,8 +51,8 @@ where v.slug = '<slug-url>';
 -- select id, 'Dehors', 2 from venues where slug = '<slug-url>';
 
 -- Tavoli (ripeti la riga per ogni tavolo; code univoco per locale)
--- insert into restaurant_tables (venue_id, zone_id, code, seats_min, seats_max)
--- select z.venue_id, z.id, 'S1', 1, 2
+-- insert into restaurant_tables (venue_id, zone_id, code, seats_max)
+-- select z.venue_id, z.id, 'S1', 2
 -- from zones z join venues v on v.id = z.venue_id
 -- where v.slug = '<slug-url>' and z.name = 'Sala';
 
