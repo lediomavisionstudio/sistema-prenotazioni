@@ -23,8 +23,6 @@ const FILTERS = {
   tutte: () => true,
 };
 
-const TABLE_BLOCKING_STATUSES = new Set(['in_attesa', 'confermata', 'arrivato']);
-
 async function init() {
   state.session = await requireSession();
   if (!state.session) return;
@@ -55,7 +53,7 @@ async function init() {
 async function loadConfig() {
   const [{ data: shifts, error: e1 }, { data: tables, error: e2 }] = await Promise.all([
     supabase.from('service_shifts').select('id, name, start_time, end_time, sort_order').eq('venue_id', state.venue.id).order('sort_order'),
-    supabase.from('restaurant_tables').select('id, code, seats_max, layout_x, layout_y, layout_width, layout_height, layout_rotation, layout_shape, layout_color').eq('venue_id', state.venue.id),
+    supabase.from('restaurant_tables').select('id, code, seats_max').eq('venue_id', state.venue.id),
   ]);
   if (e1) throw e1;
   if (e2) throw e2;
@@ -73,29 +71,8 @@ async function load() {
     .gte('reservation_date', today)
     .order('reservation_date', { ascending: true });
   if (error) throw error;
-  state.reservations = await withTableAssignments(await withEmailVerificationStatus(data || []));
+  state.reservations = await withEmailVerificationStatus(data || []);
   render();
-}
-
-async function withTableAssignments(rows) {
-  if (!rows.length) return rows;
-  const { data, error } = await supabase
-    .from('reservation_tables')
-    .select('reservation_id, table_id')
-    .in('reservation_id', rows.map((r) => r.id));
-  if (error) {
-    console.warn('[tables] assegnazioni multiple non disponibili:', error.message || error);
-    return rows.map((r) => ({ ...r, table_ids: r.table_id ? [r.table_id] : [] }));
-  }
-  const byReservation = new Map();
-  for (const row of data || []) {
-    if (!byReservation.has(row.reservation_id)) byReservation.set(row.reservation_id, []);
-    byReservation.get(row.reservation_id).push(row.table_id);
-  }
-  return rows.map((r) => {
-    const ids = byReservation.get(r.id) || (r.table_id ? [r.table_id] : []);
-    return { ...r, table_ids: ids };
-  });
 }
 
 async function withEmailVerificationStatus(rows) {
@@ -158,7 +135,7 @@ function render() {
       const shift = state.shiftsById.get(r.shift_id);
       return reservationCardHtml(r, {
         timeLabel: shift ? hhmm(shift.start_time) : '',
-        tableCode: tableCodes(r),
+        tableCode: r.table_id ? state.tablesById.get(r.table_id)?.code : null,
         shiftName: shift ? shift.name : '',
         tableOptions: tableOptionsForReservation(r),
       });
@@ -180,7 +157,7 @@ function render() {
 
 async function changeStatus(id, to) {
   const res = state.reservations.find((r) => r.id === id);
-  if (to === 'confermata' && res && reservationTableIds(res).length === 0) {
+  if (to === 'confermata' && res && !res.table_id) {
     toast('Assegna un tavolo prima di confermare la prenotazione.', true);
     return;
   }
@@ -192,47 +169,22 @@ async function changeStatus(id, to) {
 }
 
 function tableOptionsForReservation(reservation) {
-  const occupiedByTable = new Map();
-  state.reservations
+  const occupied = new Set(state.reservations
     .filter((r) =>
       r.id !== reservation.id &&
+      r.table_id &&
       r.reservation_date === reservation.reservation_date &&
       r.shift_id === reservation.shift_id &&
-      TABLE_BLOCKING_STATUSES.has(r.status))
-    .forEach((r) => {
-      reservationTableIds(r).forEach((tableId) => {
-        occupiedByTable.set(tableId, r);
-      });
-    });
-  const occupied = new Set(occupiedByTable.keys());
-  const selected = new Set(reservationTableIds(reservation));
+      r.status !== 'annullata' &&
+      r.status !== 'no_show')
+    .map((r) => r.table_id));
 
   return [...state.tablesById.values()].map((table) => {
     const fits = reservation.party_size <= table.seats_max;
     const busy = occupied.has(table.id);
-    const tableReservation = occupiedByTable.get(table.id);
-    const tableShift = tableReservation ? state.shifts.find((shift) => shift.id === tableReservation.shift_id) : null;
     return {
       id: table.id,
-      code: table.code,
-      seatsMax: table.seats_max,
-      busy,
-      busyStatus: tableReservation?.status || '',
-      busyReservation: tableReservation ? [
-        tableReservation.customer_last_name,
-        tableReservation.customer_first_name,
-      ].filter(Boolean).join(' ') : '',
-      busyTime: tableReservation?.reservation_time || tableReservation?.time || tableShift?.start_time || '',
-      fits,
-      layoutX: table.layout_x,
-      layoutY: table.layout_y,
-      layoutWidth: table.layout_width,
-      layoutHeight: table.layout_height,
-      layoutRotation: table.layout_rotation,
-      layoutShape: table.layout_shape,
-      layoutColor: table.layout_color,
-      previewDisabled: busy && !selected.has(table.id),
-      disabled: (!fits || busy) && !selected.has(table.id),
+      disabled: (!fits || busy) && table.id !== reservation.table_id,
       label: `${table.code} (${table.seats_max})${fits ? '' : ' - non adatto'}${busy ? ' - occupato' : ''}`,
     };
   });
@@ -240,30 +192,17 @@ function tableOptionsForReservation(reservation) {
 
 async function assignTable(id, tableId) {
   try {
-    const tableIds = Array.isArray(tableId) ? tableId : (tableId ? [tableId] : []);
-    const { error } = await supabase.rpc('assign_reservation_tables', {
+    const { error } = await supabase.rpc('assign_reservation_table', {
       p_reservation_id: id,
-      p_table_ids: tableIds,
+      p_table_id: tableId,
     });
     if (error) throw error;
-    toast(tableIds.length > 1 ? 'Tavoli assegnati' : tableIds.length ? 'Tavolo assegnato' : 'Tavolo rimosso');
+    toast(tableId ? 'Tavolo assegnato' : 'Tavolo rimosso');
     await load();
   } catch (error) {
     console.error('[tables] assegnazione tavolo fallita:', error);
     toast(tableAssignmentError(error), true);
   }
-}
-
-function reservationTableIds(reservation) {
-  if (Array.isArray(reservation.table_ids) && reservation.table_ids.length) return reservation.table_ids;
-  return reservation.table_id ? [reservation.table_id] : [];
-}
-
-function tableCodes(reservation) {
-  const codes = reservationTableIds(reservation)
-    .map((id) => state.tablesById.get(id)?.code)
-    .filter(Boolean);
-  return codes.length ? codes.join(' + ') : null;
 }
 
 function tableAssignmentError(error) {
@@ -342,18 +281,6 @@ function subscribeRealtime() {
           clearTimeout(reloadTimer);
           reloadTimer = setTimeout(() => load().catch(console.error), 250);
         }
-      })
-    .on('postgres_changes',
-      { event: '*', schema: 'public', table: 'reservation_tables' },
-      () => {
-        clearTimeout(reloadTimer);
-        reloadTimer = setTimeout(() => load().catch(console.error), 250);
-      })
-    .on('postgres_changes',
-      { event: '*', schema: 'public', table: 'restaurant_tables', filter: `venue_id=eq.${state.venue.id}` },
-      () => {
-        clearTimeout(reloadTimer);
-        reloadTimer = setTimeout(() => loadConfig().then(load).catch(console.error), 250);
       })
     .subscribe();
 }

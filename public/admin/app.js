@@ -82,7 +82,6 @@ export const STATUS_LABEL = {
   arrivato: 'Arrivato',
   no_show: 'No-show',
   annullata: 'Annullata',
-  terminata: 'Servizio terminato',
 };
 
 export const WEEKDAYS = [
