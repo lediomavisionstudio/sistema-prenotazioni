@@ -306,6 +306,15 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
 }
 
 .tables-header {
+  display: grid;
+  grid-template-columns:
+    minmax(160px, 1.5fr)
+    minmax(130px, 1fr)
+    minmax(130px, 1fr)
+    minmax(110px, .8fr)
+    minmax(110px, .8fr);
+  column-gap: 16px;
+  align-items: center;
   margin-top: 4px;
   padding: 0 16px 9px;
   color: var(--ink-soft);
@@ -387,6 +396,7 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
 .tables-save-message {
   display: flex;
   align-items: center;
+  flex-direction: row;
   gap: 10px;
   min-width: 0;
 }
@@ -416,7 +426,10 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
 }
 
 .tables-save-message > span {
-  display: inline;
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -453,7 +466,7 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
   }
 
   .tables-header {
-    display: none;
+    display: grid;
   }
 
   .table-cell {
@@ -477,9 +490,9 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
   }
 
   .tables-save-bar {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 14px;
+    align-items: center;
+    flex-direction: row;
+    justify-content: space-between;
   }
 
   .tables-save-actions {
