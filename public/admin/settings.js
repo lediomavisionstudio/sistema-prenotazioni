@@ -167,15 +167,25 @@ function renderTables() {
   state.dirtyTables = new Set([...state.dirtyTables].filter((id) => state.tables.some((table) => table.id === id)));
   const zoneName = (id) => escapeHtml(state.zones.find((z) => z.id === id)?.name || '—');
   $('tableRows').innerHTML = state.tables.map((t) => `
-    <div class="row-item table-row" data-table-row="${t.id}">
-      <input class="table-row__code" value="${escapeHtml(t.code)}" data-tid="${t.id}" data-f="code" ${dis()} maxlength="20" aria-label="Nome tavolo" />
-      <select data-tid="${t.id}" data-f="zone_id" ${dis()} aria-label="Zona tavolo">
-        ${state.zones.map((z) => `<option value="${z.id}" ${z.id === t.zone_id ? 'selected' : ''}>${escapeHtml(z.name)}</option>`).join('')}
-      </select>
-      <input type="hidden" value="${t.seats_min}" data-tid="${t.id}" data-f="seats_min" />
-      <input class="table-row__seats" type="number" min="1" value="${t.seats_max}" data-tid="${t.id}" data-f="seats_max" ${dis()} aria-label="Posti massimi" />
-      <label class="pill table-row__active"><input type="checkbox" ${t.active ? 'checked' : ''} data-tid="${t.id}" data-f="active" ${dis()} /> attivo</label>
-      <button class="act act--warn" data-del-table="${t.id}" ${dis()}>Elimina</button>
+    <div class="row-item tables-grid table-row" data-table-row="${t.id}">
+      <div class="table-cell" data-label="Codice">
+        <input class="table-row__code" value="${escapeHtml(t.code)}" data-tid="${t.id}" data-f="code" ${dis()} maxlength="20" aria-label="Nome tavolo" />
+      </div>
+      <div class="table-cell" data-label="Zona">
+        <select data-tid="${t.id}" data-f="zone_id" ${dis()} aria-label="Zona tavolo">
+          ${state.zones.map((z) => `<option value="${z.id}" ${z.id === t.zone_id ? 'selected' : ''}>${escapeHtml(z.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="table-cell" data-label="Posti max">
+        <input type="hidden" value="${t.seats_min}" data-tid="${t.id}" data-f="seats_min" />
+        <input class="table-row__seats" type="number" min="1" value="${t.seats_max}" data-tid="${t.id}" data-f="seats_max" ${dis()} aria-label="Posti massimi" />
+      </div>
+      <div class="table-cell" data-label="Stato">
+        <label class="pill table-row__active"><input type="checkbox" ${t.active ? 'checked' : ''} data-tid="${t.id}" data-f="active" ${dis()} /> attivo</label>
+      </div>
+      <div class="table-cell table-cell--actions" data-label="Azioni">
+        <button class="act act--warn" data-del-table="${t.id}" ${dis()}>Elimina</button>
+      </div>
     </div>`).join('') || '<div class="res-empty">Nessun tavolo.</div>';
 
   $('tableRows').querySelectorAll('[data-tid][data-f]').forEach((input) => {

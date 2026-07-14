@@ -77,23 +77,20 @@
     <!-- Tavoli -->
     <section class="section">
       <div class="section__head"><h2 class="section__title">Tavoli</h2></div>
-      <div class="tables-grid-header" aria-hidden="true">
-        <span>Codice</span>
-        <span>Zona</span>
-        <span>Posti max</span>
-        <span>Stato</span>
-        <span>Azioni</span>
+      <div class="tables-grid tables-header" aria-hidden="true">
+        <div>Codice</div>
+        <div>Zona</div>
+        <div>Posti max</div>
+        <div>Stato</div>
+        <div>Azioni</div>
       </div>
       <div class="rows" id="tableRows"></div>
-      <div class="table-edit-bar" id="tableSaveBar" hidden>
-        <div class="table-edit-bar__message">
-          <span class="table-edit-bar__icon" aria-hidden="true">ⓘ</span>
-          <div class="table-edit-bar__copy">
-            <strong>Hai modifiche non salvate.</strong>
-            <span id="tableSaveHint">Controlla le righe evidenziate prima di salvare.</span>
-          </div>
+      <div class="tables-save-bar" id="tableSaveBar" hidden>
+        <div class="tables-save-message">
+          <span class="info-icon" aria-hidden="true">i</span>
+          <span><strong>Hai modifiche non salvate.</strong> <span id="tableSaveHint">Controlla le righe evidenziate prima di salvare.</span></span>
         </div>
-        <div class="table-edit-bar__actions">
+        <div class="tables-save-actions">
           <button class="btn btn--ghost btn--sm" id="cancelTableChanges" type="button">Annulla modifiche</button>
           <button class="btn btn--primary btn--sm" id="saveTableChanges" type="button">Salva modifiche</button>
         </div>
