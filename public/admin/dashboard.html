@@ -7,7 +7,7 @@
   <title>Dashboard — Pannello gestionale</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../assets/css/theme.css" />
   <link rel="stylesheet" href="../assets/css/panel.css" />
 
@@ -27,16 +27,41 @@
         <span class="topbar__role" id="userRole"></span>
       </div>
       <nav class="topbar__nav" aria-label="Navigazione gestionale">
-        <a class="topbar__link is-active" href="dashboard.html"><i data-lucide="layout-dashboard" aria-hidden="true"></i><span>Dashboard</span></a>
-        <a class="topbar__link" href="upcoming.html"><i data-lucide="calendar-days" aria-hidden="true"></i><span>In arrivo</span></a>
-        <a class="topbar__link" href="stats.html"><i data-lucide="bar-chart-3" aria-hidden="true"></i><span>Statistiche</span></a>
-        <a class="topbar__link" href="settings.html"><i data-lucide="settings" aria-hidden="true"></i><span>Impostazioni</span></a>
-        <button class="btn btn--ghost btn--sm topbar__logout" id="logoutBtn" type="button"><i data-lucide="log-out" aria-hidden="true"></i><span>Esci</span></button>
+        <a class="topbar__link is-active" href="dashboard.html" aria-label="Dashboard" title="Dashboard"><i data-lucide="layout-dashboard" aria-hidden="true"></i><span>Dashboard</span></a>
+        <a class="topbar__link" href="upcoming.html" aria-label="In arrivo" title="In arrivo"><i data-lucide="calendar-days" aria-hidden="true"></i><span>In arrivo</span></a>
+        <a class="topbar__link" href="stats.html" aria-label="Statistiche" title="Statistiche"><i data-lucide="bar-chart-3" aria-hidden="true"></i><span>Statistiche</span></a>
+        <a class="topbar__link" href="settings.html" aria-label="Impostazioni" title="Impostazioni"><i data-lucide="settings" aria-hidden="true"></i><span>Impostazioni</span></a>
+        <button class="btn btn--ghost btn--sm topbar__logout" id="logoutBtn" type="button" aria-label="Esci" title="Esci"><i data-lucide="log-out" aria-hidden="true"></i><span>Esci</span></button>
       </nav>
     </div>
   </header>
 
   <main class="page" id="page" hidden>
+
+    <section class="dashboard-hero" aria-label="Intestazione dashboard">
+      <div class="dashboard-hero__copy">
+        <p class="crm-eyebrow">Dashboard operativa</p>
+        <h1>Schermata principale</h1>
+        <p>Vista live della giornata, dei tavoli e delle richieste del ristorante.</p>
+      </div>
+      <div class="dashboard-hero__actions">
+        <button class="dashboard-icon-btn" id="notificationToggle" type="button" aria-label="Notifiche" title="Notifiche">
+          <i data-lucide="bell" aria-hidden="true"></i>
+          <span class="dashboard-icon-btn__dot" aria-hidden="true"></span>
+        </button>
+        <label class="theme-switch" for="themeToggle" title="Dark mode">
+          <input id="themeToggle" type="checkbox" aria-label="Dark mode" />
+          <span><i data-lucide="moon" aria-hidden="true"></i></span>
+        </label>
+        <div class="operator-profile" aria-label="Profilo operatore">
+          <span class="operator-profile__avatar"><i data-lucide="user-round" aria-hidden="true"></i></span>
+          <span class="operator-profile__meta">
+            <strong id="operatorProfileLabel">Staff</strong>
+            <small>Operatore</small>
+          </span>
+        </div>
+      </div>
+    </section>
 
     <!-- Selettore data -->
     <div class="datebar">
@@ -74,6 +99,7 @@
         <div class="dash-metric"><span>Tavoli liberi</span><strong id="dashTablesFree">0</strong></div>
         <div class="dash-metric"><span>Tavoli occupati</span><strong id="dashTablesBusy">0</strong></div>
         <div class="dash-metric"><span>Richieste in attesa</span><strong id="dashPending">0</strong></div>
+        <div class="dash-metric"><span>Confermate</span><strong id="dashConfirmed">0</strong></div>
         <div class="dash-metric"><span>Lista attesa</span><strong id="dashWaitlist">0</strong></div>
       </div>
       <div class="restaurant-home__insights">
@@ -187,6 +213,7 @@
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/pwa.js"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script>window.addEventListener('DOMContentLoaded', function () { if (window.lucide) window.lucide.createIcons(); });</script>
   <script type="module" src="./dashboard.js"></script>
 </body>

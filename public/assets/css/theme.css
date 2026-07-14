@@ -1,37 +1,61 @@
 /* =========================================================================
-   Design system condiviso — stessi token del widget cliente.
-   Il widget (index.html) li tiene inline per restare standalone; qui sono
-   centralizzati per il pannello gestionale (più pagine). Se cambi la palette,
-   allinea entrambi.
+   Design system condiviso
+   Palette premium centralizzata per il pannello gestionale.
    ========================================================================= */
 
 :root {
-  /* Palette calda */
-  --paper:        #efe4c9;   /* sfondo — carta paglia */
-  --surface:      #fffdf6;   /* card */
-  --surface-soft: #f7efdb;   /* riquadri interni */
-  --ink:          #3a2b23;   /* testo — marrone inchiostro */
-  --ink-soft:     #7a6a5d;   /* testo secondario */
-  --tomato:       #c8402a;   /* accento — rosso pomodoro */
-  --tomato-dark:  #a5321f;
-  --tomato-soft:  #f7ddd5;
-  --line:         #e3d6ba;
-  --disabled-bg:  #ece4d3;
+  /* Semantic palette */
+  --color-primary:    #b8332a;
+  --color-secondary:  #2563eb;
+  --color-success:    #168a5b;
+  --color-warning:    #b7791f;
+  --color-danger:     #c03535;
+  --color-background: #f5f7fb;
+  --color-surface:    #ffffff;
+  --color-card:       #fbfcff;
+  --color-border:     #d9dee8;
+  --color-text:       #15171c;
+  --color-muted:      #667085;
 
-  /* Stati prenotazione (badge + mappa tavoli) */
-  --st-attesa:      #b07d1a;  --st-attesa-bg:   #f8ecd0;
-  --st-confermata:  #2f7d55;  --st-confermata-bg:#daeee2;
-  --st-arrivato:    #2b6cb0;  --st-arrivato-bg: #d9e8f5;
-  --st-noshow:      #a5321f;  --st-noshow-bg:   #f4d9d3;
-  --st-annullata:   #8a7d72;  --st-annullata-bg:#e9e2d6;
+  /* Compatibility aliases used by the existing UI */
+  --paper:        var(--color-background);
+  --surface:      var(--color-surface);
+  --surface-soft: #eef2f8;
+  --ink:          var(--color-text);
+  --ink-soft:     var(--color-muted);
+  --tomato:       var(--color-primary);
+  --tomato-dark:  #8f241f;
+  --tomato-soft:  #fbe7e4;
+  --line:         var(--color-border);
+  --disabled-bg:  #e7ebf2;
 
-  --ok: #2f7d55;
+  /* Reservation states */
+  --st-attesa:      var(--color-warning);   --st-attesa-bg:      #fff4d6;
+  --st-confermata:  var(--color-success);   --st-confermata-bg:  #dcfce7;
+  --st-arrivato:    var(--color-secondary); --st-arrivato-bg:    #dbeafe;
+  --st-noshow:      var(--color-danger);    --st-noshow-bg:      #fee2e2;
+  --st-annullata:   #64748b;                --st-annullata-bg:   #e2e8f0;
+
+  --ok: var(--color-success);
 
   --radius:    18px;
   --radius-sm: 12px;
   --radius-xs: 9px;
-  --shadow:    0 10px 40px rgba(58, 43, 35, 0.12);
-  --shadow-sm: 0 2px 10px rgba(58, 43, 35, 0.07);
-  --font-title: "Bricolage Grotesque", system-ui, sans-serif;
+  --shadow:    0 18px 55px rgba(15, 23, 42, 0.10);
+  --shadow-sm: 0 8px 22px rgba(15, 23, 42, 0.06);
+  --font-title: "Inter", system-ui, -apple-system, sans-serif;
   --font-body:  "Inter", system-ui, -apple-system, sans-serif;
+
+  /* Typography scale */
+  --text-h1: clamp(2.25rem, 4vw, 3.75rem);
+  --text-h2: clamp(1.55rem, 2.5vw, 2.25rem);
+  --text-h3: clamp(1.18rem, 1.7vw, 1.5rem);
+  --text-body: 0.96rem;
+  --text-caption: 0.78rem;
+  --text-label: 0.82rem;
+  --text-badge: 0.72rem;
+  --leading-tight: 1.08;
+  --leading-title: 1.16;
+  --leading-body: 1.62;
+  --tracking-label: 0.04em;
 }

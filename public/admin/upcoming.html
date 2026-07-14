@@ -7,7 +7,7 @@
   <title>In arrivo — Pannello gestionale</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../assets/css/theme.css" />
   <link rel="stylesheet" href="../assets/css/panel.css" />
 
@@ -27,20 +27,24 @@
         <span class="topbar__role" id="userRole"></span>
       </div>
       <nav class="topbar__nav" aria-label="Navigazione gestionale">
-        <a class="topbar__link" href="dashboard.html"><i data-lucide="layout-dashboard" aria-hidden="true"></i><span>Dashboard</span></a>
-        <a class="topbar__link is-active" href="upcoming.html"><i data-lucide="calendar-days" aria-hidden="true"></i><span>In arrivo</span></a>
-        <a class="topbar__link" href="stats.html"><i data-lucide="bar-chart-3" aria-hidden="true"></i><span>Statistiche</span></a>
-        <a class="topbar__link" href="settings.html"><i data-lucide="settings" aria-hidden="true"></i><span>Impostazioni</span></a>
-        <button class="btn btn--ghost btn--sm topbar__logout" id="logoutBtn" type="button"><i data-lucide="log-out" aria-hidden="true"></i><span>Esci</span></button>
+        <a class="topbar__link" href="dashboard.html" aria-label="Dashboard" title="Dashboard"><i data-lucide="layout-dashboard" aria-hidden="true"></i><span>Dashboard</span></a>
+        <a class="topbar__link is-active" href="upcoming.html" aria-label="In arrivo" title="In arrivo"><i data-lucide="calendar-days" aria-hidden="true"></i><span>In arrivo</span></a>
+        <a class="topbar__link" href="stats.html" aria-label="Statistiche" title="Statistiche"><i data-lucide="bar-chart-3" aria-hidden="true"></i><span>Statistiche</span></a>
+        <a class="topbar__link" href="settings.html" aria-label="Impostazioni" title="Impostazioni"><i data-lucide="settings" aria-hidden="true"></i><span>Impostazioni</span></a>
+        <button class="btn btn--ghost btn--sm topbar__logout" id="logoutBtn" type="button" aria-label="Esci" title="Esci"><i data-lucide="log-out" aria-hidden="true"></i><span>Esci</span></button>
       </nav>
     </div>
   </header>
 
   <main class="page" id="page" hidden>
-    <div class="section__head">
-      <h1 class="section__title" style="font-size:1.3rem">Prossime prenotazioni</h1>
-      <span class="pill" id="pendingCount"></span>
-    </div>
+    <section class="upcoming-hero" aria-label="Intestazione prenotazioni in arrivo">
+      <div>
+        <p class="crm-eyebrow">Reservation desk</p>
+        <h1>Prossime prenotazioni</h1>
+        <p>Una vista operativa pulita per gestire arrivi, contatti, tavoli e stati cliente.</p>
+      </div>
+      <span class="upcoming-hero__pill" id="pendingCount"></span>
+    </section>
 
     <div class="admin-toolbar admin-toolbar--compact">
       <label class="searchbox" for="upcomingSearch">

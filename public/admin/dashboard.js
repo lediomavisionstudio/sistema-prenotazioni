@@ -17,6 +17,7 @@ import { initPrintExport } from './print-export.js';
 const $ = (id) => document.getElementById(id);
 const LIVE_IMMINENT_MINUTES = 45;
 const LIVE_TOO_LONG_MINUTES = 120;
+let dayChartInstance = null;
 
 const state = {
   session: null,
@@ -55,6 +56,8 @@ async function init() {
     state.role = current.role;
     $('venueName').textContent = current.venue.name;
     $('userRole').textContent = (current.role === 'owner' ? 'Titolare' : 'Staff') + ' · ' + (state.session.user.email || '');
+
+    initDashboardChrome();
 
     await loadConfig();
     initCustomerCrm({ supabase, state, toast });
@@ -204,6 +207,8 @@ function renderRestaurantHome() {
   $('dashTablesFree').textContent = Math.max(0, activeTables.length - occupiedTableIds.size);
   $('dashTablesBusy').textContent = occupiedTableIds.size;
   $('dashPending').textContent = state.reservations.filter((r) => r.status === 'in_attesa').length;
+  const confirmedMetric = $('dashConfirmed');
+  if (confirmedMetric) confirmedMetric.textContent = confirmed.length;
   $('dashWaitlist').textContent = state.waitlist.length;
 
   renderNextArrival(active);
@@ -234,18 +239,63 @@ function renderNextArrival(activeRows) {
 }
 
 function renderDayChart(activeRows) {
-  const max = Math.max(1, ...state.shifts.map((s) =>
-    activeRows.filter((r) => r.shift_id === s.id).reduce((sum, r) => sum + (r.party_size || 0), 0)));
-  $('dayChart').innerHTML = state.shifts.length
-    ? state.shifts.map((s) => {
-      const covers = activeRows.filter((r) => r.shift_id === s.id).reduce((sum, r) => sum + (r.party_size || 0), 0);
-      return `<div class="day-chart__row">
-        <span>${escapeHtml(s.name)}</span>
-        <div><i style="width:${Math.max(4, Math.round((covers / max) * 100))}%"></i></div>
-        <strong>${covers}</strong>
-      </div>`;
-    }).join('')
-    : '<div class="res-empty">Nessun turno configurato.</div>';
+  const target = $('dayChart');
+  const rows = state.shifts.map((s) => ({
+    label: s.name,
+    covers: activeRows.filter((r) => r.shift_id === s.id).reduce((sum, r) => sum + (r.party_size || 0), 0),
+  }));
+
+  if (!rows.length) {
+    if (dayChartInstance) dayChartInstance.destroy();
+    dayChartInstance = null;
+    target.innerHTML = '<div class="res-empty">Nessun turno configurato.</div>';
+    return;
+  }
+
+  if (window.Chart) {
+    if (dayChartInstance) dayChartInstance.destroy();
+    target.innerHTML = '<canvas id="dayChartCanvas" aria-label="Grafico coperti per turno" role="img"></canvas>';
+    const ctx = $('dayChartCanvas');
+    dayChartInstance = new window.Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: rows.map((row) => row.label),
+        datasets: [{
+          label: 'Coperti',
+          data: rows.map((row) => row.covers),
+          borderRadius: 12,
+          borderSkipped: false,
+          backgroundColor: ['#c8402a', '#2f8f72', '#2d74d6', '#e6a23c'],
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 260, easing: 'easeOutQuart' },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(18, 21, 19, .92)',
+            padding: 12,
+            cornerRadius: 12,
+            displayColors: false,
+          },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: '#7b8279', font: { weight: 700 } } },
+          y: { beginAtZero: true, grid: { color: 'rgba(127, 135, 127, .14)' }, ticks: { precision: 0, color: '#7b8279' } },
+        },
+      },
+    });
+    return;
+  }
+
+  const max = Math.max(1, ...rows.map((row) => row.covers));
+  target.innerHTML = rows.map((row) => `<div class="day-chart__row">
+    <span>${escapeHtml(row.label)}</span>
+    <div><i style="width:${Math.max(4, Math.round((row.covers / max) * 100))}%"></i></div>
+    <strong>${row.covers}</strong>
+  </div>`).join('');
 }
 
 function renderDayTimeline(activeRows) {
@@ -1025,6 +1075,67 @@ function wireControls() {
       state.search = search.value;
       renderList();
     });
+  }
+}
+
+function initDashboardChrome() {
+  const profile = $('operatorProfileLabel');
+  if (profile) {
+    profile.textContent = state.session.user.email || (state.role === 'owner' ? 'Titolare' : 'Staff');
+  }
+
+  const root = document.documentElement;
+  const themeToggle = $('themeToggle');
+  const savedTheme = readAdminTheme();
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
+  root.dataset.adminTheme = initialTheme;
+
+  if (themeToggle) {
+    themeToggle.checked = initialTheme === 'dark';
+    themeToggle.addEventListener('change', () => {
+      const nextTheme = themeToggle.checked ? 'dark' : 'light';
+      root.dataset.adminTheme = nextTheme;
+      saveAdminTheme(nextTheme);
+    });
+  }
+
+  const notificationToggle = $('notificationToggle');
+  if (notificationToggle) {
+    notificationToggle.addEventListener('click', async () => {
+      if (!('Notification' in window)) {
+        toast('Notifiche desktop non supportate da questo browser.', true);
+        return;
+      }
+      if (Notification.permission === 'granted') {
+        toast('Notifiche gia attive');
+        return;
+      }
+      try {
+        const permission = await Notification.requestPermission();
+        toast(permission === 'granted' ? 'Notifiche attivate' : 'Notifiche non attivate', permission !== 'granted');
+      } catch (error) {
+        console.error('[dashboard-ui] permesso notifiche non disponibile:', error);
+        toast('Non posso attivare le notifiche su questo dispositivo.', true);
+      }
+    });
+  }
+}
+
+function readAdminTheme() {
+  try {
+    return localStorage.getItem('admin-theme');
+  } catch (error) {
+    console.warn('[dashboard-ui] preferenza tema non leggibile:', error);
+    return null;
+  }
+}
+
+function saveAdminTheme(theme) {
+  try {
+    localStorage.setItem('admin-theme', theme);
+  } catch (error) {
+    console.warn('[dashboard-ui] preferenza tema non salvata:', error);
   }
 }
 
