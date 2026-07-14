@@ -46,7 +46,12 @@ export function reservationCardHtml(r, opts = {}) {
 
 function tableAssignmentHtml(r, opts = {}) {
   if (!Array.isArray(opts.tableOptions)) return '';
-  const selectedIds = new Set(Array.isArray(r.table_ids) && r.table_ids.length ? r.table_ids : [r.table_id].filter(Boolean));
+  const partySize = Number(r.party_size || 0);
+  const hasSingleTableAvailable = opts.tableOptions.some((table) =>
+    !table.disabled && Number(table.seatsMax || 0) >= partySize);
+  const selectionMode = hasSingleTableAvailable ? 'single' : 'multi';
+  const rawSelectedIds = new Set(Array.isArray(r.table_ids) && r.table_ids.length ? r.table_ids : [r.table_id].filter(Boolean));
+  const selectedIds = selectionMode === 'single' ? new Set([...rawSelectedIds].slice(0, 1)) : rawSelectedIds;
   const selectedTables = opts.tableOptions.filter((table) => selectedIds.has(table.id));
   const selectedCodes = selectedTables.map((table) => table.code).filter(Boolean);
   const selectedSeats = selectedTables.reduce((sum, table) => sum + (table.seatsMax || 0), 0);
@@ -65,8 +70,8 @@ function tableAssignmentHtml(r, opts = {}) {
       <span class="table-picker__status">${escapeHtml(status)}</span>
     </label>`;
   }).join('');
-  return `<div class="res__table-assign" data-party-size="${escapeHtml(r.party_size || 0)}">
-    <div class="table-picker" data-table-picker="${escapeHtml(r.id)}">
+  return `<div class="res__table-assign" data-party-size="${escapeHtml(r.party_size || 0)}" data-selection-mode="${selectionMode}">
+    <div class="table-picker" data-table-picker="${escapeHtml(r.id)}" data-selection-mode="${selectionMode}">
       <button class="table-picker__button" type="button" data-table-picker-toggle aria-expanded="false">
         <span data-table-picker-label>${escapeHtml(summary)}</span>
         <span aria-hidden="true">▾</span>
@@ -97,6 +102,7 @@ export function wireRowActions(container, onChange) {
 
 export function wireTableAssignment(container, onAssign) {
   container.querySelectorAll('[data-table-picker]').forEach((picker) => {
+    enforceTableSelectionMode(picker);
     refreshTablePicker(picker);
     const toggle = picker.querySelector('[data-table-picker-toggle]');
     const menu = picker.querySelector('[data-table-picker-menu]');
@@ -106,7 +112,10 @@ export function wireTableAssignment(container, onAssign) {
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
     picker.querySelectorAll('[data-table-choice]').forEach((choice) =>
-      choice.addEventListener('change', () => refreshTablePicker(picker)));
+      choice.addEventListener('change', () => {
+        if (choice.checked) enforceTableSelectionMode(picker, choice);
+        refreshTablePicker(picker);
+      }));
   });
   container.querySelectorAll('[data-table-save]').forEach((button) =>
     button.addEventListener('click', () => {
@@ -121,12 +130,24 @@ export function wireTableAssignment(container, onAssign) {
         if (error) error.hidden = false;
         return;
       }
-      onAssign(id, ids);
+      const selectionMode = box?.dataset.selectionMode || picker?.dataset.selectionMode || 'multi';
+      onAssign(id, selectionMode === 'single' ? (ids[0] || null) : ids);
     }));
 }
 
+function enforceTableSelectionMode(picker, activeChoice = null) {
+  if (picker?.dataset.selectionMode !== 'single') return;
+  const checked = [...picker.querySelectorAll('[data-table-choice]:checked')];
+  const keep = activeChoice || checked[0];
+  checked.forEach((input) => {
+    if (input !== keep) input.checked = false;
+  });
+}
+
 function selectedTableIds(picker) {
-  return [...picker.querySelectorAll('[data-table-choice]:checked')].map((input) => input.dataset.tableChoice).filter(Boolean);
+  const checked = [...picker.querySelectorAll('[data-table-choice]:checked')];
+  const choices = picker?.dataset.selectionMode === 'single' ? checked.slice(0, 1) : checked;
+  return choices.map((input) => input.dataset.tableChoice).filter(Boolean);
 }
 
 function tablePickerSeats(picker) {
