@@ -2303,16 +2303,23 @@
       if (email && !options.skipOtp && !otpIsVerified(email)) {
         setSubmitting(true);
         try {
-          await requestEmailOtp(email);
-          openOtpModal(email);
+          const otpResult = await requestEmailOtp(email);
+          if (otpResult?.alreadyVerified) {
+            state.otp.verifiedRequestId = state.requestId;
+            state.otp.verifiedEmail = email.toLowerCase();
+            console.info('[otp] email gia verificata in precedenza, proseguo senza popup');
+          } else {
+            openOtpModal(email);
+            return;
+          }
         } catch (err) {
           console.error('[otp] invio codice fallito:', err);
           showFormError(mapOtpError(err));
           $('confirmModal').hidden = true;
+          return;
         } finally {
           setSubmitting(false);
         }
-        return;
       }
 
       setSubmitting(true);
@@ -2375,6 +2382,10 @@
       };
       console.info('[otp] invoco send-email-otp', payload);
       const { data, error } = await supabase.functions.invoke('send-email-otp', { body: payload });
+      if (!error && (data?.already_verified === true || data?.alreadyVerified === true || data?.verified === true)) {
+        console.info('[otp] email gia verificata, OTP non richiesto:', data);
+        return { ...data, alreadyVerified: true };
+      }
       if (error || data?.error || data?.sent === false) {
         console.error('[otp] send-email-otp fallita:', error || data);
         throw new Error(data?.error || error?.message || 'OTP_INVIO_FALLITO');

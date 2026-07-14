@@ -52,6 +52,28 @@ Deno.serve(async (req) => {
     if (venueError) throw venueError;
     if (!venue) return json({ sent: false, error: "LOCALE_NON_TROVATO" }, 404);
 
+    const { data: verifiedRows, error: verifiedLookupError } = await supabase
+      .from("email_verification_codes")
+      .select("id, verified_at")
+      .eq("venue_id", venue.id)
+      .eq("email", email)
+      .not("verified_at", "is", null)
+      .order("verified_at", { ascending: false })
+      .limit(1);
+    if (verifiedLookupError) throw verifiedLookupError;
+    if ((verifiedRows || []).length > 0) {
+      console.info("[send-email-otp] email gia verificata, OTP non inviato", {
+        recipient: email,
+        venue_id: venue.id,
+        verified_at: verifiedRows?.[0]?.verified_at || null,
+      });
+      return json({
+        sent: false,
+        already_verified: true,
+        verified: true,
+      });
+    }
+
     const windowStart = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const { count, error: countError } = await supabase
       .from("email_verification_codes")
