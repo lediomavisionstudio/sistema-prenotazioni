@@ -186,11 +186,7 @@ function normalizeScheduleMode(mode) {
 }
 
 function bookingModeForDate(date) {
-  if (state.venue?.booking_same_mode_all_days !== false) {
-    return normalizeScheduleMode(state.venue?.booking_mode);
-  }
-  const modes = state.venue?.booking_mode_by_weekday || {};
-  return normalizeScheduleMode(modes[isoDow(date)]);
+  return normalizeScheduleMode('shifts');
 }
 
 function minutesOf(time) {
@@ -212,7 +208,7 @@ function scheduleItemsForDate(date) {
   if (bookingModeForDate(date) !== 'free') {
     return shifts.map((shift) => ({ ...shift, key: shift.id, shift_id: shift.id, mode: 'shifts' }));
   }
-  const interval = state.venue?.booking_slot_interval_minutes || 30;
+  const interval = 30;
   return shifts.flatMap((shift) => {
     const start = minutesOf(shift.start_time);
     const end = minutesOf(shift.end_time);

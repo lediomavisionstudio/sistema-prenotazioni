@@ -47,7 +47,7 @@ export async function signOut() {
 export async function loadCurrentVenue() {
   const { data, error } = await supabase
     .from('venue_staff')
-    .select('role, venue:venues(id, name, slug, timezone, closed_weekdays, active, booking_same_mode_all_days, booking_mode, booking_mode_by_weekday, booking_slot_interval_minutes)')
+    .select('role, venue:venues(id, name, slug, timezone, closed_weekdays, active)')
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle();

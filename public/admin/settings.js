@@ -20,6 +20,8 @@ const state = {
   scheduleConfig: null,
 };
 
+const SCHEDULE_CONFIG_KEY = 'booking_admin_schedule_mode';
+
 async function init() {
   state.session = await requireSession();
   if (!state.session) return;
@@ -321,17 +323,45 @@ function defaultScheduleDays(mode = 'shifts') {
   return Object.fromEntries(WEEKDAYS.map((day) => [day.n, normalizeScheduleMode(mode)]));
 }
 
-function venueScheduleDays() {
+function defaultScheduleConfig() {
   return {
-    ...defaultScheduleDays(state.venue.booking_mode),
-    ...(state.venue.booking_mode_by_weekday || {}),
+    sameMode: true,
+    mode: 'shifts',
+    days: defaultScheduleDays('shifts'),
   };
 }
 
+function scheduleStorageKey() {
+  return `${SCHEDULE_CONFIG_KEY}:${state.venue?.id || 'default'}`;
+}
+
+function loadScheduleConfig() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(scheduleStorageKey()) || 'null');
+    const base = defaultScheduleConfig();
+    if (!parsed || typeof parsed !== 'object') return base;
+    return {
+      sameMode: parsed.sameMode !== false,
+      mode: normalizeScheduleMode(parsed.mode),
+      days: {
+        ...base.days,
+        ...(parsed.days || {}),
+      },
+    };
+  } catch (error) {
+    console.warn('[settings] configurazione orari locale non valida:', error);
+    return defaultScheduleConfig();
+  }
+}
+
 function renderScheduleConfig() {
-  const sameMode = state.venue.booking_same_mode_all_days !== false;
-  const mode = normalizeScheduleMode(state.venue.booking_mode);
-  const days = venueScheduleDays();
+  state.scheduleConfig = state.scheduleConfig || loadScheduleConfig();
+  const sameMode = state.scheduleConfig.sameMode !== false;
+  const mode = normalizeScheduleMode(state.scheduleConfig.mode);
+  const days = {
+    ...defaultScheduleDays(mode),
+    ...(state.scheduleConfig.days || {}),
+  };
   $('scheduleSameMode').checked = sameMode;
   $('scheduleModeShifts').checked = mode === 'shifts';
   $('scheduleModeFree').checked = mode === 'free';
@@ -391,23 +421,14 @@ async function saveScheduleConfig() {
     ? defaultScheduleDays(mode)
     : Object.fromEntries([...$('scheduleDayModes').querySelectorAll('[data-schedule-day]')]
       .map((select) => [select.dataset.scheduleDay, normalizeScheduleMode(select.value)]));
-  const patch = {
-    booking_same_mode_all_days: sameMode,
-    booking_mode: mode,
-    booking_mode_by_weekday: days,
-  };
-  const { data, error } = await supabase
-    .from('venues')
-    .update(patch)
-    .eq('id', state.venue.id)
-    .select('*')
-    .maybeSingle();
-  if (error) {
+  state.scheduleConfig = { sameMode, mode, days };
+  try {
+    localStorage.setItem(scheduleStorageKey(), JSON.stringify(state.scheduleConfig));
+  } catch (error) {
     console.error(error);
-    toast(error.message?.includes('row-level') ? 'Permesso negato (solo titolare).' : 'Configurazione orari non salvata.', true);
+    toast('Configurazione orari non salvata dal browser.', true);
     return;
   }
-  state.venue = { ...state.venue, ...(data || patch) };
   renderScheduleConfig();
   toast('Configurazione orari salvata.');
 }
@@ -430,14 +451,21 @@ function wire() {
   $('cancelTableChanges').addEventListener('click', cancelTableChanges);
   $('scheduleSameMode').addEventListener('change', () => {
     if (!state.canEdit) return;
-    state.venue.booking_same_mode_all_days = $('scheduleSameMode').checked;
+    state.scheduleConfig = state.scheduleConfig || loadScheduleConfig();
+    state.scheduleConfig.sameMode = $('scheduleSameMode').checked;
     renderScheduleConfig();
   });
   $('scheduleModeShifts').addEventListener('change', () => {
-    if (state.canEdit) state.venue.booking_mode = 'shifts';
+    if (state.canEdit) {
+      state.scheduleConfig = state.scheduleConfig || loadScheduleConfig();
+      state.scheduleConfig.mode = 'shifts';
+    }
   });
   $('scheduleModeFree').addEventListener('change', () => {
-    if (state.canEdit) state.venue.booking_mode = 'free';
+    if (state.canEdit) {
+      state.scheduleConfig = state.scheduleConfig || loadScheduleConfig();
+      state.scheduleConfig.mode = 'free';
+    }
   });
   $('saveScheduleConfig').addEventListener('click', saveScheduleConfig);
   document.querySelectorAll('[data-schedule-tab]').forEach((button) =>
