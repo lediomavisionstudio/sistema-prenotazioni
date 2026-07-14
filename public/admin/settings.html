@@ -187,9 +187,10 @@
         </div>
       </div>
       <form class="card" id="tableAdd" style="margin-top:10px">
-        <div class="form-grid form-grid--tables">
+        <div class="form-grid">
           <div class="field"><label>Codice</label><input id="tCode" placeholder="es. S7" maxlength="20" required /></div>
           <div class="field"><label>Zona</label><select id="tZone"></select></div>
+          <div class="field"><label>Posti min</label><input id="tMin" type="number" min="1" value="1" required /></div>
           <div class="field"><label>Posti max</label><input id="tMax" type="number" min="1" value="4" required /></div>
         </div>
         <button class="btn btn--primary btn--sm" type="submit" style="margin-top:12px">+ Aggiungi tavolo</button>
