@@ -8,7 +8,19 @@ import {
 
 const $ = (id) => document.getElementById(id);
 
-const state = { session: null, venue: null, role: null, zones: [], tables: [], shifts: [], canEdit: false, dirtyTables: new Set() };
+const state = {
+  session: null,
+  venue: null,
+  role: null,
+  zones: [],
+  tables: [],
+  shifts: [],
+  canEdit: false,
+  dirtyTables: new Set(),
+  scheduleConfig: null,
+};
+
+const SCHEDULE_CONFIG_KEY = 'booking_admin_schedule_mode';
 
 async function init() {
   state.session = await requireSession();
@@ -29,6 +41,7 @@ async function init() {
     await reloadAll();
     renderVenueForm();
     renderWeekdays();
+    renderScheduleConfig();
     wire();
 
     $('pageSpinner').hidden = true;
@@ -50,7 +63,7 @@ async function reloadAll() {
   state.zones = z.data || [];
   state.tables = t.data || [];
   state.shifts = s.data || [];
-  renderZones(); renderTables(); renderShifts(); fillZoneSelect();
+  renderZones(); renderTables(); renderShifts(); renderFreeHours(); fillZoneSelect();
 }
 
 function dis() { return state.canEdit ? '' : 'disabled'; }
@@ -301,6 +314,121 @@ function renderShifts() {
   }));
 }
 
+// --- Orari ----------------------------------------------------------------
+function defaultScheduleConfig() {
+  return {
+    mode: 'shifts',
+    applyAll: true,
+    activeTab: 'shifts',
+    days: Object.fromEntries(WEEKDAYS.map((day) => [day.n, 'shifts'])),
+  };
+}
+
+function scheduleStorageKey() {
+  return `${SCHEDULE_CONFIG_KEY}:${state.venue?.id || 'default'}`;
+}
+
+function loadScheduleConfig() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(scheduleStorageKey()) || 'null');
+    const base = defaultScheduleConfig();
+    if (!parsed || typeof parsed !== 'object') return base;
+    const mode = parsed.mode === 'free' ? 'free' : 'shifts';
+    return {
+      ...base,
+      ...parsed,
+      mode,
+      activeTab: parsed.activeTab === 'free' ? 'free' : 'shifts',
+      applyAll: parsed.applyAll !== false,
+      days: {
+        ...base.days,
+        ...(parsed.days || {}),
+      },
+    };
+  } catch (error) {
+    console.warn('[settings] configurazione orari locale non valida:', error);
+    return defaultScheduleConfig();
+  }
+}
+
+function saveScheduleConfigToStorage() {
+  try {
+    localStorage.setItem(scheduleStorageKey(), JSON.stringify(state.scheduleConfig || defaultScheduleConfig()));
+    return true;
+  } catch (error) {
+    console.error('[settings] salvataggio configurazione orari non riuscito:', error);
+    return false;
+  }
+}
+
+function renderScheduleConfig() {
+  state.scheduleConfig = state.scheduleConfig || loadScheduleConfig();
+  const config = state.scheduleConfig;
+  $('scheduleModeShifts').checked = config.mode === 'shifts';
+  $('scheduleModeFree').checked = config.mode === 'free';
+  $('scheduleApplyAll').checked = !!config.applyAll;
+  $('scheduleModeShifts').disabled = !state.canEdit;
+  $('scheduleModeFree').disabled = !state.canEdit;
+  $('scheduleApplyAll').disabled = !state.canEdit;
+  $('saveScheduleConfig').disabled = !state.canEdit;
+
+  $('scheduleDayModes').hidden = !!config.applyAll;
+  $('scheduleDayModes').innerHTML = WEEKDAYS.map((day) => {
+    const mode = config.days?.[day.n] === 'free' ? 'free' : 'shifts';
+    return `
+      <div class="row-item schedule-day">
+        <strong>${escapeHtml(day.long)}</strong>
+        <div class="schedule-day-options" role="radiogroup" aria-label="Modalità ${escapeHtml(day.long)}">
+          <label class="pill" style="cursor:pointer"><input type="radio" name="scheduleDay${day.n}" value="shifts" data-schedule-day="${day.n}" ${mode === 'shifts' ? 'checked' : ''} ${dis()} /> Turni</label>
+          <label class="pill" style="cursor:pointer"><input type="radio" name="scheduleDay${day.n}" value="free" data-schedule-day="${day.n}" ${mode === 'free' ? 'checked' : ''} ${dis()} /> Orari liberi</label>
+        </div>
+      </div>`;
+  }).join('');
+
+  $('scheduleDayModes').querySelectorAll('[data-schedule-day]').forEach((input) => {
+    input.addEventListener('change', () => {
+      if (!state.canEdit) return;
+      state.scheduleConfig.days[input.dataset.scheduleDay] = input.value;
+    });
+  });
+
+  setScheduleTab(config.activeTab);
+}
+
+function renderFreeHours() {
+  const rows = $('freeHoursRows');
+  if (!rows) return;
+  rows.innerHTML = `
+    <div class="card" style="padding:12px">
+      <div class="row-item" style="border:none;padding:0;background:none">
+        <input class="row-item__grow" value="Orari liberi" disabled />
+        <input type="time" value="19:00" disabled />
+        <input type="time" value="23:00" disabled />
+        <button class="btn btn--ghost btn--sm" type="button" disabled>Salva</button>
+        <button class="act act--warn" type="button" disabled>Elimina</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
+        ${WEEKDAYS.map((d) => `<label class="pill"><input type="checkbox" disabled /> ${d.short}</label>`).join('')}
+      </div>
+    </div>`;
+}
+
+function setScheduleTab(tab) {
+  const active = tab === 'free' ? 'free' : 'shifts';
+  state.scheduleConfig = state.scheduleConfig || loadScheduleConfig();
+  state.scheduleConfig.activeTab = active;
+  $('scheduleTabShifts').classList.toggle('is-active', active === 'shifts');
+  $('scheduleTabFree').classList.toggle('is-active', active === 'free');
+  $('schedulePanelShifts').hidden = active !== 'shifts';
+  $('schedulePanelFree').hidden = active !== 'free';
+}
+
+function saveScheduleConfig() {
+  if (!state.canEdit) return;
+  if (saveScheduleConfigToStorage()) toast('Configurazione orari salvata.');
+  else toast('Configurazione orari non salvata dal browser.', true);
+}
+
 // --- Chiusura settimanale -------------------------------------------------
 function renderWeekdays() {
   const closed = new Set(state.venue.closed_weekdays || []);
@@ -317,6 +445,31 @@ function wire() {
   $('saveVenue').addEventListener('click', saveVenue);
   $('saveTableChanges').addEventListener('click', saveTableChanges);
   $('cancelTableChanges').addEventListener('click', cancelTableChanges);
+  $('scheduleModeShifts').addEventListener('change', () => {
+    if (!state.canEdit) return;
+    state.scheduleConfig.mode = 'shifts';
+    if (state.scheduleConfig.applyAll) {
+      state.scheduleConfig.days = Object.fromEntries(WEEKDAYS.map((day) => [day.n, 'shifts']));
+    }
+  });
+  $('scheduleModeFree').addEventListener('change', () => {
+    if (!state.canEdit) return;
+    state.scheduleConfig.mode = 'free';
+    if (state.scheduleConfig.applyAll) {
+      state.scheduleConfig.days = Object.fromEntries(WEEKDAYS.map((day) => [day.n, 'free']));
+    }
+  });
+  $('scheduleApplyAll').addEventListener('change', () => {
+    if (!state.canEdit) return;
+    state.scheduleConfig.applyAll = $('scheduleApplyAll').checked;
+    if (state.scheduleConfig.applyAll) {
+      state.scheduleConfig.days = Object.fromEntries(WEEKDAYS.map((day) => [day.n, state.scheduleConfig.mode]));
+    }
+    renderScheduleConfig();
+  });
+  $('saveScheduleConfig').addEventListener('click', saveScheduleConfig);
+  document.querySelectorAll('[data-schedule-tab]').forEach((button) =>
+    button.addEventListener('click', () => setScheduleTab(button.dataset.scheduleTab)));
 
   $('zoneAdd').addEventListener('submit', (e) => {
     e.preventDefault();

@@ -101,6 +101,68 @@
         align-self: flex-end !important;
       }
     }
+
+    .schedule-mode-card {
+      margin-bottom: 10px;
+    }
+
+    .schedule-mode-head {
+      margin-bottom: 14px;
+    }
+
+    .schedule-mode-head p {
+      margin: 4px 0 0;
+      color: var(--ink-soft);
+      font-size: .88rem;
+    }
+
+    .schedule-mode-options,
+    .schedule-mode-save,
+    .schedule-day-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .schedule-mode-save {
+      justify-content: space-between;
+      margin-top: 12px;
+    }
+
+    .schedule-days {
+      margin-top: 12px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .schedule-day {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .schedule-tabs {
+      margin-top: 12px;
+    }
+
+    .schedule-tab-panel[hidden],
+    .schedule-days[hidden] {
+      display: none !important;
+    }
+
+    @media (max-width: 700px) {
+      .schedule-mode-save,
+      .schedule-day {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .schedule-mode-save .btn {
+        align-self: flex-start;
+      }
+    }
   </style>
 
   <!-- PWA: gestionale installabile -->
@@ -196,19 +258,58 @@
       </form>
     </section>
 
-    <!-- Turni -->
+    <!-- Orari -->
     <section class="section">
-      <div class="section__head"><h2 class="section__title">Orari turni</h2></div>
-      <div class="rows" id="shiftRows"></div>
-      <form class="card" id="shiftAdd" style="margin-top:10px">
-        <div class="form-grid">
-          <div class="field"><label>Nome</label><input id="sName" placeholder="es. Turno III" maxlength="40" required /></div>
-          <div class="field"><label>Codice</label><input id="sCode" placeholder="es. turno_3" maxlength="30" required /></div>
-          <div class="field"><label>Inizio</label><input id="sStart" type="time" value="19:00" required /></div>
-          <div class="field"><label>Fine</label><input id="sEnd" type="time" value="21:00" required /></div>
+      <div class="section__head"><h2 class="section__title">Orari</h2></div>
+      <div class="card schedule-mode-card">
+        <div class="schedule-mode-head">
+          <h3 style="margin:0;font-size:1rem">Orari</h3>
+          <p>Scegli la modalità di prenotazione del tuo locale.</p>
         </div>
-        <button class="btn btn--primary btn--sm" type="submit" style="margin-top:12px">+ Aggiungi turno</button>
-      </form>
+        <div class="schedule-mode-options" role="radiogroup" aria-label="Modalità prenotazione">
+          <label class="pill" style="cursor:pointer"><input type="radio" name="scheduleMode" value="shifts" id="scheduleModeShifts" /> Turni</label>
+          <label class="pill" style="cursor:pointer"><input type="radio" name="scheduleMode" value="free" id="scheduleModeFree" /> Orari liberi</label>
+        </div>
+        <div class="schedule-mode-save">
+          <label class="pill" style="cursor:pointer"><input type="checkbox" id="scheduleApplyAll" /> Usa questa modalità per tutti i giorni di apertura</label>
+          <button class="btn btn--primary btn--sm" id="saveScheduleConfig" type="button">Salva configurazione</button>
+        </div>
+        <div class="schedule-days" id="scheduleDayModes" hidden></div>
+      </div>
+
+      <div class="tabs schedule-tabs" role="tablist" aria-label="Configurazione orari">
+        <button class="tab is-active" id="scheduleTabShifts" type="button" data-schedule-tab="shifts">
+          <span class="tab__name">Turni</span>
+        </button>
+        <button class="tab" id="scheduleTabFree" type="button" data-schedule-tab="free">
+          <span class="tab__name">Orari liberi</span>
+        </button>
+      </div>
+
+      <div class="schedule-tab-panel" id="schedulePanelShifts">
+        <div class="rows" id="shiftRows"></div>
+        <form class="card" id="shiftAdd" style="margin-top:10px">
+          <div class="form-grid">
+            <div class="field"><label>Nome</label><input id="sName" placeholder="es. Turno III" maxlength="40" required /></div>
+            <div class="field"><label>Codice</label><input id="sCode" placeholder="es. turno_3" maxlength="30" required /></div>
+            <div class="field"><label>Inizio</label><input id="sStart" type="time" value="19:00" required /></div>
+            <div class="field"><label>Fine</label><input id="sEnd" type="time" value="21:00" required /></div>
+          </div>
+          <button class="btn btn--primary btn--sm" type="submit" style="margin-top:12px">+ Aggiungi turno</button>
+        </form>
+      </div>
+
+      <div class="schedule-tab-panel" id="schedulePanelFree" hidden>
+        <div class="rows" id="freeHoursRows"></div>
+        <form class="card" style="margin-top:10px">
+          <div class="form-grid">
+            <div class="field"><label>Inizio</label><input type="time" value="19:00" disabled /></div>
+            <div class="field"><label>Fine</label><input type="time" value="23:00" disabled /></div>
+            <div class="field"><label>Intervallo</label><input value="30 minuti" disabled /></div>
+          </div>
+          <button class="btn btn--primary btn--sm" type="button" style="margin-top:12px" disabled>+ Aggiungi fascia</button>
+        </form>
+      </div>
     </section>
 
     <!-- Chiusura settimanale -->
