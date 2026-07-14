@@ -499,3 +499,104 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
     justify-content: flex-end;
   }
 }
+
+/* Tavoli settings hard override ------------------------------------------ */
+.section .tables-grid,
+.section .tables-header,
+.section #tableRows > .table-row {
+  display: grid !important;
+  grid-template-columns:
+    minmax(200px, 1.4fr)
+    minmax(120px, .7fr)
+    minmax(200px, 1.2fr)
+    minmax(76px, .5fr)
+    minmax(110px, .6fr) !important;
+  column-gap: 12px !important;
+  align-items: center !important;
+}
+
+.section .tables-header {
+  padding: 0 16px 8px !important;
+}
+
+.section .tables-header > div,
+.section .tables-header > span {
+  display: block !important;
+  min-width: 0 !important;
+  white-space: nowrap !important;
+}
+
+.section .tables-header > div:last-child,
+.section .tables-header > span:last-child {
+  text-align: left !important;
+}
+
+.section #tableRows > .table-row {
+  width: 100% !important;
+}
+
+.section #tableRows > .table-row > .table-cell {
+  min-width: 0 !important;
+}
+
+.section #tableRows > .table-row input:not([type="checkbox"]),
+.section #tableRows > .table-row select {
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.section #tableRows > .table-row .table-cell--actions {
+  display: flex !important;
+  justify-content: flex-start !important;
+}
+
+.section .tables-save-bar {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 24px !important;
+  width: 100% !important;
+}
+
+.section .tables-save-message {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 0 !important;
+  min-width: 0 !important;
+}
+
+.section .tables-save-message .info-icon {
+  display: none !important;
+}
+
+.section .tables-save-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 12px !important;
+  margin-left: auto !important;
+  flex-wrap: nowrap !important;
+}
+
+@media (max-width: 700px) {
+  .section .tables-grid,
+  .section #tableRows > .table-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  .section .tables-header {
+    display: none !important;
+  }
+
+  .section .tables-save-bar {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+  }
+
+  .section .tables-save-actions {
+    align-self: flex-end !important;
+  }
+}
