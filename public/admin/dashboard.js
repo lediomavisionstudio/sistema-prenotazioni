@@ -21,6 +21,7 @@ const state = {
   role: null,
   date: todayISO(),
   shiftId: null,
+  slotKey: null,
   shifts: [],          // service_shifts attivi
   tables: [],          // restaurant_tables attivi (con zona)
   tablesById: new Map(),
@@ -82,7 +83,7 @@ async function loadConfig() {
   state.tablesById = new Map(state.tables.map((t) => [t.id, t]));
   state.capacity = state.tables.reduce((s, t) => s + (t.seats_max || 0), 0);
 
-  if (!state.shiftId && state.shifts.length) state.shiftId = state.shifts[0].id;
+  ensureScheduleSelection();
   populateManualShiftSelect();
 }
 
@@ -150,12 +151,14 @@ async function loadWaitlist() {
 }
 
 function render() {
+  ensureScheduleSelection();
   $('dateLabel').textContent = formatLong(state.date);
   renderKpis();
   renderTabs();
   renderList();
   renderWaitlist();
   renderMap();
+  populateManualShiftSelect();
 }
 
 // ---------------------------------------------------------------------------
@@ -167,7 +170,7 @@ function renderKpis() {
   const covers = confirmed.reduce((s, r) => s + r.party_size, 0);
 
   // Capienza teorica del giorno = posti a sedere × numero di turni.
-  const denom = state.capacity * Math.max(1, state.shifts.length);
+  const denom = state.capacity * Math.max(1, scheduleItemsForDate(state.date).length);
   const occ = denom > 0 ? Math.round((covers / denom) * 100) : 0;
 
   $('kpiCovers').textContent = covers;
@@ -178,22 +181,89 @@ function renderKpis() {
 // ---------------------------------------------------------------------------
 // Tab turni
 // ---------------------------------------------------------------------------
+function normalizeScheduleMode(mode) {
+  return mode === 'free' ? 'free' : 'shifts';
+}
+
+function bookingModeForDate(date) {
+  if (state.venue?.booking_same_mode_all_days !== false) {
+    return normalizeScheduleMode(state.venue?.booking_mode);
+  }
+  const modes = state.venue?.booking_mode_by_weekday || {};
+  return normalizeScheduleMode(modes[isoDow(date)]);
+}
+
+function minutesOf(time) {
+  const [hours, minutes] = String(time || '00:00').split(':').map(Number);
+  return (hours || 0) * 60 + (minutes || 0);
+}
+
+function timeOf(minutes) {
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}:00`;
+}
+
+function shiftsForDate(date) {
+  const dow = isoDow(date);
+  return state.shifts.filter((shift) => !Array.isArray(shift.days_of_week) || shift.days_of_week.includes(dow));
+}
+
+function scheduleItemsForDate(date) {
+  const shifts = shiftsForDate(date);
+  if (bookingModeForDate(date) !== 'free') {
+    return shifts.map((shift) => ({ ...shift, key: shift.id, shift_id: shift.id, mode: 'shifts' }));
+  }
+  const interval = state.venue?.booking_slot_interval_minutes || 30;
+  return shifts.flatMap((shift) => {
+    const start = minutesOf(shift.start_time);
+    const end = minutesOf(shift.end_time);
+    const items = [];
+    for (let minute = start; minute < end; minute += interval) {
+      const next = Math.min(minute + interval, end);
+      items.push({
+        ...shift,
+        key: `${shift.id}|${minute}`,
+        shift_id: shift.id,
+        name: hhmm(timeOf(minute)),
+        start_time: timeOf(minute),
+        end_time: timeOf(next),
+        mode: 'free',
+      });
+    }
+    return items.length ? items : [{ ...shift, key: shift.id, shift_id: shift.id, mode: 'free' }];
+  });
+}
+
+function ensureScheduleSelection() {
+  const items = scheduleItemsForDate(state.date);
+  if (!items.length) {
+    state.shiftId = null;
+    state.slotKey = null;
+    return;
+  }
+  const current = items.find((item) => item.key === state.slotKey && item.shift_id === state.shiftId);
+  if (current) return;
+  const sameShift = items.find((item) => item.shift_id === state.shiftId);
+  const next = sameShift || items[0];
+  state.shiftId = next.shift_id;
+  state.slotKey = next.key;
+}
+
 function renderTabs() {
   const box = $('shiftTabs');
   box.innerHTML = '';
-  for (const s of state.shifts) {
-    const n = state.reservations.filter((r) => r.shift_id === s.id && r.status !== 'annullata').length;
+  for (const s of scheduleItemsForDate(state.date)) {
+    const n = state.reservations.filter((r) => r.shift_id === s.shift_id && r.status !== 'annullata').length;
     const btn = document.createElement('button');
-    btn.className = 'tab' + (s.id === state.shiftId ? ' is-active' : '');
+    btn.className = 'tab' + (s.key === state.slotKey ? ' is-active' : '');
     btn.innerHTML =
       `<span class="tab__name">${escapeHtml(s.name)}</span>` +
       `<span class="tab__meta">${hhmm(s.start_time)}–${hhmm(s.end_time)} · ${n} pren.</span>`;
-    btn.addEventListener('click', () => { state.shiftId = s.id; render(); });
+    btn.addEventListener('click', () => { state.shiftId = s.shift_id; state.slotKey = s.key; render(); });
     box.appendChild(btn);
   }
 }
 
-function currentShift() { return state.shifts.find((s) => s.id === state.shiftId); }
+function currentShift() { return scheduleItemsForDate(state.date).find((s) => s.key === state.slotKey) || state.shifts.find((s) => s.id === state.shiftId); }
 
 // ---------------------------------------------------------------------------
 // Lista prenotazioni del turno selezionato
@@ -439,8 +509,8 @@ function renderMap() {
 // ---------------------------------------------------------------------------
 function populateManualShiftSelect() {
   const sel = $('mShift');
-  sel.innerHTML = state.shifts.map((s) =>
-    `<option value="${s.id}">${escapeHtml(s.name)} (${hhmm(s.start_time)}–${hhmm(s.end_time)})</option>`).join('');
+  sel.innerHTML = scheduleItemsForDate(state.date).map((s) =>
+    `<option value="${s.shift_id}">${escapeHtml(s.name)} (${hhmm(s.start_time)}–${hhmm(s.end_time)})</option>`).join('');
 }
 
 async function refreshManualTableSelect() {

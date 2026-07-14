@@ -1186,6 +1186,20 @@
     const todayLocal = () => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate(), 12); };
     const hhmm = (t) => (t || '').slice(0, 5);
     const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+    const normalizeBookingMode = (mode) => mode === 'free' ? 'free' : 'shifts';
+    const bookingModeForDate = (iso) => {
+      if (!state.venue || state.venue.booking_same_mode_all_days !== false) {
+        return normalizeBookingMode(state.venue && state.venue.booking_mode);
+      }
+      const modes = state.venue.booking_mode_by_weekday || {};
+      return normalizeBookingMode(modes[isoDow(isoToDate(iso))]);
+    };
+    const minutesOf = (time) => {
+      const [hours, minutes] = String(time || '00:00').split(':').map(Number);
+      return (hours || 0) * 60 + (minutes || 0);
+    };
+    const timeOf = (minutes) => `${pad2(Math.floor(minutes / 60))}:${pad2(minutes % 60)}:00`;
+    const slotKeyOf = (item) => item.slot_key || item.shift_id;
     const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
       '&': '&amp;',
       '<': '&lt;',
@@ -2078,11 +2092,36 @@
         p_date: state.selDate,
       });
       if (error) throw error;
-      state.dayShifts = data || [];
+      state.dayShifts = bookingModeForDate(state.selDate) === 'free'
+        ? buildFreeTimeSlots(data || [])
+        : (data || []).map((item) => ({ ...item, slot_key: item.shift_id, slot_mode: 'shifts' }));
       // Mantieni il turno selezionato se ancora presente (dati aggiornati).
       if (state.selShift) {
-        state.selShift = state.dayShifts.find((s) => s.shift_id === state.selShift.shift_id) || null;
+        const previousKey = slotKeyOf(state.selShift);
+        state.selShift = state.dayShifts.find((s) => slotKeyOf(s) === previousKey) || null;
       }
+    }
+
+    function buildFreeTimeSlots(shifts) {
+      const interval = Number(state.venue && state.venue.booking_slot_interval_minutes) || 30;
+      return shifts.flatMap((shift) => {
+        const start = minutesOf(shift.start_time);
+        const end = minutesOf(shift.end_time);
+        const slots = [];
+        for (let minute = start; minute < end; minute += interval) {
+          const next = Math.min(minute + interval, end);
+          slots.push({
+            ...shift,
+            slot_key: `${shift.shift_id}|${minute}`,
+            slot_mode: 'free',
+            parent_shift_name: shift.shift_name,
+            shift_name: hhmm(timeOf(minute)),
+            start_time: timeOf(minute),
+            end_time: timeOf(next),
+          });
+        }
+        return slots.length ? slots : [{ ...shift, slot_key: shift.shift_id, slot_mode: 'free' }];
+      });
     }
 
     // -------------------------------------------------------------------
@@ -2219,7 +2258,7 @@
         btn.type = 'button';
         // Un turno pieno (available=false) non è più disabilitato: resta
         // selezionabile per mettersi in lista d'attesa.
-        const selected = state.selShift && state.selShift.shift_id === s.shift_id;
+        const selected = state.selShift && slotKeyOf(state.selShift) === slotKeyOf(s);
         btn.className = 'time-slot' + (selected ? ' is-selected' : '') + (s.available ? '' : ' time-slot--wait');
         btn.innerHTML =
           `<div class="time-slot__name">${s.shift_name}</div>` +

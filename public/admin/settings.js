@@ -20,8 +20,6 @@ const state = {
   scheduleConfig: null,
 };
 
-const SCHEDULE_CONFIG_KEY = 'booking_admin_schedule_mode';
-
 async function init() {
   state.session = await requireSession();
   if (!state.session) return;
@@ -315,84 +313,48 @@ function renderShifts() {
 }
 
 // --- Orari ----------------------------------------------------------------
-function defaultScheduleConfig() {
+function normalizeScheduleMode(mode) {
+  return mode === 'free' ? 'free' : 'shifts';
+}
+
+function defaultScheduleDays(mode = 'shifts') {
+  return Object.fromEntries(WEEKDAYS.map((day) => [day.n, normalizeScheduleMode(mode)]));
+}
+
+function venueScheduleDays() {
   return {
-    mode: 'shifts',
-    applyAll: true,
-    activeTab: 'shifts',
-    days: Object.fromEntries(WEEKDAYS.map((day) => [day.n, 'shifts'])),
+    ...defaultScheduleDays(state.venue.booking_mode),
+    ...(state.venue.booking_mode_by_weekday || {}),
   };
 }
 
-function scheduleStorageKey() {
-  return `${SCHEDULE_CONFIG_KEY}:${state.venue?.id || 'default'}`;
-}
-
-function loadScheduleConfig() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(scheduleStorageKey()) || 'null');
-    const base = defaultScheduleConfig();
-    if (!parsed || typeof parsed !== 'object') return base;
-    const mode = parsed.mode === 'free' ? 'free' : 'shifts';
-    return {
-      ...base,
-      ...parsed,
-      mode,
-      activeTab: parsed.activeTab === 'free' ? 'free' : 'shifts',
-      applyAll: parsed.applyAll !== false,
-      days: {
-        ...base.days,
-        ...(parsed.days || {}),
-      },
-    };
-  } catch (error) {
-    console.warn('[settings] configurazione orari locale non valida:', error);
-    return defaultScheduleConfig();
-  }
-}
-
-function saveScheduleConfigToStorage() {
-  try {
-    localStorage.setItem(scheduleStorageKey(), JSON.stringify(state.scheduleConfig || defaultScheduleConfig()));
-    return true;
-  } catch (error) {
-    console.error('[settings] salvataggio configurazione orari non riuscito:', error);
-    return false;
-  }
-}
-
 function renderScheduleConfig() {
-  state.scheduleConfig = state.scheduleConfig || loadScheduleConfig();
-  const config = state.scheduleConfig;
-  $('scheduleModeShifts').checked = config.mode === 'shifts';
-  $('scheduleModeFree').checked = config.mode === 'free';
-  $('scheduleApplyAll').checked = !!config.applyAll;
+  const sameMode = state.venue.booking_same_mode_all_days !== false;
+  const mode = normalizeScheduleMode(state.venue.booking_mode);
+  const days = venueScheduleDays();
+  $('scheduleSameMode').checked = sameMode;
+  $('scheduleModeShifts').checked = mode === 'shifts';
+  $('scheduleModeFree').checked = mode === 'free';
+  $('scheduleSameMode').disabled = !state.canEdit;
   $('scheduleModeShifts').disabled = !state.canEdit;
   $('scheduleModeFree').disabled = !state.canEdit;
-  $('scheduleApplyAll').disabled = !state.canEdit;
   $('saveScheduleConfig').disabled = !state.canEdit;
 
-  $('scheduleDayModes').hidden = !!config.applyAll;
+  $('scheduleGlobalMode').hidden = !sameMode;
+  $('scheduleDayModes').hidden = sameMode;
   $('scheduleDayModes').innerHTML = WEEKDAYS.map((day) => {
-    const mode = config.days?.[day.n] === 'free' ? 'free' : 'shifts';
+    const dayMode = normalizeScheduleMode(days[day.n]);
     return `
       <div class="row-item schedule-day">
         <strong>${escapeHtml(day.long)}</strong>
-        <div class="schedule-day-options" role="radiogroup" aria-label="Modalità ${escapeHtml(day.long)}">
-          <label class="pill" style="cursor:pointer"><input type="radio" name="scheduleDay${day.n}" value="shifts" data-schedule-day="${day.n}" ${mode === 'shifts' ? 'checked' : ''} ${dis()} /> Turni</label>
-          <label class="pill" style="cursor:pointer"><input type="radio" name="scheduleDay${day.n}" value="free" data-schedule-day="${day.n}" ${mode === 'free' ? 'checked' : ''} ${dis()} /> Orari liberi</label>
-        </div>
+        <select data-schedule-day="${day.n}" ${dis()} aria-label="Modalità ${escapeHtml(day.long)}">
+          <option value="shifts" ${dayMode === 'shifts' ? 'selected' : ''}>Turni</option>
+          <option value="free" ${dayMode === 'free' ? 'selected' : ''}>Orari liberi</option>
+        </select>
       </div>`;
   }).join('');
 
-  $('scheduleDayModes').querySelectorAll('[data-schedule-day]').forEach((input) => {
-    input.addEventListener('change', () => {
-      if (!state.canEdit) return;
-      state.scheduleConfig.days[input.dataset.scheduleDay] = input.value;
-    });
-  });
-
-  setScheduleTab(config.activeTab);
+  setScheduleTab('shifts');
 }
 
 function renderFreeHours() {
@@ -415,18 +377,39 @@ function renderFreeHours() {
 
 function setScheduleTab(tab) {
   const active = tab === 'free' ? 'free' : 'shifts';
-  state.scheduleConfig = state.scheduleConfig || loadScheduleConfig();
-  state.scheduleConfig.activeTab = active;
   $('scheduleTabShifts').classList.toggle('is-active', active === 'shifts');
   $('scheduleTabFree').classList.toggle('is-active', active === 'free');
   $('schedulePanelShifts').hidden = active !== 'shifts';
   $('schedulePanelFree').hidden = active !== 'free';
 }
 
-function saveScheduleConfig() {
+async function saveScheduleConfig() {
   if (!state.canEdit) return;
-  if (saveScheduleConfigToStorage()) toast('Configurazione orari salvata.');
-  else toast('Configurazione orari non salvata dal browser.', true);
+  const sameMode = $('scheduleSameMode').checked;
+  const mode = normalizeScheduleMode(document.querySelector('input[name="scheduleMode"]:checked')?.value);
+  const days = sameMode
+    ? defaultScheduleDays(mode)
+    : Object.fromEntries([...$('scheduleDayModes').querySelectorAll('[data-schedule-day]')]
+      .map((select) => [select.dataset.scheduleDay, normalizeScheduleMode(select.value)]));
+  const patch = {
+    booking_same_mode_all_days: sameMode,
+    booking_mode: mode,
+    booking_mode_by_weekday: days,
+  };
+  const { data, error } = await supabase
+    .from('venues')
+    .update(patch)
+    .eq('id', state.venue.id)
+    .select('*')
+    .maybeSingle();
+  if (error) {
+    console.error(error);
+    toast(error.message?.includes('row-level') ? 'Permesso negato (solo titolare).' : 'Configurazione orari non salvata.', true);
+    return;
+  }
+  state.venue = { ...state.venue, ...(data || patch) };
+  renderScheduleConfig();
+  toast('Configurazione orari salvata.');
 }
 
 // --- Chiusura settimanale -------------------------------------------------
@@ -445,27 +428,16 @@ function wire() {
   $('saveVenue').addEventListener('click', saveVenue);
   $('saveTableChanges').addEventListener('click', saveTableChanges);
   $('cancelTableChanges').addEventListener('click', cancelTableChanges);
-  $('scheduleModeShifts').addEventListener('change', () => {
+  $('scheduleSameMode').addEventListener('change', () => {
     if (!state.canEdit) return;
-    state.scheduleConfig.mode = 'shifts';
-    if (state.scheduleConfig.applyAll) {
-      state.scheduleConfig.days = Object.fromEntries(WEEKDAYS.map((day) => [day.n, 'shifts']));
-    }
+    state.venue.booking_same_mode_all_days = $('scheduleSameMode').checked;
+    renderScheduleConfig();
+  });
+  $('scheduleModeShifts').addEventListener('change', () => {
+    if (state.canEdit) state.venue.booking_mode = 'shifts';
   });
   $('scheduleModeFree').addEventListener('change', () => {
-    if (!state.canEdit) return;
-    state.scheduleConfig.mode = 'free';
-    if (state.scheduleConfig.applyAll) {
-      state.scheduleConfig.days = Object.fromEntries(WEEKDAYS.map((day) => [day.n, 'free']));
-    }
-  });
-  $('scheduleApplyAll').addEventListener('change', () => {
-    if (!state.canEdit) return;
-    state.scheduleConfig.applyAll = $('scheduleApplyAll').checked;
-    if (state.scheduleConfig.applyAll) {
-      state.scheduleConfig.days = Object.fromEntries(WEEKDAYS.map((day) => [day.n, state.scheduleConfig.mode]));
-    }
-    renderScheduleConfig();
+    if (state.canEdit) state.venue.booking_mode = 'free';
   });
   $('saveScheduleConfig').addEventListener('click', saveScheduleConfig);
   document.querySelectorAll('[data-schedule-tab]').forEach((button) =>

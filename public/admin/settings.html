@@ -264,17 +264,21 @@
       <div class="card schedule-mode-card">
         <div class="schedule-mode-head">
           <h3 style="margin:0;font-size:1rem">Orari</h3>
-          <p>Scegli la modalità di prenotazione del tuo locale.</p>
+          <p>Scegli come i clienti possono prenotare durante la settimana.</p>
         </div>
-        <div class="schedule-mode-options" role="radiogroup" aria-label="Modalità prenotazione">
+        <div class="schedule-mode-save">
+          <label class="pill" style="cursor:pointer"><input type="checkbox" id="scheduleSameMode" /> Usa la stessa modalità per tutti i giorni di apertura</label>
+        </div>
+        <div class="schedule-mode-options" id="scheduleGlobalMode" role="radiogroup" aria-label="Modalità prenotazione">
+          <span style="font-weight:700">Modalità</span>
           <label class="pill" style="cursor:pointer"><input type="radio" name="scheduleMode" value="shifts" id="scheduleModeShifts" /> Turni</label>
           <label class="pill" style="cursor:pointer"><input type="radio" name="scheduleMode" value="free" id="scheduleModeFree" /> Orari liberi</label>
         </div>
+        <div class="schedule-days" id="scheduleDayModes" hidden></div>
         <div class="schedule-mode-save">
-          <label class="pill" style="cursor:pointer"><input type="checkbox" id="scheduleApplyAll" /> Usa questa modalità per tutti i giorni di apertura</label>
+          <span></span>
           <button class="btn btn--primary btn--sm" id="saveScheduleConfig" type="button">Salva configurazione</button>
         </div>
-        <div class="schedule-days" id="scheduleDayModes" hidden></div>
       </div>
 
       <div class="tabs schedule-tabs" role="tablist" aria-label="Configurazione orari">
