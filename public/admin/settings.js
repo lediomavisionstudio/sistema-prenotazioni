@@ -172,10 +172,9 @@ function renderTables() {
       <select data-tid="${t.id}" data-f="zone_id" ${dis()} aria-label="Zona tavolo">
         ${state.zones.map((z) => `<option value="${z.id}" ${z.id === t.zone_id ? 'selected' : ''}>${escapeHtml(z.name)}</option>`).join('')}
       </select>
-      <input class="table-row__seats" type="number" min="1" value="${t.seats_min}" data-tid="${t.id}" data-f="seats_min" ${dis()} aria-label="Posti minimi" />
+      <input type="hidden" value="${t.seats_min}" data-tid="${t.id}" data-f="seats_min" />
       <input class="table-row__seats" type="number" min="1" value="${t.seats_max}" data-tid="${t.id}" data-f="seats_max" ${dis()} aria-label="Posti massimi" />
       <label class="pill table-row__active"><input type="checkbox" ${t.active ? 'checked' : ''} data-tid="${t.id}" data-f="active" ${dis()} /> attivo</label>
-      <span class="table-row__dirty">Modificato</span>
       <button class="act act--warn" data-del-table="${t.id}" ${dis()}>Elimina</button>
     </div>`).join('') || '<div class="res-empty">Nessun tavolo.</div>';
 

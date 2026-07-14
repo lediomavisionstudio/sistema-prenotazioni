@@ -296,12 +296,29 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
 .table-row {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(110px, .9fr) minmax(150px, 1fr) 92px 92px auto auto auto;
+  grid-template-columns: minmax(110px, .9fr) minmax(150px, 1fr) 104px minmax(100px, auto) auto;
   gap: 10px;
   align-items: center;
   padding: 14px;
   border-radius: 20px;
   transition: border-color .2s ease, box-shadow .2s ease, background .2s ease, transform .2s ease;
+}
+
+.table-row-header {
+  display: grid;
+  grid-template-columns: minmax(110px, .9fr) minmax(150px, 1fr) 104px minmax(100px, auto) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 0 14px 8px;
+  color: var(--ink-soft);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.table-row-header span:last-child {
+  text-align: right;
 }
 
 .table-row.is-dirty {
@@ -333,21 +350,8 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
   cursor: pointer;
 }
 
-.table-row__dirty {
-  display: none;
-  width: fit-content;
-  padding: 7px 10px;
-  border-radius: 999px;
-  color: var(--tomato-dark);
-  background: var(--tomato-soft);
-  font-size: var(--text-badge, .72rem);
-  font-weight: 800;
-  letter-spacing: .03em;
-  text-transform: uppercase;
-}
-
-.table-row.is-dirty .table-row__dirty {
-  display: inline-flex;
+.table-row .act {
+  justify-self: end;
 }
 
 .settings-savebar {
@@ -377,8 +381,9 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
 
 .settings-savebar__status > div {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
   min-width: 0;
 }
 
@@ -439,11 +444,18 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
     grid-template-columns: 1fr 1fr;
   }
 
+  .table-row-header {
+    display: none;
+  }
+
   .table-row__code,
   .table-row select,
-  .table-row__active,
   .table-row .act {
     grid-column: 1 / -1;
+  }
+
+  .table-row .act {
+    justify-self: end;
   }
 
   .settings-savebar {
@@ -453,7 +465,6 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
   }
 
   .settings-savebar__actions {
-    display: grid;
-    grid-template-columns: 1fr;
+    justify-content: flex-end;
   }
 }
