@@ -8,7 +8,7 @@ import {
 
 const $ = (id) => document.getElementById(id);
 
-const state = { session: null, venue: null, role: null, zones: [], tables: [], shifts: [], canEdit: false };
+const state = { session: null, venue: null, role: null, zones: [], tables: [], shifts: [], canEdit: false, dirtyTables: new Set() };
 
 async function init() {
   state.session = await requireSession();
@@ -164,36 +164,103 @@ function fillZoneSelect() {
 }
 
 function renderTables() {
+  state.dirtyTables = new Set([...state.dirtyTables].filter((id) => state.tables.some((table) => table.id === id)));
   const zoneName = (id) => escapeHtml(state.zones.find((z) => z.id === id)?.name || '—');
   $('tableRows').innerHTML = state.tables.map((t) => `
-    <div class="row-item">
-      <input style="width:80px" value="${escapeHtml(t.code)}" data-tid="${t.id}" data-f="code" ${dis()} maxlength="20" />
-      <select data-tid="${t.id}" data-f="zone_id" ${dis()}>
+    <div class="row-item table-row" data-table-row="${t.id}">
+      <input class="table-row__code" value="${escapeHtml(t.code)}" data-tid="${t.id}" data-f="code" ${dis()} maxlength="20" aria-label="Nome tavolo" />
+      <select data-tid="${t.id}" data-f="zone_id" ${dis()} aria-label="Zona tavolo">
         ${state.zones.map((z) => `<option value="${z.id}" ${z.id === t.zone_id ? 'selected' : ''}>${escapeHtml(z.name)}</option>`).join('')}
       </select>
-      <input style="width:64px" type="number" min="1" value="${t.seats_min}" data-tid="${t.id}" data-f="seats_min" ${dis()} />
-      <input style="width:64px" type="number" min="1" value="${t.seats_max}" data-tid="${t.id}" data-f="seats_max" ${dis()} />
-      <label class="pill" style="cursor:pointer"><input type="checkbox" ${t.active ? 'checked' : ''} data-tid="${t.id}" data-f="active" ${dis()} /> attivo</label>
-      <button class="btn btn--ghost btn--sm" data-save-table="${t.id}" ${dis()}>Salva</button>
+      <input class="table-row__seats" type="number" min="1" value="${t.seats_min}" data-tid="${t.id}" data-f="seats_min" ${dis()} aria-label="Posti minimi" />
+      <input class="table-row__seats" type="number" min="1" value="${t.seats_max}" data-tid="${t.id}" data-f="seats_max" ${dis()} aria-label="Posti massimi" />
+      <label class="pill table-row__active"><input type="checkbox" ${t.active ? 'checked' : ''} data-tid="${t.id}" data-f="active" ${dis()} /> attivo</label>
+      <span class="table-row__dirty">Modificato</span>
       <button class="act act--warn" data-del-table="${t.id}" ${dis()}>Elimina</button>
     </div>`).join('') || '<div class="res-empty">Nessun tavolo.</div>';
 
-  $('tableRows').querySelectorAll('[data-save-table]').forEach((b) => b.addEventListener('click', () => {
-    const id = b.dataset.saveTable;
-    const g = (f) => $('tableRows').querySelector(`[data-tid="${id}"][data-f="${f}"]`);
-    const patch = {
-      code: g('code').value.trim(),
-      zone_id: g('zone_id').value,
-      seats_min: parseInt(g('seats_min').value, 10),
-      seats_max: parseInt(g('seats_max').value, 10),
-      active: g('active').checked,
-    };
-    if (!patch.code || !(patch.seats_max >= patch.seats_min && patch.seats_min > 0)) { toast('Dati tavolo non validi.', true); return; }
-    run(supabase.from('restaurant_tables').update(patch).eq('id', id), 'Tavolo aggiornato');
-  }));
+  $('tableRows').querySelectorAll('[data-tid][data-f]').forEach((input) => {
+    const eventName = input.type === 'checkbox' || input.tagName === 'SELECT' ? 'change' : 'input';
+    input.addEventListener(eventName, () => markTableDirty(input.dataset.tid));
+  });
   $('tableRows').querySelectorAll('[data-del-table]').forEach((b) => b.addEventListener('click', () => {
     if (confirm('Eliminare il tavolo?')) run(supabase.from('restaurant_tables').delete().eq('id', b.dataset.delTable), 'Tavolo eliminato');
   }));
+  refreshTableDirtyUi();
+}
+
+function tablePatchFromRow(id) {
+  const g = (f) => $('tableRows').querySelector(`[data-tid="${id}"][data-f="${f}"]`);
+  return {
+    code: g('code').value.trim(),
+    zone_id: g('zone_id').value,
+    seats_min: parseInt(g('seats_min').value, 10),
+    seats_max: parseInt(g('seats_max').value, 10),
+    active: g('active').checked,
+  };
+}
+
+function markTableDirty(id) {
+  if (!state.canEdit || !id) return;
+  const original = state.tables.find((table) => table.id === id);
+  if (!original) return;
+  const patch = tablePatchFromRow(id);
+  const changed =
+    patch.code !== original.code ||
+    patch.zone_id !== original.zone_id ||
+    patch.seats_min !== original.seats_min ||
+    patch.seats_max !== original.seats_max ||
+    patch.active !== original.active;
+  if (changed) state.dirtyTables.add(id);
+  else state.dirtyTables.delete(id);
+  refreshTableDirtyUi();
+}
+
+function refreshTableDirtyUi(saved = false) {
+  $('tableRows').querySelectorAll('[data-table-row]').forEach((row) => {
+    row.classList.toggle('is-dirty', state.dirtyTables.has(row.dataset.tableRow));
+  });
+  const bar = $('tableSaveBar');
+  if (!bar) return;
+  bar.hidden = state.dirtyTables.size === 0 && !saved;
+  bar.classList.toggle('is-saved', saved);
+  $('tableSaveHint').textContent = saved
+    ? '✓ Modifiche salvate'
+    : `${state.dirtyTables.size} ${state.dirtyTables.size === 1 ? 'riga modificata' : 'righe modificate'}.`;
+}
+
+function cancelTableChanges() {
+  state.dirtyTables.clear();
+  renderTables();
+  refreshTableDirtyUi();
+}
+
+async function saveTableChanges() {
+  if (!state.dirtyTables.size) return;
+  const ids = [...state.dirtyTables];
+  const patches = ids.map((id) => ({ id, patch: tablePatchFromRow(id) }));
+  const invalid = patches.find(({ patch }) => !patch.code || !(patch.seats_max >= patch.seats_min && patch.seats_min > 0));
+  if (invalid) { toast('Dati tavolo non validi.', true); return; }
+
+  $('saveTableChanges').disabled = true;
+  $('cancelTableChanges').disabled = true;
+  try {
+    const results = await Promise.all(patches.map(({ id, patch }) =>
+      supabase.from('restaurant_tables').update(patch).eq('id', id)));
+    const failed = results.find((result) => result.error);
+    if (failed) throw failed.error;
+    state.dirtyTables.clear();
+    await reloadAll();
+    refreshTableDirtyUi(true);
+    toast('Modifiche salvate');
+    setTimeout(() => refreshTableDirtyUi(false), 1600);
+  } catch (error) {
+    console.error(error);
+    toast(error.message?.includes('row-level') ? 'Permesso negato (solo titolare).' : 'Salvataggio modifiche non riuscito.', true);
+  } finally {
+    $('saveTableChanges').disabled = false;
+    $('cancelTableChanges').disabled = false;
+  }
 }
 
 // --- Turni ----------------------------------------------------------------
@@ -242,6 +309,8 @@ function renderWeekdays() {
 function wire() {
   $('vBrandPick').addEventListener('input', () => { $('vBrand').value = $('vBrandPick').value; });
   $('saveVenue').addEventListener('click', saveVenue);
+  $('saveTableChanges').addEventListener('click', saveTableChanges);
+  $('cancelTableChanges').addEventListener('click', cancelTableChanges);
 
   $('zoneAdd').addEventListener('submit', (e) => {
     e.preventDefault();

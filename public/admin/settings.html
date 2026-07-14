@@ -89,6 +89,17 @@
       </form>
     </section>
 
+    <div class="settings-savebar" id="tableSaveBar" hidden>
+      <div class="settings-savebar__status">
+        <strong>Hai modifiche non salvate.</strong>
+        <span id="tableSaveHint">Controlla le righe evidenziate prima di salvare.</span>
+      </div>
+      <div class="settings-savebar__actions">
+        <button class="btn btn--ghost btn--sm" id="cancelTableChanges" type="button">Annulla modifiche</button>
+        <button class="btn btn--primary btn--sm" id="saveTableChanges" type="button">Salva modifiche</button>
+      </div>
+    </div>
+
     <!-- Turni -->
     <section class="section">
       <div class="section__head"><h2 class="section__title">Orari turni</h2></div>
