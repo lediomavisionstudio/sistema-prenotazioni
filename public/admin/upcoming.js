@@ -180,12 +180,14 @@ function tableOptionsForReservation(reservation) {
     .map((r) => r.table_id));
 
   return [...state.tablesById.values()].map((table) => {
-    const fits = reservation.party_size <= table.seats_max;
     const busy = occupied.has(table.id);
     return {
       id: table.id,
-      disabled: (!fits || busy) && table.id !== reservation.table_id,
-      label: `${table.code} (${table.seats_max})${fits ? '' : ' - non adatto'}${busy ? ' - occupato' : ''}`,
+      code: table.code,
+      seatsMax: table.seats_max,
+      busy,
+      disabled: busy && table.id !== reservation.table_id,
+      label: `${table.code} (${table.seats_max})${busy ? ' - occupato' : ''}`,
     };
   });
 }
