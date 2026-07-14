@@ -105,15 +105,11 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
 .datebar__cal {
   color: var(--tomato-dark);
   font-family: var(--font-body);
-  font-size: .95rem;
+  font-size: 1rem;
   line-height: 1;
 }
 .datebar__picker {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
+  display: none !important;
 }
 .datebar__today { font-size: 0.75rem; color: var(--ink-soft); }
 .datebar__today a { cursor: pointer; }
