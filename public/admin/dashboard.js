@@ -275,7 +275,8 @@ function renderTabs() {
     const btn = document.createElement('button');
     btn.className = 'tab' + (s.key === state.slotKey ? ' is-active' : '');
     btn.innerHTML = isFreeHourShift(s)
-      ? `<span class="tab__name">${hhmm(s.start_time)}</span>`
+      ? `<span class="tab__name">${hhmm(s.start_time)}</span>` +
+        `<span class="tab__meta">${n} pren.</span>`
       : `<span class="tab__name">${escapeHtml(s.name)}</span>` +
         `<span class="tab__meta">${hhmm(s.start_time)}–${hhmm(s.end_time)} · ${n} pren.</span>`;
     btn.addEventListener('click', () => { state.shiftId = s.shift_id; state.slotKey = s.key; render(); });

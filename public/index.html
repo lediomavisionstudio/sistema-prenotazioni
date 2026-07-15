@@ -2241,13 +2241,14 @@
         // selezionabile per mettersi in lista d'attesa.
         const selected = state.selShift && state.selShift.shift_id === s.shift_id;
         btn.className = 'time-slot' + (selected ? ' is-selected' : '') + (s.available ? '' : ' time-slot--wait');
-        const timeContent = isFreeHourDayShift(s)
+        const isFreeHour = isFreeHourDayShift(s);
+        const timeContent = isFreeHour
           ? `<div class="time-slot__name">${hhmm(s.start_time)}</div>`
           : `<div class="time-slot__name">${s.shift_name}</div>` +
             `<div class="time-slot__range">${hhmm(s.start_time)}–${hhmm(s.end_time)}</div>`;
         btn.innerHTML =
           timeContent +
-          (s.available ? '' : `<div class="time-slot__full">Completo · lista d'attesa</div>`);
+          (s.available || isFreeHour ? '' : `<div class="time-slot__full">Completo · lista d'attesa</div>`);
         btn.addEventListener('click', () => {
           state.selShift = s;
           renderTimes();
