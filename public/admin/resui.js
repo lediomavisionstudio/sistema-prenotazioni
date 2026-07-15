@@ -6,7 +6,11 @@ import { openTableMapSelector } from './table-map-selector.js';
 // Transizioni di stato disponibili per ciascuno stato corrente.
 export const TRANSITIONS = {
   in_attesa:  [{ to: 'confermata', label: 'Conferma', cls: 'act--ok' }, { to: 'annullata', label: 'Rifiuta', cls: 'act--warn' }],
-  confermata: [{ to: 'arrivato', label: 'Arrivato', cls: 'act--go' }],
+  confermata: [
+    { to: 'arrivato', label: 'Arrivato', cls: 'act--go' },
+    { to: 'no_show', label: 'Non presentato', cls: 'act--warn' },
+    { to: 'annullata', label: 'Annulla prenotazione', cls: 'act--mute' },
+  ],
   arrivato:   [{ to: 'terminato', label: 'Terminato', cls: 'act--ok' }],
   no_show:    [{ to: 'confermata', label: 'Ripristina', cls: 'act--mute' }],
   annullata:  [{ to: 'in_attesa', label: 'Ripristina', cls: 'act--mute' }],
@@ -74,6 +78,8 @@ function reservationTimerHtml(r, opts = {}) {
   const time = String(opts.timeLabel || '').slice(0, 5);
   if (!['in_attesa', 'confermata'].includes(r.status)) return '';
   if (!date || !time) return '';
+  const diff = reservationMinuteDiff(date, time);
+  if (diff === null || diff >= 0) return '';
   return `<small class="res__timer" data-res-timer data-res-date="${escapeHtml(date)}" data-res-time="${escapeHtml(time)}" data-res-status="${escapeHtml(r.status)}"></small>`;
 }
 
@@ -141,8 +147,8 @@ function updateReservationTimers(scope = document) {
     const minutes = Math.abs(diff);
     if (!['in_attesa', 'confermata'].includes(status)) {
       timer.textContent = '';
-    } else if (diff > 0) {
-      timer.textContent = `Tra ${diff} min`;
+    } else if (diff >= 0) {
+      timer.textContent = '';
     } else {
       timer.textContent = `Ritardo ${minutes} min`;
     }
@@ -150,14 +156,14 @@ function updateReservationTimers(scope = document) {
 }
 
 function partySizeHtml(r, opts = {}) {
-  if (!opts.canEditPartySize) return `<span>${escapeHtml(r.party_size)} coperti</span>`;
+  if (!opts.canEditPartySize) return `<span>${escapeHtml(r.party_size)} persone</span>`;
   return `<span class="party-editor" data-party-editor="${escapeHtml(r.id)}">
     <span class="party-view" data-party-view>
-      <span><strong data-party-value>${escapeHtml(r.party_size)}</strong> coperti</span>
+      <span><strong data-party-value>${escapeHtml(r.party_size)}</strong> persone</span>
       <button class="act act--mute" type="button" data-party-edit="${escapeHtml(r.id)}">Modifica</button>
     </span>
     <span class="party-view" data-party-form hidden>
-      <input class="party-edit-input" type="number" min="1" step="1" inputmode="numeric" value="${escapeHtml(r.party_size)}" data-party-input aria-label="Numero coperti" />
+      <input class="party-edit-input" type="number" min="1" step="1" inputmode="numeric" value="${escapeHtml(r.party_size)}" data-party-input aria-label="Numero persone" />
       <button class="act act--ok" type="button" data-party-save="${escapeHtml(r.id)}">Salva</button>
       <button class="act act--mute" type="button" data-party-cancel="${escapeHtml(r.id)}">Annulla</button>
     </span>
@@ -272,7 +278,7 @@ export function createPartySizeUpdater({ supabase, toast, getReservations, reloa
     if (!reservation) return;
     const partySize = Number.parseInt(nextPartySize, 10);
     if (!Number.isInteger(partySize) || partySize < 1) {
-      toast('Inserisci un numero di coperti valido.', true);
+      toast('Inserisci un numero di persone valido.', true);
       return;
     }
     if (partySize === previousPartySize) {
@@ -285,11 +291,11 @@ export function createPartySizeUpdater({ supabase, toast, getReservations, reloa
         .update({ party_size: partySize })
         .eq('id', id);
       if (error) throw error;
-      toast('Numero di coperti aggiornato.');
+      toast('Numero di persone aggiornato.');
       await reload();
     } catch (error) {
-      console.error('[reservations] aggiornamento coperti fallito:', error);
-      toast('Impossibile aggiornare il numero di coperti.', true);
+      console.error('[reservations] aggiornamento persone fallito:', error);
+      toast('Impossibile aggiornare il numero di persone.', true);
       await reload();
     }
   };
@@ -402,7 +408,7 @@ export function waitlistCardHtml(w, position, opts = {}) {
           <span class="pill">lista d'attesa</span></div>
         <div class="res__meta">
           <a href="tel:${escapeHtml(w.customer_phone)}">${escapeHtml(w.customer_phone)}</a>
-          <span>${w.party_size} coperti</span>
+          <span>${w.party_size} persone</span>
           ${opts.shiftName ? `<span>${escapeHtml(opts.shiftName)}</span>` : ''}
         </div>
         ${w.notes ? `<div class="res__notes">${escapeHtml(w.notes)}</div>` : ''}

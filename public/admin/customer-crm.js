@@ -148,7 +148,7 @@ function historyRow(row) {
   return `<div class="crm-history__row">
     <div>
       <strong>${escapeHtml(formatLong(row.reservation_date))}</strong>
-      <span>${row.party_size} coperti · ${escapeHtml(STATUS_LABEL[row.status] || row.status)}</span>
+      <span>${row.party_size} persone · ${escapeHtml(STATUS_LABEL[row.status] || row.status)}</span>
     </div>
     ${row.notes ? `<p>${escapeHtml(row.notes)}</p>` : ''}
   </div>`;

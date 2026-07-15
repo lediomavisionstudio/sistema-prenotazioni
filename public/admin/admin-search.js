@@ -99,7 +99,7 @@ function renderResults(root, rows, query) {
     const meta = [
       formatLong(row.reservation_date),
       shiftLabel(row),
-      `${row.party_size || 0} coperti`,
+      `${row.party_size || 0} persone`,
       tableCode(row) ? `Tavolo ${tableCode(row)}` : null,
     ].filter(Boolean).join(' · ');
     return `<a class="global-search__result" href="${targetFor(row)}" data-search-result="${escapeHtml(row.id)}">

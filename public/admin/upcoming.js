@@ -191,7 +191,7 @@ function render() {
       <section class="section">
         <div class="section__head">
           <h2 class="section__title" style="text-transform:capitalize">${escapeHtml(formatLong(iso))}</h2>
-          <span class="pill">${dayRows.length} pren. · ${covers} coperti</span>
+          <span class="pill">${dayRows.length} pren. · ${covers} persone</span>
         </div>
         <div class="res-list">${cards}</div>
       </section>`;

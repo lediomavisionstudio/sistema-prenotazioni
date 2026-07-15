@@ -217,10 +217,13 @@ function renderOperationalBar() {
     : null;
   const selectedItem = currentShift();
   const isOpen = !!currentItem;
-  const activeReservations = state.reservations.filter((r) => r.status === 'confermata' || r.status === 'arrivato');
+  const selectedRows = selectedShiftReservations();
+  const activeReservations = selectedRows.filter((r) => r.status === 'confermata' || r.status === 'arrivato');
   const occupiedTableIds = new Set(activeReservations.flatMap(reservationTableIds));
-  const confirmedCovers = activeReservations.reduce((sum, r) => sum + Number(r.party_size || 0), 0);
-  const pendingCount = state.reservations.filter((r) => r.status === 'in_attesa').length;
+  const confirmedCovers = selectedRows
+    .filter((r) => r.status === 'confermata')
+    .reduce((sum, r) => sum + Number(r.party_size || 0), 0);
+  const pendingCount = selectedRows.filter((r) => r.status === 'in_attesa').length;
   const shift = currentItem || selectedItem;
   const shiftLabel = shift
     ? (isFreeHourShift(shift) ? hhmm(shift.start_time) : (shift.name || 'Turno'))
@@ -250,11 +253,11 @@ function renderOperationalBar() {
 // KPI (sull'intera giornata)
 // ---------------------------------------------------------------------------
 function renderKpis() {
-  const active = state.reservations.filter((r) => !['annullata', 'no_show', 'terminato'].includes(r.status));
-  const confirmed = state.reservations.filter((r) => r.status === 'confermata' || r.status === 'arrivato');
-  const covers = confirmed.reduce((s, r) => s + r.party_size, 0);
-  const pending = state.reservations.filter((r) => r.status === 'in_attesa').length;
-  const noShows = state.reservations.filter((r) => r.status === 'no_show').length;
+  const active = selectedShiftReservations();
+  const confirmed = active.filter((r) => r.status === 'confermata');
+  const covers = confirmed.reduce((s, r) => s + Number(r.party_size || 0), 0);
+  const pending = active.filter((r) => r.status === 'in_attesa').length;
+  const noShows = active.filter((r) => r.status === 'no_show').length;
   const completedTotal = confirmed.length + noShows;
   const noShowRate = completedTotal > 0 ? Math.round((noShows / completedTotal) * 100) + '%' : '—';
 
@@ -284,6 +287,10 @@ function nextArrivalLabel(rows) {
     : candidates[0];
   const name = `${next.reservation.customer_first_name || ''} ${next.reservation.customer_last_name || ''}`.trim();
   return `${hhmm(next.shift.start_time)} ${name || 'Prenotazione'}`;
+}
+
+function selectedShiftReservations() {
+  return state.reservations.filter((r) => r.shift_id === state.shiftId);
 }
 
 // ---------------------------------------------------------------------------
@@ -397,8 +404,7 @@ function renderOccupancyHeatmap() {
 function renderList() {
   const list = $('resList');
   const shift = currentShift();
-  const rows = state.reservations
-    .filter((r) => r.shift_id === state.shiftId)
+  const rows = selectedShiftReservations()
     .sort((a, b) => statusRank(a.status) - statusRank(b.status) || a.customer_last_name.localeCompare(b.customer_last_name, 'it'));
 
   if (rows.length === 0) {

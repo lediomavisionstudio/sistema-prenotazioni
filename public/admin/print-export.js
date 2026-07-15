@@ -46,7 +46,7 @@ function kitchenHtml() {
   return `${printHeader('Stampa cucina')}
     <section class="print-grid">
       ${rows.map((r) => `<article class="kitchen-ticket">
-        <strong>${ctx.escapeHtml(shiftTime(r))} · ${r.party_size} coperti</strong>
+        <strong>${ctx.escapeHtml(shiftTime(r))} · ${r.party_size} persone</strong>
         <h2>${ctx.escapeHtml(fullName(r))}</h2>
         <p>Tavolo ${ctx.escapeHtml(tableCode(r))}</p>
         <div>${ctx.escapeHtml(r.notes || 'Nessuna nota cucina')}</div>
