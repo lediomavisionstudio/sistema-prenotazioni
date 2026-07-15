@@ -24,6 +24,7 @@ export function reservationCardHtml(r, opts = {}) {
   const emailBadge = emailVerificationBadgeHtml(r);
   const tableControl = tableAssignmentHtml(r, opts);
   const partyControl = partySizeHtml(r, opts);
+  const quickActions = reservationQuickActionsHtml(r, opts);
   const capacityWarning = opts.capacityWarning
     ? '<span class="party-capacity-warning">La capienza dei tavoli assegnati non è più sufficiente. Modifica l’assegnazione dei tavoli.</span>'
     : '';
@@ -44,9 +45,38 @@ export function reservationCardHtml(r, opts = {}) {
         ${tableControl}
         ${r.notes ? `<div class="res__notes">${escapeHtml(r.notes)}</div>` : ''}
       </div>
-      <div class="res__side"><span class="badge badge--${r.status}">${STATUS_LABEL[r.status]}</span></div>
+      <div class="res__side">
+        ${quickActions}
+        <span class="badge badge--${r.status}">${STATUS_LABEL[r.status]}</span>
+      </div>
       ${acts ? `<div class="res__actions">${acts}</div>` : ''}
     </div>`;
+}
+
+function reservationQuickActionsHtml(r, opts = {}) {
+  const actions = [];
+  if (r.customer_phone) {
+    actions.push(`<a href="tel:${escapeHtml(r.customer_phone)}">Chiama</a>`);
+    actions.push(`<a href="https://wa.me/${escapeHtml(String(r.customer_phone).replace(/\D/g, ''))}" target="_blank" rel="noopener">WhatsApp</a>`);
+  }
+  if (r.customer_email) actions.push(`<a href="mailto:${escapeHtml(r.customer_email)}">Scrivi email</a>`);
+  if (opts.canEditPartySize) actions.push('<button type="button" data-quick-party>Modifica coperti</button>');
+  if (Array.isArray(opts.tableOptions)) actions.push('<button type="button" data-quick-table>Cambia tavolo</button>');
+  if (r.status === 'confermata') {
+    actions.push(`<button type="button" data-id="${escapeHtml(r.id)}" data-to="arrivato">Segna arrivato</button>`);
+    actions.push(`<button type="button" data-id="${escapeHtml(r.id)}" data-to="no_show">Non presentato</button>`);
+    actions.push(`<button type="button" data-id="${escapeHtml(r.id)}" data-to="annullata">Annulla</button>`);
+  } else if (r.status === 'in_attesa') {
+    actions.push(`<button type="button" data-id="${escapeHtml(r.id)}" data-to="confermata">Conferma</button>`);
+    actions.push(`<button type="button" data-id="${escapeHtml(r.id)}" data-to="annullata">Rifiuta</button>`);
+  } else if (r.status === 'arrivato' || r.status === 'no_show' || r.status === 'annullata') {
+    actions.push(`<button type="button" data-id="${escapeHtml(r.id)}" data-to="confermata">Ripristina</button>`);
+  }
+  if (!actions.length) return '';
+  return `<details class="quick-menu">
+    <summary aria-label="Azioni rapide"><span aria-hidden="true">•••</span></summary>
+    <div class="quick-menu__panel">${actions.join('')}</div>
+  </details>`;
 }
 
 function partySizeHtml(r, opts = {}) {
@@ -118,6 +148,23 @@ function emailVerificationBadgeHtml(r) {
 export function wireRowActions(container, onChange) {
   container.querySelectorAll('.act[data-id][data-to]').forEach((b) =>
     b.addEventListener('click', () => onChange(b.dataset.id, b.dataset.to)));
+  container.querySelectorAll('.quick-menu [data-id][data-to]').forEach((b) =>
+    b.addEventListener('click', () => onChange(b.dataset.id, b.dataset.to)));
+}
+
+export function wireReservationQuickActions(container) {
+  container.querySelectorAll('[data-quick-party]').forEach((button) =>
+    button.addEventListener('click', () => {
+      const card = button.closest('.res');
+      card?.querySelector('[data-party-edit]')?.click();
+      button.closest('details')?.removeAttribute('open');
+    }));
+  container.querySelectorAll('[data-quick-table]').forEach((button) =>
+    button.addEventListener('click', () => {
+      const card = button.closest('.res');
+      card?.querySelector('[data-table-picker-toggle]')?.click();
+      button.closest('details')?.removeAttribute('open');
+    }));
 }
 
 export function wirePartySizeEditing(container, onSave) {

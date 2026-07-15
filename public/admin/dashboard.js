@@ -7,7 +7,7 @@ import {
   STATUS_LABEL,
 } from './app.js';
 import {
-  createPartySizeUpdater, statusRank, reservationCardHtml, wirePartySizeEditing, wireRowActions, wireTableAssignment,
+  createPartySizeUpdater, statusRank, reservationCardHtml, wirePartySizeEditing, wireReservationQuickActions, wireRowActions, wireTableAssignment,
   waitlistCardHtml, wireWaitlistActions,
 } from './resui.js';
 import { createSharedCalendar } from '../assets/js/shared-calendar.js';
@@ -362,6 +362,7 @@ function renderList() {
   })).join('');
 
   wireRowActions(list, changeStatus);
+  wireReservationQuickActions(list);
   wirePartySizeEditing(list, updatePartySize);
   wireTableAssignment(list, assignTable);
 }

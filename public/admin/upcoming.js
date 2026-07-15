@@ -7,7 +7,7 @@ import {
 } from './app.js';
 import {
   createPartySizeUpdater, statusRank, reservationCardHtml,
-  wirePartySizeEditing, wireRowActions, wireTableAssignment,
+  wirePartySizeEditing, wireReservationQuickActions, wireRowActions, wireTableAssignment,
 } from './resui.js';
 
 const $ = (id) => document.getElementById(id);
@@ -198,6 +198,7 @@ function render() {
   }).join('');
 
   wireRowActions(box, changeStatus);
+  wireReservationQuickActions(box);
   wirePartySizeEditing(box, updatePartySize);
   wireTableAssignment(box, assignTable);
 }
