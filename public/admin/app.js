@@ -36,8 +36,28 @@ export async function requireSession() {
 }
 
 export async function signOut() {
+  clearLoginFormFields();
   await supabase.auth.signOut();
+  clearSupabaseAuthStorage();
   location.replace('index.html');
+}
+
+function clearLoginFormFields() {
+  document.querySelectorAll('input[type="email"], input[type="password"], input[name="email"], input[name="password"], #email, #password')
+    .forEach((input) => { input.value = ''; });
+}
+
+function clearSupabaseAuthStorage() {
+  try {
+    const storages = [localStorage, sessionStorage].filter(Boolean);
+    storages.forEach((storage) => {
+      Object.keys(storage)
+        .filter((key) => key.startsWith('sb-') || key.includes('supabase.auth'))
+        .forEach((key) => storage.removeItem(key));
+    });
+  } catch (error) {
+    console.warn('[auth] pulizia storage locale non riuscita:', error);
+  }
 }
 
 let logoutModal;
