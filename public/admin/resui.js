@@ -10,10 +10,12 @@ export const TRANSITIONS = {
     { to: 'arrivato', label: 'Arrivato', cls: 'act--go' },
     { to: 'no_show', label: 'Non presentato', cls: 'act--warn' },
     { to: 'annullata', label: 'Annulla prenotazione', cls: 'act--mute' },
+    { to: 'confermata', label: 'Ripristina', cls: 'act--mute' },
   ],
-  arrivato:   [{ to: 'terminato', label: 'Terminato', cls: 'act--ok' }],
+  arrivato:   [{ to: 'terminato', label: 'Terminato', cls: 'act--ok' }, { to: 'confermata', label: 'Ripristina', cls: 'act--mute' }],
+  terminato:  [{ to: 'confermata', label: 'Ripristina', cls: 'act--mute' }],
   no_show:    [{ to: 'confermata', label: 'Ripristina', cls: 'act--mute' }],
-  annullata:  [{ to: 'in_attesa', label: 'Ripristina', cls: 'act--mute' }],
+  annullata:  [{ to: 'confermata', label: 'Ripristina', cls: 'act--mute' }],
 };
 
 // Ordine di visualizzazione: attive prima, chiuse in fondo.
