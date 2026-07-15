@@ -5,7 +5,7 @@ import { STATUS_LABEL, escapeHtml } from './app.js';
 // Transizioni di stato disponibili per ciascuno stato corrente.
 export const TRANSITIONS = {
   in_attesa:  [{ to: 'confermata', label: 'Conferma', cls: 'act--ok' }, { to: 'annullata', label: 'Rifiuta', cls: 'act--warn' }],
-  confermata: [{ to: 'arrivato', label: 'Arrivato', cls: 'act--go' }, { to: 'no_show', label: 'Non presentato', cls: 'act--warn' }, { to: 'annullata', label: 'Annulla', cls: 'act--mute' }],
+  confermata: [{ to: 'arrivato', label: 'Arrivato', cls: 'act--go' }],
   arrivato:   [{ to: 'terminato', label: 'Terminato', cls: 'act--ok' }],
   no_show:    [{ to: 'confermata', label: 'Ripristina', cls: 'act--mute' }],
   annullata:  [{ to: 'in_attesa', label: 'Ripristina', cls: 'act--mute' }],
@@ -26,7 +26,6 @@ export function reservationCardHtml(r, opts = {}) {
   const partyControl = partySizeHtml(r, opts);
   const quickActions = reservationQuickActionsHtml(r, opts);
   const timer = reservationTimerHtml(r, opts);
-  const timeline = reservationTimelineHtml(r);
   const stateClasses = [`res--status-${r.status}`, reservationDelayClass(r, opts)].filter(Boolean).join(' ');
   const capacityWarning = opts.capacityWarning
     ? '<span class="party-capacity-warning">La capienza dei tavoli assegnati non è più sufficiente. Modifica l’assegnazione dei tavoli.</span>'
@@ -37,7 +36,6 @@ export function reservationCardHtml(r, opts = {}) {
       <div class="res__main">
         <div class="res__name">${escapeHtml(r.customer_last_name)} ${escapeHtml(r.customer_first_name)}
           ${r.source === 'widget' ? '<span class="pill">widget</span>' : ''}</div>
-        ${timeline}
         <div class="res__meta">
           <a href="tel:${escapeHtml(r.customer_phone)}">${escapeHtml(r.customer_phone)}</a>
           ${partyControl}
@@ -70,22 +68,10 @@ function reservationQuickActionsHtml(r, opts = {}) {
   </details>`;
 }
 
-function reservationTimelineHtml(r) {
-  const steps = [
-    { key: 'in_attesa', label: 'Prenotata' },
-    { key: 'confermata', label: 'Confermata' },
-    { key: 'arrivato', label: 'Arrivata' },
-    { key: 'terminato', label: 'Terminata' },
-  ];
-  const current = steps.findIndex((step) => step.key === r.status);
-  return `<div class="res__timeline" aria-label="Timeline stato prenotazione">
-    ${steps.map((step, index) => `<span class="${index <= current ? 'is-done' : ''}${index === current ? ' is-current' : ''}">${escapeHtml(step.label)}</span>`).join('')}
-  </div>`;
-}
-
 function reservationTimerHtml(r, opts = {}) {
   const date = r.reservation_date || '';
   const time = String(opts.timeLabel || '').slice(0, 5);
+  if (!['in_attesa', 'confermata'].includes(r.status)) return '';
   if (!date || !time) return '';
   return `<small class="res__timer" data-res-timer data-res-date="${escapeHtml(date)}" data-res-time="${escapeHtml(time)}" data-res-status="${escapeHtml(r.status)}"></small>`;
 }
@@ -152,12 +138,12 @@ function updateReservationTimers(scope = document) {
     }
     const status = timer.dataset.resStatus;
     const minutes = Math.abs(diff);
-    if (status === 'terminato') {
-      timer.textContent = diff <= 0 ? `Terminata ${minutes} min fa` : 'Terminata';
+    if (!['in_attesa', 'confermata'].includes(status)) {
+      timer.textContent = '';
     } else if (diff > 0) {
       timer.textContent = `Tra ${diff} min`;
     } else {
-      timer.textContent = `In corso da ${minutes} min`;
+      timer.textContent = `Ritardo ${minutes} min`;
     }
   });
 }
