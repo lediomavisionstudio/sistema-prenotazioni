@@ -290,7 +290,8 @@ function tableCodes(reservation) {
 
 function tableOptionsForReservation(reservation) {
   const selected = new Set(reservationTableIds(reservation));
-  const occupied = new Set(state.reservations
+  const occupants = new Map();
+  state.reservations
     .filter((r) =>
       r.id !== reservation.id &&
       r.reservation_date === reservation.reservation_date &&
@@ -298,16 +299,23 @@ function tableOptionsForReservation(reservation) {
       r.status !== 'annullata' &&
       r.status !== 'no_show' &&
       r.status !== 'terminato')
-    .flatMap(reservationTableIds));
+    .forEach((row) => {
+      reservationTableIds(row).forEach((tableId) => occupants.set(tableId, row));
+    });
 
   return [...state.tablesById.values()].map((table) => {
-    const busy = occupied.has(table.id);
+    const occupant = occupants.get(table.id);
+    const busy = !!occupant;
+    const shift = occupant ? state.shiftsById.get(occupant.shift_id) : null;
     return {
       id: table.id,
       code: table.code,
       seatsMax: table.seats_max,
+      zoneName: table.zone?.name || 'Sala',
       busy,
       disabled: busy && !selected.has(table.id),
+      guestName: occupant ? `${occupant.customer_first_name || ''} ${occupant.customer_last_name || ''}`.trim() : '',
+      guestDetail: occupant ? `${occupant.party_size} persone · ${shift ? hhmm(shift.start_time) + ' · ' : ''}${STATUS_LABEL[occupant.status] || occupant.status}` : '',
       label: `${table.code} (${table.seats_max})${busy ? ' - occupato' : ''}`,
     };
   });
@@ -328,9 +336,11 @@ async function assignTable(id, tableId) {
     if (error) throw error;
     toast(tableIds.length > 1 ? 'Tavoli assegnati' : tableIds.length ? 'Tavolo assegnato' : 'Tavolo rimosso');
     await load();
+    return true;
   } catch (error) {
     console.error('[tables] assegnazione tavolo fallita:', error);
     toast(tableAssignmentError(error), true);
+    return false;
   }
 }
 

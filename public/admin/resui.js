@@ -1,6 +1,7 @@
 // UI condivisa delle prenotazioni: transizioni di stato, rendering di una
 // riga/card e aggancio delle azioni. Usato da dashboard.js e upcoming.js.
 import { STATUS_LABEL, escapeHtml } from './app.js';
+import { openTableMapSelector } from './table-map-selector.js';
 
 // Transizioni di stato disponibili per ciascuno stato corrente.
 export const TRANSITIONS = {
@@ -179,7 +180,7 @@ function tableAssignmentHtml(r, opts = {}) {
     const selected = selectedIds.has(table.id);
     const disabled = table.disabled && !selected;
     const status = table.busy && !selected ? 'Occupato' : table.disabled && !selected ? 'Fuori servizio' : 'Disponibile';
-    return `<label class="table-picker__option${disabled ? ' is-disabled' : ''}">
+    return `<label class="table-picker__option${disabled ? ' is-disabled' : ''}" data-zone="${escapeHtml(table.zoneName || 'Sala')}" data-guest="${escapeHtml(table.guestName || '')}" data-detail="${escapeHtml(table.guestDetail || '')}">
       <input type="checkbox" data-table-choice="${escapeHtml(table.id)}" ${selected ? 'checked' : ''} ${disabled ? 'disabled' : ''} />
       <span class="table-picker__check" aria-hidden="true"></span>
       <span class="table-picker__main">
@@ -189,7 +190,7 @@ function tableAssignmentHtml(r, opts = {}) {
       <span class="table-picker__status">${escapeHtml(status)}</span>
     </label>`;
   }).join('');
-  return `<div class="res__table-assign" data-party-size="${escapeHtml(r.party_size || 0)}" data-selection-mode="${selectionMode}">
+  return `<div class="res__table-assign" data-party-size="${escapeHtml(r.party_size || 0)}" data-selection-mode="${selectionMode}" data-reservation-first-name="${escapeHtml(r.customer_first_name || '')}" data-reservation-last-name="${escapeHtml(r.customer_last_name || '')}" data-reservation-time="${escapeHtml(opts.timeLabel || '')}" data-reservation-shift="${escapeHtml(opts.shiftName || '')}">
     <div class="table-picker" data-table-picker="${escapeHtml(r.id)}" data-selection-mode="${selectionMode}">
       <button class="table-picker__button" type="button" data-table-picker-toggle aria-expanded="false">
         <span data-table-picker-label>${escapeHtml(summary)}</span>
@@ -197,7 +198,7 @@ function tableAssignmentHtml(r, opts = {}) {
       </button>
       <div class="table-picker__menu" data-table-picker-menu hidden>${options}</div>
     </div>
-    <button class="act act--mute" type="button" data-table-save="${escapeHtml(r.id)}">Assegna tavoli</button>
+    <button class="act act--mute" type="button" data-table-save="${escapeHtml(r.id)}">${selectedCodes.length ? 'Cambia tavolo' : 'Assegna tavoli'}</button>
     <div class="table-picker__summary" data-table-summary>
       <span>Tavoli selezionati: <strong data-table-summary-codes>${escapeHtml(selectedCodes.join(' + ') || '—')}</strong></span>
       <span>Capienza totale: <strong data-table-summary-seats>${selectedSeats}</strong> posti</span>
@@ -296,6 +297,7 @@ export function createPartySizeUpdater({ supabase, toast, getReservations, reloa
 
 export function wireTableAssignment(container, onAssign) {
   container.querySelectorAll('[data-table-picker]').forEach((picker) => {
+    picker.closest('.res__table-assign')?.classList.add('is-map-enabled');
     enforceTableSelectionMode(picker);
     refreshTablePicker(picker);
     const toggle = picker.querySelector('[data-table-picker-toggle]');
@@ -312,21 +314,43 @@ export function wireTableAssignment(container, onAssign) {
       }));
   });
   container.querySelectorAll('[data-table-save]').forEach((button) =>
-    button.addEventListener('click', () => {
-      const id = button.dataset.tableSave;
+    button.addEventListener('click', async () => {
       const box = button.closest('.res__table-assign');
       const picker = box?.querySelector('[data-table-picker]');
-      const ids = picker ? selectedTableIds(picker) : [];
-      const totalSeats = tablePickerSeats(picker);
-      const partySize = parseInt(box?.dataset.partySize || '0', 10) || 0;
-      const error = box?.querySelector('[data-table-summary-error]');
-      if (ids.length && totalSeats < partySize) {
-        if (error) error.hidden = false;
-        return;
-      }
-      const selectionMode = box?.dataset.selectionMode || picker?.dataset.selectionMode || 'multi';
-      onAssign(id, selectionMode === 'single' ? (ids[0] || null) : ids);
+      const opened = openTableMapSelector({
+        box,
+        picker,
+        saveButton: button,
+        reservation: reservationContext(box),
+        onConfirm: () => saveTableAssignment(button, onAssign),
+      });
+      if (!opened) await saveTableAssignment(button, onAssign);
     }));
+}
+
+async function saveTableAssignment(button, onAssign) {
+  const id = button.dataset.tableSave;
+  const box = button.closest('.res__table-assign');
+  const picker = box?.querySelector('[data-table-picker]');
+  const ids = picker ? selectedTableIds(picker) : [];
+  const totalSeats = tablePickerSeats(picker);
+  const partySize = parseInt(box?.dataset.partySize || '0', 10) || 0;
+  const error = box?.querySelector('[data-table-summary-error]');
+  if (ids.length && totalSeats < partySize) {
+    if (error) error.hidden = false;
+    return false;
+  }
+  const selectionMode = box?.dataset.selectionMode || picker?.dataset.selectionMode || 'multi';
+  return await onAssign(id, selectionMode === 'single' ? (ids[0] || null) : ids);
+}
+
+function reservationContext(box) {
+  return {
+    firstName: box?.dataset.reservationFirstName || '',
+    lastName: box?.dataset.reservationLastName || '',
+    timeLabel: box?.dataset.reservationTime || '',
+    shiftName: box?.dataset.reservationShift || '',
+  };
 }
 
 function enforceTableSelectionMode(picker, activeChoice = null) {
