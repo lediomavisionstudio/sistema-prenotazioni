@@ -29,6 +29,7 @@ const state = {
   tableAssignments: new Map(),
   waitlist: [],        // voci in coda del giorno (status in_coda, tutti i turni)
   capacity: 0,         // somma seats_max tavoli attivi
+  lastUpdatedAt: null,
 };
 
 const updatePartySize = createPartySizeUpdater({
@@ -116,6 +117,7 @@ async function loadDay() {
 
   state.reservations = await withTableAssignments(await withEmailVerificationStatus(data || []));
   state.waitlist = waitlist;
+  state.lastUpdatedAt = new Date();
   render();
 }
 
@@ -193,12 +195,54 @@ async function loadWaitlist() {
 function render() {
   ensureScheduleSelection();
   $('dateLabel').textContent = formatLong(state.date);
+  renderOperationalBar();
   renderKpis();
   renderTabs();
   renderList();
   renderWaitlist();
   renderMap();
   populateManualShiftSelect();
+}
+
+function renderOperationalBar() {
+  const bar = $('operationalBar');
+  if (!bar) return;
+  const items = scheduleItemsForDate(state.date);
+  const now = new Date();
+  const today = state.date === todayISO();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const currentItem = today
+    ? items.find((item) => nowMinutes >= minutesOf(item.start_time) && nowMinutes < minutesOf(item.end_time))
+    : null;
+  const selectedItem = currentShift();
+  const isOpen = !!currentItem;
+  const activeReservations = state.reservations.filter((r) => r.status === 'confermata' || r.status === 'arrivato');
+  const occupiedTableIds = new Set(activeReservations.flatMap(reservationTableIds));
+  const confirmedCovers = activeReservations.reduce((sum, r) => sum + Number(r.party_size || 0), 0);
+  const pendingCount = state.reservations.filter((r) => r.status === 'in_attesa').length;
+  const shift = currentItem || selectedItem;
+  const shiftLabel = shift
+    ? (isFreeHourShift(shift) ? hhmm(shift.start_time) : (shift.name || 'Turno'))
+    : null;
+  const updatedAt = state.lastUpdatedAt
+    ? state.lastUpdatedAt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+    : null;
+
+  const metrics = [
+    { label: 'Stato locale', value: isOpen ? 'Aperto' : 'Chiuso', tone: isOpen ? 'ok' : 'muted' },
+    shiftLabel ? { label: currentItem ? 'Turno attuale' : 'Turno selezionato', value: shiftLabel } : null,
+    { label: 'Tavoli occupati', value: `${occupiedTableIds.size}/${state.tables.length}` },
+    { label: 'Coperti', value: confirmedCovers },
+    { label: 'In attesa', value: pendingCount },
+    updatedAt ? { label: 'Aggiornato alle', value: updatedAt } : null,
+  ].filter(Boolean);
+
+  bar.innerHTML = metrics.map((item) => `
+    <div class="opsbar__item${item.tone ? ` opsbar__item--${item.tone}` : ''}">
+      <span class="opsbar__label">${escapeHtml(item.label)}</span>
+      <strong class="opsbar__value">${escapeHtml(item.value)}</strong>
+    </div>
+  `).join('');
 }
 
 // ---------------------------------------------------------------------------

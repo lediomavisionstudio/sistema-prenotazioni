@@ -238,6 +238,57 @@ html[data-admin-theme="dark"] .topbar__link.is-active {
 
 .page { max-width: 1080px; margin: 0 auto; padding: 18px 18px 60px; }
 
+/* Barra operativa ---------------------------------------------------------- */
+.opsbar {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 18px;
+}
+.opsbar__item {
+  min-width: 0;
+  padding: 12px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface) 92%, var(--surface-soft));
+  box-shadow: var(--shadow-sm);
+}
+.opsbar__label {
+  display: block;
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.opsbar__value {
+  display: block;
+  overflow: hidden;
+  margin-top: 3px;
+  color: var(--ink);
+  font-size: .98rem;
+  line-height: 1.12;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.opsbar__item--ok {
+  border-color: color-mix(in srgb, var(--st-confermata) 32%, var(--line));
+  background: color-mix(in srgb, var(--st-confermata-bg) 42%, var(--surface));
+}
+.opsbar__item--muted {
+  background: var(--surface);
+}
+@media (max-width: 900px) {
+  .opsbar { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .opsbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .opsbar__item { padding: 11px; }
+}
+
 /* Selettore data ----------------------------------------------------------- */
 .datebar {
   display: flex; align-items: center; justify-content: center; gap: 10px;
