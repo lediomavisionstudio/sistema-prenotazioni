@@ -215,6 +215,47 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
   align-self: start;
 }
 
+.form-grid.dati-locale-fields {
+  grid-template-columns: 120px repeat(2, minmax(0, 1fr));
+  gap: 16px 20px;
+  align-items: start;
+}
+
+.form-grid.dati-locale-fields > .field:nth-child(1) {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.form-grid.dati-locale-fields > .field:nth-child(2) {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.form-grid.dati-locale-fields > .field:nth-child(3) {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.form-grid.dati-locale-fields > .field:nth-child(4) {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.form-grid.dati-locale-fields > .field:nth-child(5) {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.form-grid.dati-locale-fields > .field:nth-child(7) {
+  grid-column: 3;
+  grid-row: 3;
+}
+
+.form-grid.dati-locale-fields > .field--logo {
+  grid-column: 1;
+  grid-row: 1 / span 3;
+}
+
 .logo-upload {
   display: flex;
   align-items: flex-start;
@@ -259,12 +300,29 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
 }
 
 @media (max-width: 1023px) {
+  .form-grid.dati-locale-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .form-grid.dati-locale-fields > .field,
+  .form-grid.dati-locale-fields > .field:nth-child(n),
+  .form-grid.dati-locale-fields > .field--logo {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
   .logo-upload__preview {
     display: none;
   }
 
   .logo-upload .btn {
     align-self: flex-start;
+  }
+}
+
+@media (max-width: 767px) {
+  .form-grid.dati-locale-fields {
+    grid-template-columns: 1fr;
   }
 }
 .command-palette[hidden] {
