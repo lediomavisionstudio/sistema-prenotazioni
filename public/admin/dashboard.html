@@ -27,6 +27,8 @@
         <span class="topbar__venue" id="venueName">—</span>
         <span class="topbar__role" id="userRole"></span>
       </div>
+      <input class="topbar__toggle" id="adminNavToggle" type="checkbox" aria-label="Apri menu" />
+      <label class="topbar__menu" for="adminNavToggle" aria-hidden="true"><span></span><span></span><span></span></label>
       <nav class="topbar__nav">
         <a class="topbar__link is-active" href="dashboard.html">Dashboard</a>
         <a class="topbar__link" href="upcoming.html">In arrivo</a>
@@ -34,6 +36,7 @@
         <a class="topbar__link" href="settings.html">Impostazioni</a>
         <button class="btn btn--ghost btn--sm" id="logoutBtn" type="button">Esci</button>
       </nav>
+      <label class="topbar__scrim" for="adminNavToggle" aria-hidden="true"></label>
     </div>
   </header>
 
