@@ -157,11 +157,6 @@ function mountSearch() {
     if (!root.contains(event.target)) root.querySelector('[data-global-search-results]').hidden = true;
   });
   document.addEventListener('keydown', (event) => {
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-      event.preventDefault();
-      input.focus();
-      input.select();
-    }
     if (event.key === 'Escape') root.querySelector('[data-global-search-results]').hidden = true;
   });
 }
