@@ -491,6 +491,49 @@ html[data-admin-theme="dark"] .topbar__link.is-active {
 .tab__name { font-family: var(--font-title); font-size: 0.98rem; }
 .tab__meta { font-size: 0.72rem; }
 
+/* Heatmap occupazione ------------------------------------------------------ */
+.occupancy-section {
+  margin-bottom: 20px;
+}
+.occupancy-heatmap {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+.occupancy-cell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  padding: 10px 12px;
+  text-align: left;
+  transition: transform .18s ease, border-color .18s ease, background .18s ease;
+}
+.occupancy-cell:hover {
+  transform: translateY(-1px);
+  border-color: var(--tomato);
+}
+.occupancy-cell span {
+  overflow: hidden;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.occupancy-cell strong {
+  color: var(--ink-soft);
+  font-size: .78rem;
+}
+.occupancy-cell--low { background: var(--surface); }
+.occupancy-cell--medium { background: var(--st-attesa-bg); border-color: color-mix(in srgb, var(--st-attesa) 26%, var(--line)); }
+.occupancy-cell--high { background: var(--tomato-soft); border-color: color-mix(in srgb, var(--tomato) 32%, var(--line)); }
+.occupancy-cell--full { background: var(--st-noshow-bg); border-color: color-mix(in srgb, var(--st-noshow) 34%, var(--line)); }
+
 /* Sezioni ------------------------------------------------------------------ */
 .section { margin-bottom: 26px; }
 .section__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 10px; }

@@ -198,6 +198,7 @@ function render() {
   renderOperationalBar();
   renderKpis();
   renderTabs();
+  renderOccupancyHeatmap();
   renderList();
   renderWaitlist();
   renderMap();
@@ -360,6 +361,35 @@ function renderTabs() {
 }
 
 function currentShift() { return scheduleItemsForDate(state.date).find((s) => s.key === state.slotKey) || state.shifts.find((s) => s.id === state.shiftId); }
+
+function renderOccupancyHeatmap() {
+  const box = $('occupancyHeatmap');
+  if (!box) return;
+  const items = scheduleItemsForDate(state.date);
+  if (!items.length) {
+    box.innerHTML = '<div class="res-empty">Nessun turno configurato per questa data.</div>';
+    return;
+  }
+  const capacity = Math.max(1, state.capacity);
+  box.innerHTML = items.map((item) => {
+    const covers = state.reservations
+      .filter((r) => r.shift_id === item.shift_id && (r.status === 'confermata' || r.status === 'arrivato'))
+      .reduce((sum, r) => sum + Number(r.party_size || 0), 0);
+    const ratio = covers / capacity;
+    const level = ratio >= 1 ? 'full' : ratio >= .75 ? 'high' : ratio >= .4 ? 'medium' : 'low';
+    const label = isFreeHourShift(item) ? hhmm(item.start_time) : item.name;
+    return `<button class="occupancy-cell occupancy-cell--${level}" type="button" data-shift="${escapeHtml(item.shift_id)}">
+      <span>${escapeHtml(label)}</span>
+      <strong>${covers}/${capacity}</strong>
+    </button>`;
+  }).join('');
+  box.querySelectorAll('[data-shift]').forEach((button) =>
+    button.addEventListener('click', () => {
+      state.shiftId = button.dataset.shift;
+      state.slotKey = button.dataset.shift;
+      render();
+    }));
+}
 
 // ---------------------------------------------------------------------------
 // Lista prenotazioni del turno selezionato
