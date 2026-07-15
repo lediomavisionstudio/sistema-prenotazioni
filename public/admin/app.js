@@ -168,3 +168,124 @@ export function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
+
+function initResponsiveAdminNav() {
+  const toggle = document.getElementById('adminNavToggle');
+  const menuButton = document.querySelector('.topbar__menu');
+  const nav = document.querySelector('.topbar__nav');
+  const venueName = document.getElementById('venueName');
+  const userRole = document.getElementById('userRole');
+  if (!toggle || !menuButton || !nav) return;
+
+  const title = nav.querySelector('.topbar__nav-title');
+  const role = nav.querySelector('.topbar__nav-role');
+  const focusableSelector = 'a[href], button:not([disabled]), label[for], input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  let lastFocus = null;
+
+  menuButton.setAttribute('role', 'button');
+  menuButton.setAttribute('tabindex', '0');
+  menuButton.setAttribute('aria-controls', 'adminMobileNav');
+  menuButton.setAttribute('aria-expanded', 'false');
+  nav.id = nav.id || 'adminMobileNav';
+
+  const syncDrawerHeader = () => {
+    if (title) title.textContent = (venueName?.textContent || '').trim() || 'Gestionale';
+    if (role) role.textContent = (userRole?.textContent || '').trim() || 'Amministratore';
+  };
+
+  const setOpenState = (isOpen) => {
+    menuButton.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    document.body.classList.toggle('admin-nav-open', isOpen);
+  };
+
+  const openMenu = () => {
+    lastFocus = document.activeElement;
+    syncDrawerHeader();
+    toggle.checked = true;
+    setOpenState(true);
+    window.setTimeout(() => {
+      const first = nav.querySelector(focusableSelector);
+      if (first) first.focus({ preventScroll: true });
+    }, 30);
+  };
+
+  const closeMenu = ({ restoreFocus = true } = {}) => {
+    if (!toggle.checked) return;
+    toggle.checked = false;
+    setOpenState(false);
+    if (restoreFocus) {
+      const target = lastFocus && document.contains(lastFocus) ? lastFocus : menuButton;
+      target.focus({ preventScroll: true });
+    }
+  };
+
+  const toggleMenu = () => {
+    if (toggle.checked) closeMenu();
+    else openMenu();
+  };
+
+  menuButton.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      toggleMenu();
+    }
+  });
+
+  toggle.addEventListener('change', () => {
+    if (toggle.checked) {
+      lastFocus = document.activeElement;
+      syncDrawerHeader();
+      setOpenState(true);
+    } else {
+      setOpenState(false);
+    }
+  });
+
+  nav.querySelectorAll('.topbar__link, #logoutBtn').forEach((item) => {
+    item.addEventListener('click', () => closeMenu({ restoreFocus: false }));
+  });
+
+  nav.querySelectorAll('.topbar__nav-close').forEach((item) => {
+    item.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        closeMenu();
+      }
+    });
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (!toggle.checked) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeMenu();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = [...nav.querySelectorAll(focusableSelector)]
+      .filter((el) => el.offsetParent !== null || el === document.activeElement);
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus({ preventScroll: true });
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus({ preventScroll: true });
+    }
+  });
+
+  [venueName, userRole].filter(Boolean).forEach((node) => {
+    new MutationObserver(syncDrawerHeader).observe(node, { childList: true, subtree: true, characterData: true });
+  });
+
+  syncDrawerHeader();
+  setOpenState(toggle.checked);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initResponsiveAdminNav, { once: true });
+} else {
+  initResponsiveAdminNav();
+}
