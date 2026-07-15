@@ -407,6 +407,26 @@ html[data-admin-theme="dark"] .topbar__link.is-active {
 
 .page { max-width: 1080px; margin: 0 auto; padding: 18px 18px 60px; }
 
+.dashboard-main {
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-main > .datebar {
+  margin-bottom: 26px;
+}
+
+.dashboard-main > .opsbar,
+.dashboard-main > .kpis,
+.dashboard-main > .tabs,
+.dashboard-main > .section {
+  margin-bottom: 24px;
+}
+
+.dashboard-main > .section:last-child {
+  margin-bottom: 0;
+}
+
 /* Barra operativa ---------------------------------------------------------- */
 .opsbar {
   display: grid;
