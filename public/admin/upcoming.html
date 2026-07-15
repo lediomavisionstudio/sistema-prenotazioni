@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#c8402a" />
-  <title>In arrivo — Pannello gestionale</title>
+  <title>Prenotazioni — Pannello gestionale</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -31,7 +31,7 @@
       <label class="topbar__menu" for="adminNavToggle" aria-hidden="true"><span></span><span></span><span></span></label>
       <nav class="topbar__nav">
         <a class="topbar__link" href="dashboard.html">Dashboard</a>
-        <a class="topbar__link is-active" href="upcoming.html">In arrivo</a>
+        <a class="topbar__link is-active" href="upcoming.html">Prenotazioni</a>
         <a class="topbar__link" href="stats.html">Statistiche</a>
         <a class="topbar__link" href="settings.html">Impostazioni</a>
         <button class="btn btn--ghost btn--sm" id="logoutBtn" type="button">Esci</button>
@@ -42,7 +42,7 @@
 
   <main class="page" id="page" hidden>
     <div class="section__head">
-      <h1 class="section__title" style="font-size:1.3rem">Prossime prenotazioni</h1>
+      <h1 class="section__title" style="font-size:1.3rem">Prenotazioni</h1>
       <span class="pill" id="pendingCount"></span>
     </div>
 
@@ -74,6 +74,7 @@
           <option value="in_attesa">In attesa</option>
           <option value="confermata">Confermata</option>
           <option value="arrivato">Arrivato</option>
+          <option value="terminato">Terminato</option>
           <option value="no_show">Non presentato</option>
           <option value="rifiutata">Rifiutata</option>
           <option value="annullata">Annullata</option>

@@ -7,7 +7,7 @@ import {
 } from './app.js';
 import {
   createPartySizeUpdater, statusRank, reservationCardHtml,
-  wirePartySizeEditing, wireReservationQuickActions, wireRowActions, wireTableAssignment,
+  wirePartySizeEditing, wireReservationQuickActions, wireReservationTimers, wireRowActions, wireTableAssignment,
 } from './resui.js';
 
 const $ = (id) => document.getElementById(id);
@@ -27,7 +27,7 @@ const state = {
 };
 
 const FILTERS = {
-  attive: (r) => r.status === 'confermata',
+  attive: (r) => r.status === 'confermata' || r.status === 'arrivato',
   in_attesa: (r) => r.status === 'in_attesa',
   tutte: () => true,
 };
@@ -199,6 +199,7 @@ function render() {
 
   wireRowActions(box, changeStatus);
   wireReservationQuickActions(box);
+  wireReservationTimers(box);
   wirePartySizeEditing(box, updatePartySize);
   wireTableAssignment(box, assignTable);
 }
@@ -295,7 +296,8 @@ function tableOptionsForReservation(reservation) {
       r.reservation_date === reservation.reservation_date &&
       r.shift_id === reservation.shift_id &&
       r.status !== 'annullata' &&
-      r.status !== 'no_show')
+      r.status !== 'no_show' &&
+      r.status !== 'terminato')
     .flatMap(reservationTableIds));
 
   return [...state.tablesById.values()].map((table) => {

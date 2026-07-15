@@ -7,7 +7,7 @@ import {
   STATUS_LABEL,
 } from './app.js';
 import {
-  createPartySizeUpdater, statusRank, reservationCardHtml, wirePartySizeEditing, wireReservationQuickActions, wireRowActions, wireTableAssignment,
+  createPartySizeUpdater, statusRank, reservationCardHtml, wirePartySizeEditing, wireReservationQuickActions, wireReservationTimers, wireRowActions, wireTableAssignment,
   waitlistCardHtml, wireWaitlistActions,
 } from './resui.js';
 import { createSharedCalendar } from '../assets/js/shared-calendar.js';
@@ -250,7 +250,7 @@ function renderOperationalBar() {
 // KPI (sull'intera giornata)
 // ---------------------------------------------------------------------------
 function renderKpis() {
-  const active = state.reservations.filter((r) => r.status !== 'annullata');
+  const active = state.reservations.filter((r) => !['annullata', 'no_show', 'terminato'].includes(r.status));
   const confirmed = state.reservations.filter((r) => r.status === 'confermata' || r.status === 'arrivato');
   const covers = confirmed.reduce((s, r) => s + r.party_size, 0);
   const pending = state.reservations.filter((r) => r.status === 'in_attesa').length;
@@ -347,7 +347,7 @@ function renderTabs() {
   const box = $('shiftTabs');
   box.innerHTML = '';
   for (const s of scheduleItemsForDate(state.date)) {
-    const n = state.reservations.filter((r) => r.shift_id === s.shift_id && r.status !== 'annullata').length;
+    const n = state.reservations.filter((r) => r.shift_id === s.shift_id && !['annullata', 'terminato'].includes(r.status)).length;
     const btn = document.createElement('button');
     btn.className = 'tab' + (s.key === state.slotKey ? ' is-active' : '');
     btn.innerHTML = isFreeHourShift(s)
@@ -416,6 +416,7 @@ function renderList() {
 
   wireRowActions(list, changeStatus);
   wireReservationQuickActions(list);
+  wireReservationTimers(list);
   wirePartySizeEditing(list, updatePartySize);
   wireTableAssignment(list, assignTable);
 }
@@ -436,7 +437,7 @@ async function changeStatus(id, to) {
   if (res) await notifyCustomerStatusEmail(res, to);
 
   // Turno liberato: promuovi automaticamente il primo in lista d'attesa.
-  if ((to === 'annullata' || to === 'no_show') && res) {
+  if ((to === 'annullata' || to === 'no_show' || to === 'terminato') && res) {
     try {
       const { data, error: pe } = await supabase.rpc('promote_next_waitlist', {
         p_venue_id: state.venue.id, p_date: res.reservation_date, p_shift_id: res.shift_id,
@@ -456,7 +457,8 @@ function tableOptionsForReservation(reservation) {
       r.reservation_date === reservation.reservation_date &&
       r.shift_id === reservation.shift_id &&
       r.status !== 'annullata' &&
-      r.status !== 'no_show')
+      r.status !== 'no_show' &&
+      r.status !== 'terminato')
     .flatMap(reservationTableIds));
   const selected = new Set(reservationTableIds(reservation));
 

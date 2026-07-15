@@ -6,14 +6,14 @@ import { STATUS_LABEL, escapeHtml } from './app.js';
 export const TRANSITIONS = {
   in_attesa:  [{ to: 'confermata', label: 'Conferma', cls: 'act--ok' }, { to: 'annullata', label: 'Rifiuta', cls: 'act--warn' }],
   confermata: [{ to: 'arrivato', label: 'Arrivato', cls: 'act--go' }, { to: 'no_show', label: 'Non presentato', cls: 'act--warn' }, { to: 'annullata', label: 'Annulla', cls: 'act--mute' }],
-  arrivato:   [{ to: 'confermata', label: 'Ripristina', cls: 'act--mute' }],
+  arrivato:   [{ to: 'terminato', label: 'Terminato', cls: 'act--ok' }],
   no_show:    [{ to: 'confermata', label: 'Ripristina', cls: 'act--mute' }],
   annullata:  [{ to: 'in_attesa', label: 'Ripristina', cls: 'act--mute' }],
 };
 
 // Ordine di visualizzazione: attive prima, chiuse in fondo.
 export function statusRank(s) {
-  return { in_attesa: 0, confermata: 1, arrivato: 2, no_show: 3, annullata: 4 }[s] ?? 9;
+  return { in_attesa: 0, confermata: 1, arrivato: 2, terminato: 3, no_show: 4, annullata: 5 }[s] ?? 9;
 }
 
 // HTML di una card prenotazione. opts.timeLabel appare nella colonna sinistra
@@ -25,15 +25,19 @@ export function reservationCardHtml(r, opts = {}) {
   const tableControl = tableAssignmentHtml(r, opts);
   const partyControl = partySizeHtml(r, opts);
   const quickActions = reservationQuickActionsHtml(r, opts);
+  const timer = reservationTimerHtml(r, opts);
+  const timeline = reservationTimelineHtml(r);
+  const stateClasses = [`res--status-${r.status}`, reservationDelayClass(r, opts)].filter(Boolean).join(' ');
   const capacityWarning = opts.capacityWarning
     ? '<span class="party-capacity-warning">La capienza dei tavoli assegnati non è più sufficiente. Modifica l’assegnazione dei tavoli.</span>'
     : '';
   return `
-    <div class="res">
-      <div class="res__time">${escapeHtml(opts.timeLabel || '')}</div>
+    <div class="res ${stateClasses}">
+      <div class="res__time"><span>${escapeHtml(opts.timeLabel || '')}</span>${timer}</div>
       <div class="res__main">
         <div class="res__name">${escapeHtml(r.customer_last_name)} ${escapeHtml(r.customer_first_name)}
           ${r.source === 'widget' ? '<span class="pill">widget</span>' : ''}</div>
+        ${timeline}
         <div class="res__meta">
           <a href="tel:${escapeHtml(r.customer_phone)}">${escapeHtml(r.customer_phone)}</a>
           ${partyControl}
@@ -47,7 +51,7 @@ export function reservationCardHtml(r, opts = {}) {
       </div>
       <div class="res__side">
         ${quickActions}
-        <span class="badge badge--${r.status}">${STATUS_LABEL[r.status]}</span>
+        <span class="badge badge--${r.status}">${escapeHtml(STATUS_LABEL[r.status] || r.status)}</span>
       </div>
       ${acts ? `<div class="res__actions">${acts}</div>` : ''}
     </div>`;
@@ -56,27 +60,106 @@ export function reservationCardHtml(r, opts = {}) {
 function reservationQuickActionsHtml(r, opts = {}) {
   const actions = [];
   if (r.customer_phone) {
-    actions.push(`<a href="tel:${escapeHtml(r.customer_phone)}">Chiama</a>`);
-    actions.push(`<a href="https://wa.me/${escapeHtml(String(r.customer_phone).replace(/\D/g, ''))}" target="_blank" rel="noopener">WhatsApp</a>`);
+    actions.push(`<a href="https://wa.me/${escapeHtml(String(r.customer_phone).replace(/\D/g, ''))}" target="_blank" rel="noopener">Chiama WhatsApp</a>`);
   }
   if (r.customer_email) actions.push(`<a href="mailto:${escapeHtml(r.customer_email)}">Scrivi email</a>`);
-  if (opts.canEditPartySize) actions.push('<button type="button" data-quick-party>Modifica coperti</button>');
-  if (Array.isArray(opts.tableOptions)) actions.push('<button type="button" data-quick-table>Cambia tavolo</button>');
-  if (r.status === 'confermata') {
-    actions.push(`<button type="button" data-id="${escapeHtml(r.id)}" data-to="arrivato">Segna arrivato</button>`);
-    actions.push(`<button type="button" data-id="${escapeHtml(r.id)}" data-to="no_show">Non presentato</button>`);
-    actions.push(`<button type="button" data-id="${escapeHtml(r.id)}" data-to="annullata">Annulla</button>`);
-  } else if (r.status === 'in_attesa') {
-    actions.push(`<button type="button" data-id="${escapeHtml(r.id)}" data-to="confermata">Conferma</button>`);
-    actions.push(`<button type="button" data-id="${escapeHtml(r.id)}" data-to="annullata">Rifiuta</button>`);
-  } else if (r.status === 'arrivato' || r.status === 'no_show' || r.status === 'annullata') {
-    actions.push(`<button type="button" data-id="${escapeHtml(r.id)}" data-to="confermata">Ripristina</button>`);
-  }
   if (!actions.length) return '';
   return `<details class="quick-menu">
     <summary aria-label="Azioni rapide"><span aria-hidden="true">•••</span></summary>
     <div class="quick-menu__panel">${actions.join('')}</div>
   </details>`;
+}
+
+function reservationTimelineHtml(r) {
+  const steps = [
+    { key: 'in_attesa', label: 'Prenotata' },
+    { key: 'confermata', label: 'Confermata' },
+    { key: 'arrivato', label: 'Arrivata' },
+    { key: 'terminato', label: 'Terminata' },
+  ];
+  const current = steps.findIndex((step) => step.key === r.status);
+  return `<div class="res__timeline" aria-label="Timeline stato prenotazione">
+    ${steps.map((step, index) => `<span class="${index <= current ? 'is-done' : ''}${index === current ? ' is-current' : ''}">${escapeHtml(step.label)}</span>`).join('')}
+  </div>`;
+}
+
+function reservationTimerHtml(r, opts = {}) {
+  const date = r.reservation_date || '';
+  const time = String(opts.timeLabel || '').slice(0, 5);
+  if (!date || !time) return '';
+  return `<small class="res__timer" data-res-timer data-res-date="${escapeHtml(date)}" data-res-time="${escapeHtml(time)}" data-res-status="${escapeHtml(r.status)}"></small>`;
+}
+
+function reservationDelayClass(r, opts = {}) {
+  if (!['in_attesa', 'confermata'].includes(r.status)) return '';
+  const diff = reservationMinuteDiff(r.reservation_date, opts.timeLabel);
+  if (diff === null || diff >= 0) return '';
+  const late = Math.abs(diff);
+  if (late >= 30) return 'res--late-strong';
+  if (late >= 10) return 'res--late';
+  return '';
+}
+
+function reservationMinuteDiff(date, time) {
+  const cleanTime = String(time || '').slice(0, 5);
+  if (!date || !/^\d{2}:\d{2}$/.test(cleanTime)) return null;
+  const target = new Date(`${date}T${cleanTime}:00`);
+  if (Number.isNaN(target.getTime())) return null;
+  return Math.round((target.getTime() - Date.now()) / 60000);
+}
+
+let quickMenuDismissalBound = false;
+let reservationTimerInterval = null;
+
+function closeQuickMenus(except = null) {
+  document.querySelectorAll('.quick-menu[open]').forEach((menu) => {
+    if (menu !== except) menu.removeAttribute('open');
+  });
+}
+
+function wireQuickMenuDismissal(container) {
+  container.querySelectorAll('.quick-menu').forEach((menu) => {
+    menu.addEventListener('toggle', () => {
+      if (menu.open) closeQuickMenus(menu);
+    });
+    menu.querySelectorAll('a, button').forEach((item) =>
+      item.addEventListener('click', () => menu.removeAttribute('open')));
+  });
+  if (quickMenuDismissalBound) return;
+  quickMenuDismissalBound = true;
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('.quick-menu')) closeQuickMenus();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeQuickMenus();
+  });
+  window.addEventListener('pagehide', () => closeQuickMenus());
+  window.addEventListener('scroll', () => closeQuickMenus(), { passive: true });
+}
+
+export function wireReservationTimers(container = document) {
+  updateReservationTimers(container);
+  clearInterval(reservationTimerInterval);
+  reservationTimerInterval = setInterval(() => updateReservationTimers(document), 60000);
+}
+
+function updateReservationTimers(scope = document) {
+  scope.querySelectorAll('[data-res-timer]').forEach((timer) => {
+    const diff = reservationMinuteDiff(timer.dataset.resDate, timer.dataset.resTime);
+    if (diff === null) {
+      timer.textContent = '';
+      return;
+    }
+    const status = timer.dataset.resStatus;
+    const minutes = Math.abs(diff);
+    if (status === 'terminato') {
+      timer.textContent = diff <= 0 ? `Terminata ${minutes} min fa` : 'Terminata';
+    } else if (diff > 0) {
+      timer.textContent = `Tra ${diff} min`;
+    } else {
+      timer.textContent = `In corso da ${minutes} min`;
+    }
+  });
 }
 
 function partySizeHtml(r, opts = {}) {
@@ -153,18 +236,7 @@ export function wireRowActions(container, onChange) {
 }
 
 export function wireReservationQuickActions(container) {
-  container.querySelectorAll('[data-quick-party]').forEach((button) =>
-    button.addEventListener('click', () => {
-      const card = button.closest('.res');
-      card?.querySelector('[data-party-edit]')?.click();
-      button.closest('details')?.removeAttribute('open');
-    }));
-  container.querySelectorAll('[data-quick-table]').forEach((button) =>
-    button.addEventListener('click', () => {
-      const card = button.closest('.res');
-      card?.querySelector('[data-table-picker-toggle]')?.click();
-      button.closest('details')?.removeAttribute('open');
-    }));
+  wireQuickMenuDismissal(container);
 }
 
 export function wirePartySizeEditing(container, onSave) {
