@@ -63,7 +63,7 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 9px;
 }
 .topbar__brand-text {
   min-width: 0;
@@ -72,11 +72,11 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
   gap: 3px;
 }
 .topbar__logo {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   display: block;
-  flex: 0 0 48px;
-  padding: 5px;
+  flex: 0 0 40px;
+  padding: 3px;
   border: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
   border-radius: 10px;
   background: color-mix(in srgb, var(--surface) 92%, var(--surface-soft));
@@ -440,10 +440,10 @@ html[data-admin-theme="dark"] .topbar__link.is-active {
   }
 
   .topbar__logo {
-    width: 40px;
-    height: 40px;
-    flex-basis: 40px;
-    padding: 4px;
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+    padding: 3px;
   }
 
   .topbar__venue {
@@ -739,10 +739,10 @@ html[data-admin-theme="dark"] .topbar__link.is-active {
   }
 
   .topbar__logo {
-    width: 32px;
-    height: 32px;
-    flex-basis: 32px;
-    padding: 3px;
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
+    padding: 2px;
   }
 
   .topbar__menu {
