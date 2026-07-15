@@ -10,12 +10,12 @@ export const TRANSITIONS = {
     { to: 'arrivato', label: 'Arrivato', cls: 'act--go' },
     { to: 'no_show', label: 'Non presentato', cls: 'act--warn' },
     { to: 'annullata', label: 'Annulla prenotazione', cls: 'act--mute' },
-    { to: 'confermata', label: 'Ripristina', cls: 'act--mute' },
+    { to: 'in_attesa', label: 'Ripristina', cls: 'act--mute' },
   ],
-  arrivato:   [{ to: 'terminato', label: 'Terminato', cls: 'act--ok' }, { to: 'confermata', label: 'Ripristina', cls: 'act--mute' }],
-  terminato:  [{ to: 'confermata', label: 'Ripristina', cls: 'act--mute' }],
-  no_show:    [{ to: 'confermata', label: 'Ripristina', cls: 'act--mute' }],
-  annullata:  [{ to: 'confermata', label: 'Ripristina', cls: 'act--mute' }],
+  arrivato:   [{ to: 'terminato', label: 'Terminato', cls: 'act--ok' }, { to: 'in_attesa', label: 'Ripristina', cls: 'act--mute' }],
+  terminato:  [{ to: 'in_attesa', label: 'Ripristina', cls: 'act--mute' }],
+  no_show:    [{ to: 'in_attesa', label: 'Ripristina', cls: 'act--mute' }],
+  annullata:  [{ to: 'in_attesa', label: 'Ripristina', cls: 'act--mute' }],
 };
 
 // Ordine di visualizzazione: attive prima, chiuse in fondo.
@@ -224,10 +224,20 @@ function emailVerificationBadgeHtml(r) {
 
 // Aggancia i click delle azioni di stato dentro `container`.
 export function wireRowActions(container, onChange) {
-  container.querySelectorAll('.act[data-id][data-to]').forEach((b) =>
-    b.addEventListener('click', () => onChange(b.dataset.id, b.dataset.to)));
-  container.querySelectorAll('.quick-menu [data-id][data-to]').forEach((b) =>
-    b.addEventListener('click', () => onChange(b.dataset.id, b.dataset.to)));
+  const bindStatusButton = (b) => {
+    b.addEventListener('click', async () => {
+      if (b.disabled) return;
+      const isRestore = b.dataset.to === 'in_attesa';
+      if (isRestore) b.disabled = true;
+      try {
+        await onChange(b.dataset.id, b.dataset.to);
+      } finally {
+        if (isRestore && b.isConnected) b.disabled = false;
+      }
+    });
+  };
+  container.querySelectorAll('.act[data-id][data-to]').forEach(bindStatusButton);
+  container.querySelectorAll('.quick-menu [data-id][data-to]').forEach(bindStatusButton);
 }
 
 export function wireReservationQuickActions(container) {

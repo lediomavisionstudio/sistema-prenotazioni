@@ -439,7 +439,7 @@ async function changeStatus(id, to) {
   }
   const { error } = await supabase.from('reservations').update({ status: to }).eq('id', id);
   if (error) { console.error(error); toast('Impossibile aggiornare lo stato.', true); return; }
-  toast('Stato aggiornato: ' + STATUS_LABEL[to]);
+  toast(to === 'in_attesa' ? 'Prenotazione ripristinata' : 'Stato aggiornato: ' + STATUS_LABEL[to]);
   if (res) await notifyCustomerStatusEmail(res, to);
 
   // Turno liberato: promuovi automaticamente il primo in lista d'attesa.
