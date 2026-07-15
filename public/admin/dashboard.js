@@ -274,9 +274,10 @@ function renderTabs() {
     const n = state.reservations.filter((r) => r.shift_id === s.shift_id && r.status !== 'annullata').length;
     const btn = document.createElement('button');
     btn.className = 'tab' + (s.key === state.slotKey ? ' is-active' : '');
-    btn.innerHTML =
-      `<span class="tab__name">${escapeHtml(s.name)}</span>` +
-      `<span class="tab__meta">${hhmm(s.start_time)}–${hhmm(s.end_time)} · ${n} pren.</span>`;
+    btn.innerHTML = isFreeHourShift(s)
+      ? `<span class="tab__name">${hhmm(s.start_time)}</span>`
+      : `<span class="tab__name">${escapeHtml(s.name)}</span>` +
+        `<span class="tab__meta">${hhmm(s.start_time)}–${hhmm(s.end_time)} · ${n} pren.</span>`;
     btn.addEventListener('click', () => { state.shiftId = s.shift_id; state.slotKey = s.key; render(); });
     box.appendChild(btn);
   }
@@ -566,7 +567,10 @@ function renderMap() {
 function populateManualShiftSelect() {
   const sel = $('mShift');
   sel.innerHTML = scheduleItemsForDate(state.date).map((s) =>
-    `<option value="${s.shift_id}">${escapeHtml(s.name)} (${hhmm(s.start_time)}–${hhmm(s.end_time)})</option>`).join('');
+    `<option value="${s.shift_id}">${isFreeHourShift(s)
+      ? hhmm(s.start_time)
+      : `${escapeHtml(s.name)} (${hhmm(s.start_time)}–${hhmm(s.end_time)})`
+    }</option>`).join('');
 }
 
 async function refreshManualTableSelect() {

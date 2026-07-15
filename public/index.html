@@ -1186,6 +1186,10 @@
     const todayLocal = () => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate(), 12); };
     const hhmm = (t) => (t || '').slice(0, 5);
     const isFreeHourShift = (shift) => String(shift?.code || '').startsWith('free_');
+    const isFreeHourDayShift = (shift) => {
+      const configuredShift = state.shifts.find((item) => item.id === (shift?.shift_id || shift?.id));
+      return isFreeHourShift(configuredShift || shift);
+    };
     const normalizeBookingMode = (mode) => mode === 'free' ? 'free' : 'shifts';
     const bookingModeForDate = (iso) => {
       if (!state.venue || state.venue.booking_same_mode_all_days !== false) {
@@ -2237,9 +2241,12 @@
         // selezionabile per mettersi in lista d'attesa.
         const selected = state.selShift && state.selShift.shift_id === s.shift_id;
         btn.className = 'time-slot' + (selected ? ' is-selected' : '') + (s.available ? '' : ' time-slot--wait');
+        const timeContent = isFreeHourDayShift(s)
+          ? `<div class="time-slot__name">${hhmm(s.start_time)}</div>`
+          : `<div class="time-slot__name">${s.shift_name}</div>` +
+            `<div class="time-slot__range">${hhmm(s.start_time)}–${hhmm(s.end_time)}</div>`;
         btn.innerHTML =
-          `<div class="time-slot__name">${s.shift_name}</div>` +
-          `<div class="time-slot__range">${hhmm(s.start_time)}–${hhmm(s.end_time)}</div>` +
+          timeContent +
           (s.available ? '' : `<div class="time-slot__full">Completo · lista d'attesa</div>`);
         btn.addEventListener('click', () => {
           state.selShift = s;
@@ -2622,7 +2629,9 @@
         waitlist,
         venueName: state.venue.name,
         dateText: cap(dfFull.format(d)),
-        shiftText: `${state.selShift.shift_name} · ${hhmm(state.selShift.start_time)}–${hhmm(state.selShift.end_time)}`,
+        shiftText: isFreeHourDayShift(state.selShift)
+          ? hhmm(state.selShift.start_time)
+          : `${state.selShift.shift_name} · ${hhmm(state.selShift.start_time)}–${hhmm(state.selShift.end_time)}`,
         partySize: state.coperti,
         status: res && res.status,
         queuePosition: res && res.queue_position,
