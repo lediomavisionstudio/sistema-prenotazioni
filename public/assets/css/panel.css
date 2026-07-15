@@ -1399,14 +1399,14 @@ html[data-admin-theme="dark"] .form-error {
   position: relative;
 }
 .password-input-wrap input {
-  padding-right: 48px;
+  padding-right: 58px;
 }
 .password-toggle {
   position: absolute;
   top: 50%;
   right: 4px;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   display: inline-grid;
   place-items: center;
   border: 0;
@@ -1414,18 +1414,42 @@ html[data-admin-theme="dark"] .form-error {
   background: transparent;
   color: var(--ink-soft);
   cursor: pointer;
-  font: inherit;
-  line-height: 1;
-  opacity: .74;
+  opacity: .68;
+  padding: 0;
   transform: translateY(-50%);
   transition: opacity .18s ease, color .18s ease, background .18s ease;
 }
+.password-toggle__icon {
+  grid-area: 1 / 1;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  transition: opacity .16s ease, transform .16s ease;
+}
+.password-toggle__icon--hide {
+  opacity: 0;
+  transform: scale(.92);
+}
+.password-toggle.is-visible .password-toggle__icon--show {
+  opacity: 0;
+  transform: scale(.92);
+}
+.password-toggle.is-visible .password-toggle__icon--hide {
+  opacity: 1;
+  transform: scale(1);
+}
 .password-toggle:hover,
 .password-toggle:focus-visible {
-  background: var(--surface-soft);
   color: var(--ink);
-  opacity: 1;
+  opacity: .95;
   outline: none;
+}
+.password-toggle:focus-visible {
+  box-shadow: 0 0 0 3px var(--tomato-soft);
 }
 
 /* Settings tabelle --------------------------------------------------------- */
