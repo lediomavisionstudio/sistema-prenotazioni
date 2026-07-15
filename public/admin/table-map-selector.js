@@ -47,13 +47,6 @@ function ensureModal() {
         </div>
         <button class="table-map-modal__close" type="button" data-table-map-close aria-label="Chiudi">×</button>
       </header>
-      <div class="table-map-legend" aria-label="Legenda mappa tavoli">
-        <span><i class="table-map-legend__dot is-free"></i>Libero</span>
-        <span><i class="table-map-legend__dot is-confirmed"></i>Confermato</span>
-        <span><i class="table-map-legend__dot is-arrived"></i>Arrivato</span>
-        <span><i class="table-map-legend__dot is-finished"></i>Terminato</span>
-        <span><i class="table-map-legend__dot is-busy"></i>Occupato</span>
-      </div>
       <div class="table-map-modal__body" data-table-map-body></div>
       <p class="table-map-modal__error" data-table-map-error hidden></p>
       <div class="table-map-move-confirm" data-table-map-move-confirm hidden>
@@ -107,14 +100,14 @@ function renderModal() {
     error.textContent = activeContext.suggestionMessage || '';
     error.hidden = !activeContext.suggestionMessage;
   }
-  modal.querySelector('[data-table-map-body]').innerHTML = zones.map((zone) => `
+  modal.querySelector('[data-table-map-body]').innerHTML = `${tableMapLegendHtml()}${zones.map((zone) => `
     <section class="table-map-zone">
       <h3>${escapeHtml(zone.name)}</h3>
       <div class="table-map-grid">
         ${zone.tables.map(tableMapCardHtml).join('')}
       </div>
     </section>
-  `).join('');
+  `).join('')}`;
   modal.querySelectorAll('[data-table-map-choice]').forEach((button) =>
     button.addEventListener('click', () => toggleTable(button.dataset.tableMapChoice)));
   updateSummary();
@@ -242,6 +235,16 @@ function groupByZone(rows) {
     map.get(zone).push(row);
   });
   return [...map.entries()].map(([name, tables]) => ({ name, tables }));
+}
+
+function tableMapLegendHtml() {
+  return `<div class="table-map-legend" aria-label="Legenda mappa tavoli">
+    <span><i class="table-map-legend__dot is-free"></i>Libero</span>
+    <span><i class="table-map-legend__dot is-confirmed"></i>Confermato</span>
+    <span><i class="table-map-legend__dot is-arrived"></i>Arrivato</span>
+    <span><i class="table-map-legend__dot is-finished"></i>Terminato</span>
+    <span><i class="table-map-legend__dot is-busy"></i>Occupato</span>
+  </div>`;
 }
 
 function tableMapCardHtml(row) {
