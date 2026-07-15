@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="../assets/js/admin-theme.js"></script>
   <link rel="stylesheet" href="../assets/css/theme.css" />
   <link rel="stylesheet" href="../assets/css/panel.css" />
   <style>
@@ -194,6 +195,28 @@
     <p class="form-error" id="readonlyBanner" hidden style="margin-bottom:18px">
       Solo il titolare può modificare la configurazione. Puoi consultarla in sola lettura.
     </p>
+
+    <!-- Aspetto -->
+    <section class="section">
+      <div class="section__head"><h2 class="section__title">Aspetto</h2></div>
+      <div class="card">
+        <p style="margin:0 0 12px;color:var(--ink-soft);font-size:.88rem">Personalizza il tema del gestionale.</p>
+        <div class="theme-options" id="adminThemeOptions" role="radiogroup" aria-label="Tema gestionale">
+          <label class="theme-option">
+            <input type="radio" name="adminTheme" value="light" />
+            <span>Chiaro</span>
+          </label>
+          <label class="theme-option">
+            <input type="radio" name="adminTheme" value="dark" />
+            <span>Scuro</span>
+          </label>
+          <label class="theme-option">
+            <input type="radio" name="adminTheme" value="system" />
+            <span>Sistema</span>
+          </label>
+        </div>
+      </div>
+    </section>
 
     <!-- Dati locale -->
     <section class="section">

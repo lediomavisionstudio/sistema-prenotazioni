@@ -59,3 +59,38 @@
   --leading-body: 1.62;
   --tracking-label: 0.04em;
 }
+
+html[data-admin-theme="dark"] {
+  --color-primary:    #f06454;
+  --color-secondary:  #74a8ff;
+  --color-success:    #5fd59a;
+  --color-warning:    #f2c66d;
+  --color-danger:     #ff827a;
+  --color-background: #0f131a;
+  --color-surface:    #171d26;
+  --color-card:       #1d2530;
+  --color-border:     #2d3847;
+  --color-text:       #eef2f7;
+  --color-muted:      #aeb8c6;
+
+  --paper:        var(--color-background);
+  --surface:      var(--color-surface);
+  --surface-soft: #222b37;
+  --ink:          var(--color-text);
+  --ink-soft:     var(--color-muted);
+  --tomato:       var(--color-primary);
+  --tomato-dark:  #ff9a90;
+  --tomato-soft:  rgba(240, 100, 84, .16);
+  --line:         var(--color-border);
+  --disabled-bg:  #202834;
+
+  --st-attesa:      #f2c66d; --st-attesa-bg:      rgba(242, 198, 109, .16);
+  --st-confermata:  #5fd59a; --st-confermata-bg:  rgba(95, 213, 154, .16);
+  --st-arrivato:    #74a8ff; --st-arrivato-bg:    rgba(116, 168, 255, .16);
+  --st-noshow:      #ff827a; --st-noshow-bg:      rgba(255, 130, 122, .16);
+  --st-annullata:   #b4bfcc; --st-annullata-bg:   rgba(180, 191, 204, .16);
+
+  --ok: var(--color-success);
+  --shadow:    0 22px 60px rgba(0, 0, 0, .34);
+  --shadow-sm: 0 12px 28px rgba(0, 0, 0, .22);
+}

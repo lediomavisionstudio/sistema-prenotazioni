@@ -39,6 +39,7 @@ async function init() {
 
     await loadVenueDetails();
     await reloadAll();
+    renderThemeSettings();
     renderVenueForm();
     renderWeekdays();
     renderScheduleConfig();
@@ -67,6 +68,13 @@ async function reloadAll() {
 }
 
 function dis() { return state.canEdit ? '' : 'disabled'; }
+
+function renderThemeSettings() {
+  const preference = window.AdminTheme?.getPreference?.() || 'system';
+  document.querySelectorAll('input[name="adminTheme"]').forEach((input) => {
+    input.checked = input.value === preference;
+  });
+}
 
 // --- Dati locale ----------------------------------------------------------
 // loadCurrentVenue() carica solo pochi campi; qui prendiamo la riga completa
@@ -506,6 +514,12 @@ function renderWeekdays() {
 
 // --- Wiring ----------------------------------------------------------------
 function wire() {
+  document.querySelectorAll('input[name="adminTheme"]').forEach((input) =>
+    input.addEventListener('change', () => {
+      if (!input.checked) return;
+      window.AdminTheme?.setPreference?.(input.value);
+      renderThemeSettings();
+    }));
   $('vBrandPick').addEventListener('input', () => { $('vBrand').value = $('vBrandPick').value; });
   $('saveVenue').addEventListener('click', saveVenue);
   $('saveTableChanges').addEventListener('click', saveTableChanges);
