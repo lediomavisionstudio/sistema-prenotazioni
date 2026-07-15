@@ -281,6 +281,73 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
 .command-palette__empty {
   padding: 14px 12px;
 }
+
+.admin-confirm-modal[hidden] {
+  display: none !important;
+}
+
+.admin-confirm-modal {
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  animation: adminModalFade .2s ease both;
+}
+
+.admin-confirm-modal__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, .34);
+  backdrop-filter: blur(8px);
+}
+
+.admin-confirm-modal__card {
+  position: relative;
+  width: min(420px, 100%);
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  animation: adminModalScale .2s ease both;
+}
+
+.admin-confirm-modal__title {
+  margin: 0 0 8px;
+  font-family: var(--font-title);
+  font-size: 1.28rem;
+  line-height: 1.1;
+}
+
+.admin-confirm-modal__text {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: .92rem;
+}
+
+.admin-confirm-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.admin-confirm-modal__danger {
+  background: var(--tomato);
+}
+
+@keyframes adminModalFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes adminModalScale {
+  from { opacity: 0; transform: scale(.96) translateY(6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
 .topbar__toggle,
 .topbar__menu,
 .topbar__scrim {

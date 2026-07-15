@@ -2,7 +2,7 @@
 // stato, mappa tavoli e inserimento manuale. Aggiornamento live via Supabase
 // Realtime sulla tabella reservations.
 import {
-  supabase, requireSession, signOut, loadCurrentVenue,
+  supabase, requireSession, confirmSignOut, loadCurrentVenue,
   todayISO, addDays, isoDow, formatLong, hhmm, escapeHtml, toast,
   STATUS_LABEL,
 } from './app.js';
@@ -47,7 +47,7 @@ async function init() {
   state.session = await requireSession();
   if (!state.session) return;
 
-  $('logoutBtn').addEventListener('click', signOut);
+  $('logoutBtn').addEventListener('click', confirmSignOut);
 
   try {
     const current = await loadCurrentVenue();

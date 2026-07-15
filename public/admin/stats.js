@@ -2,7 +2,7 @@
 // (nessun dato pre-aggregato). I dati rispettano la RLS: ogni utente vede solo
 // i propri locali. Grafici resi con Chart.js (caricato via CDN in stats.html).
 import {
-  supabase, requireSession, signOut, loadCurrentVenue,
+  supabase, requireSession, confirmSignOut, loadCurrentVenue,
   todayISO, toISO, isoToDate, addDays, isoDow, hhmm, escapeHtml, toast, WEEKDAYS,
 } from './app.js';
 
@@ -39,7 +39,7 @@ async function init() {
   state.session = await requireSession();
   if (!state.session) return;
 
-  $('logoutBtn').addEventListener('click', signOut);
+  $('logoutBtn').addEventListener('click', confirmSignOut);
 
   try {
     const current = await loadCurrentVenue();

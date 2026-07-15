@@ -2,7 +2,7 @@
 // Le scritture su queste tabelle sono consentite dalla RLS solo al ruolo
 // 'owner'; per lo staff la pagina è in sola lettura.
 import {
-  supabase, requireSession, signOut, loadCurrentVenue,
+  supabase, requireSession, confirmSignOut, loadCurrentVenue,
   hhmm, escapeHtml, toast, WEEKDAYS,
 } from './app.js';
 
@@ -26,7 +26,7 @@ const SCHEDULE_CONFIG_KEY = 'booking_admin_schedule_mode';
 async function init() {
   state.session = await requireSession();
   if (!state.session) return;
-  $('logoutBtn').addEventListener('click', signOut);
+  $('logoutBtn').addEventListener('click', confirmSignOut);
 
   try {
     const current = await loadCurrentVenue();

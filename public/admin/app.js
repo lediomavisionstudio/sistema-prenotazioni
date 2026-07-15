@@ -40,6 +40,40 @@ export async function signOut() {
   location.replace('index.html');
 }
 
+let logoutModal;
+
+export function confirmSignOut() {
+  if (!logoutModal) {
+    logoutModal = document.createElement('div');
+    logoutModal.className = 'admin-confirm-modal';
+    logoutModal.hidden = true;
+    logoutModal.innerHTML = `
+      <div class="admin-confirm-modal__overlay" data-logout-cancel></div>
+      <section class="admin-confirm-modal__card" role="dialog" aria-modal="true" aria-labelledby="logoutConfirmTitle">
+        <h2 class="admin-confirm-modal__title" id="logoutConfirmTitle">Uscire dal gestionale?</h2>
+        <p class="admin-confirm-modal__text">Sei sicuro di voler uscire?</p>
+        <div class="admin-confirm-modal__actions">
+          <button class="btn btn--ghost" type="button" data-logout-cancel>Annulla</button>
+          <button class="btn btn--primary admin-confirm-modal__danger" type="button" data-logout-confirm>Esci</button>
+        </div>
+      </section>
+    `;
+    document.body.appendChild(logoutModal);
+    logoutModal.querySelectorAll('[data-logout-cancel]').forEach((node) =>
+      node.addEventListener('click', closeLogoutConfirm));
+    logoutModal.querySelector('[data-logout-confirm]')?.addEventListener('click', signOut);
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && logoutModal && !logoutModal.hidden) closeLogoutConfirm();
+    });
+  }
+  logoutModal.hidden = false;
+  logoutModal.querySelector('[data-logout-cancel]')?.focus({ preventScroll: true });
+}
+
+function closeLogoutConfirm() {
+  if (logoutModal) logoutModal.hidden = true;
+}
+
 // --- Locale corrente -------------------------------------------------------
 // Un utente staff può appartenere a più locali (venue_staff). Per la fase
 // pilota selezioniamo il primo; se in futuro servirà, qui si aggancia un

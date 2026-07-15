@@ -2,7 +2,7 @@
 // data (e turno), con le stesse azioni di stato della dashboard. Aggiornamento
 // live via Realtime così una nuova prenotazione dal widget compare da sola.
 import {
-  supabase, requireSession, signOut, loadCurrentVenue,
+  supabase, requireSession, confirmSignOut, loadCurrentVenue,
   todayISO, addDays, formatLong, hhmm, escapeHtml, toast, STATUS_LABEL,
 } from './app.js';
 import {
@@ -43,7 +43,7 @@ const updatePartySize = createPartySizeUpdater({
 async function init() {
   state.session = await requireSession();
   if (!state.session) return;
-  $('logoutBtn').addEventListener('click', signOut);
+  $('logoutBtn').addEventListener('click', confirmSignOut);
 
   try {
     const current = await loadCurrentVenue();
