@@ -180,7 +180,7 @@ function tableAssignmentHtml(r, opts = {}) {
     const selected = selectedIds.has(table.id);
     const disabled = table.disabled && !selected;
     const status = table.busy && !selected ? 'Occupato' : table.disabled && !selected ? 'Fuori servizio' : 'Disponibile';
-    return `<label class="table-picker__option${disabled ? ' is-disabled' : ''}" data-zone="${escapeHtml(table.zoneName || 'Sala')}" data-guest="${escapeHtml(table.guestName || '')}" data-detail="${escapeHtml(table.guestDetail || '')}">
+    return `<label class="table-picker__option${disabled ? ' is-disabled' : ''}" data-zone="${escapeHtml(table.zoneName || 'Sala')}" data-guest="${escapeHtml(table.guestName || '')}" data-detail="${escapeHtml(table.guestDetail || '')}" data-guest-phone="${escapeHtml(table.guestPhone || '')}" data-guest-email="${escapeHtml(table.guestEmail || '')}" data-guest-notes="${escapeHtml(table.guestNotes || '')}" data-guest-party="${escapeHtml(table.guestParty || '')}" data-guest-time="${escapeHtml(table.guestTime || '')}" data-guest-status="${escapeHtml(table.guestStatus || '')}">
       <input type="checkbox" data-table-choice="${escapeHtml(table.id)}" ${selected ? 'checked' : ''} ${disabled ? 'disabled' : ''} />
       <span class="table-picker__check" aria-hidden="true"></span>
       <span class="table-picker__main">

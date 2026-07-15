@@ -316,6 +316,12 @@ function tableOptionsForReservation(reservation) {
       disabled: busy && !selected.has(table.id),
       guestName: occupant ? `${occupant.customer_first_name || ''} ${occupant.customer_last_name || ''}`.trim() : '',
       guestDetail: occupant ? `${occupant.party_size} persone · ${shift ? hhmm(shift.start_time) + ' · ' : ''}${STATUS_LABEL[occupant.status] || occupant.status}` : '',
+      guestPhone: occupant?.customer_phone || '',
+      guestEmail: occupant?.customer_email || '',
+      guestNotes: occupant?.notes || '',
+      guestParty: occupant?.party_size || '',
+      guestTime: shift?.start_time ? hhmm(shift.start_time) : '',
+      guestStatus: occupant ? (STATUS_LABEL[occupant.status] || occupant.status) : '',
       label: `${table.code} (${table.seats_max})${busy ? ' - occupato' : ''}`,
     };
   });
@@ -323,6 +329,8 @@ function tableOptionsForReservation(reservation) {
 
 async function assignTable(id, tableId) {
   try {
+    const reservation = state.reservations.find((row) => row.id === id);
+    const previousIds = reservation ? reservationTableIds(reservation) : [];
     const tableIds = Array.isArray(tableId) ? tableId : (tableId ? [tableId] : []);
     const { error } = Array.isArray(tableId)
       ? await supabase.rpc('assign_reservation_tables', {
@@ -334,7 +342,7 @@ async function assignTable(id, tableId) {
           p_table_id: tableId,
         });
     if (error) throw error;
-    toast(tableIds.length > 1 ? 'Tavoli assegnati' : tableIds.length ? 'Tavolo assegnato' : 'Tavolo rimosso');
+    toast(tableAssignmentToast(previousIds, tableIds));
     await load();
     return true;
   } catch (error) {
@@ -342,6 +350,12 @@ async function assignTable(id, tableId) {
     toast(tableAssignmentError(error), true);
     return false;
   }
+}
+
+function tableAssignmentToast(previousIds, nextIds) {
+  if (!nextIds.length) return 'Tavolo liberato';
+  if (previousIds.length) return 'Tavolo aggiornato';
+  return 'Tavolo assegnato';
 }
 
 function tableAssignmentError(error) {

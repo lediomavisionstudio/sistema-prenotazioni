@@ -1066,14 +1066,57 @@ html[data-admin-theme="dark"] .topbar__link.is-active {
   overflow: auto;
   padding: 18px 22px 96px;
 }
+.table-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  padding: 13px 22px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-soft) 70%, transparent);
+}
+.table-map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink-soft);
+  font-size: .78rem;
+  font-weight: 700;
+}
+.table-map-legend__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 10%, transparent);
+}
+.table-map-legend__dot.is-free { color: #16a34a; background: #16a34a; }
+.table-map-legend__dot.is-confirmed { color: #f59e0b; background: #f59e0b; }
+.table-map-legend__dot.is-arrived { color: #2563eb; background: #2563eb; }
+.table-map-legend__dot.is-finished { color: #111827; background: #111827; }
+.table-map-legend__dot.is-busy { color: #dc2626; background: #dc2626; }
+.table-map-zone {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-soft) 45%, transparent);
+}
 .table-map-zone + .table-map-zone { margin-top: 18px; }
 .table-map-zone h3 {
-  margin: 0 0 10px;
-  color: var(--ink-soft);
-  font-size: .75rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  color: var(--ink);
+  font-size: .78rem;
   font-weight: 800;
-  letter-spacing: .07em;
+  letter-spacing: .09em;
   text-transform: uppercase;
+}
+.table-map-zone h3::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--line);
 }
 .table-map-grid {
   display: grid;
@@ -1081,6 +1124,7 @@ html[data-admin-theme="dark"] .topbar__link.is-active {
   gap: 10px;
 }
 .table-map-table {
+  position: relative;
   min-height: 112px;
   display: flex;
   flex-direction: column;
@@ -1109,12 +1153,69 @@ html[data-admin-theme="dark"] .topbar__link.is-active {
   color: var(--ink-soft);
   text-overflow: ellipsis;
 }
-.table-map-table.is-free { border-left: 4px solid var(--st-confermata); }
+.table-map-table__guest {
+  margin-top: 3px;
+  font-weight: 700;
+  color: var(--ink) !important;
+}
+.table-map-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  z-index: 20;
+  width: max-content;
+  max-width: 240px;
+  display: grid;
+  gap: 7px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 6px);
+  transition: opacity .18s ease, transform .18s ease;
+}
+.table-map-tooltip span {
+  display: grid;
+  gap: 2px;
+  color: var(--ink);
+  white-space: normal;
+}
+.table-map-tooltip b {
+  font-size: .68rem;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.table-map-table:hover .table-map-tooltip,
+.table-map-table:focus-visible .table-map-tooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.table-map-table.is-free { border-left: 4px solid #16a34a; }
 .table-map-table.is-selected {
   border-color: var(--tomato);
   background: var(--tomato-soft);
 }
-.table-map-table.is-busy { border-left: 4px solid var(--st-confermata); }
+.table-map-table.is-confirmed {
+  border-left: 4px solid #f59e0b;
+  background: color-mix(in srgb, #f59e0b 10%, var(--surface));
+}
+.table-map-table.is-arrived {
+  border-left: 4px solid #2563eb;
+  background: color-mix(in srgb, #2563eb 9%, var(--surface));
+}
+.table-map-table.is-finished {
+  border-left: 4px solid #111827;
+  background: color-mix(in srgb, #111827 8%, var(--surface));
+}
+.table-map-table.is-busy {
+  border-left: 4px solid #dc2626;
+  background: color-mix(in srgb, #dc2626 8%, var(--surface));
+}
 .table-map-table.is-off,
 .table-map-table.is-disabled {
   opacity: .62;
@@ -1125,6 +1226,33 @@ html[data-admin-theme="dark"] .topbar__link.is-active {
   color: var(--tomato-dark);
   font-size: .86rem;
   font-weight: 700;
+}
+.table-map-move-confirm {
+  margin: 0 22px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  box-shadow: var(--shadow-sm);
+  animation: adminModalScale .18s ease both;
+}
+.table-map-move-confirm[hidden] { display: none !important; }
+.table-map-move-confirm p {
+  margin: 0;
+  color: var(--ink);
+  font-size: .92rem;
+  line-height: 1.45;
+}
+.table-map-move-confirm div {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
 }
 .table-map-modal__footer {
   position: sticky;
@@ -1159,7 +1287,9 @@ html[data-admin-theme="dark"] .topbar__link.is-active {
 @media (max-width: 700px) {
   .table-map-modal { padding: 8px; }
   .table-map-modal__card { max-height: calc(100dvh - 16px); }
+  .table-map-legend { padding: 12px 14px; }
   .table-map-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .table-map-zone { padding: 12px; }
   .table-map-modal__head,
   .table-map-modal__footer {
     padding: 14px;
@@ -1169,6 +1299,11 @@ html[data-admin-theme="dark"] .topbar__link.is-active {
     align-items: stretch;
     flex-direction: column;
   }
+  .table-map-move-confirm {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .table-map-move-confirm div { justify-content: flex-end; }
   .table-map-modal__actions { justify-content: flex-end; }
 }
 
@@ -1350,12 +1485,12 @@ html[data-admin-theme="dark"] .email-badge--none { color: var(--ink-soft); backg
 }
 
 .toast {
-  position: fixed; right: 22px; bottom: 22px; transform: translateY(8px);
+  position: fixed; right: 22px; bottom: 22px; transform: translateY(8px) scale(.96);
   background: var(--ink); color: #fff; padding: 11px 18px; border-radius: 999px;
   font-size: 0.86rem; box-shadow: var(--shadow); z-index: 50; opacity: 0;
-  transition: opacity .2s, transform .2s; pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease; pointer-events: none;
 }
-.toast.is-show { opacity: 1; transform: translateY(-4px); }
+.toast.is-show { opacity: 1; transform: translateY(-4px) scale(1); }
 .toast--err { background: var(--tomato-dark); }
 html[data-admin-theme="dark"] .toast {
   background: var(--surface);

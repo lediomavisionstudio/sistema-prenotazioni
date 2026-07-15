@@ -468,6 +468,7 @@ function tableOptionsForReservation(reservation) {
   return state.tables.map((table) => {
     const occupant = occupants.get(table.id);
     const busy = !!occupant;
+    const shift = occupant ? state.shifts.find((item) => item.id === occupant.shift_id) : null;
     return {
       id: table.id,
       code: table.code,
@@ -477,6 +478,12 @@ function tableOptionsForReservation(reservation) {
       disabled: busy && !selected.has(table.id),
       guestName: occupant ? `${occupant.customer_first_name || ''} ${occupant.customer_last_name || ''}`.trim() : '',
       guestDetail: occupant ? `${occupant.party_size} persone · ${STATUS_LABEL[occupant.status] || occupant.status}` : '',
+      guestPhone: occupant?.customer_phone || '',
+      guestEmail: occupant?.customer_email || '',
+      guestNotes: occupant?.notes || '',
+      guestParty: occupant?.party_size || '',
+      guestTime: shift?.start_time ? hhmm(shift.start_time) : '',
+      guestStatus: occupant ? (STATUS_LABEL[occupant.status] || occupant.status) : '',
       label: `${table.code} (${table.seats_max})${busy ? ' - occupato' : ''}`,
     };
   });
@@ -484,13 +491,15 @@ function tableOptionsForReservation(reservation) {
 
 async function assignTable(id, tableIds) {
   try {
+    const reservation = state.reservations.find((row) => row.id === id);
+    const previousIds = reservation ? reservationTableIds(reservation) : [];
     const ids = Array.isArray(tableIds) ? tableIds : (tableIds ? [tableIds] : []);
     const { error } = await supabase.rpc('assign_reservation_tables', {
       p_reservation_id: id,
       p_table_ids: ids,
     });
     if (error) throw error;
-    toast(ids.length > 1 ? 'Tavoli assegnati' : ids.length ? 'Tavolo assegnato' : 'Tavolo rimosso');
+    toast(tableAssignmentToast(previousIds, ids));
     await loadDay();
     return true;
   } catch (error) {
@@ -498,6 +507,12 @@ async function assignTable(id, tableIds) {
     toast(tableAssignmentError(error), true);
     return false;
   }
+}
+
+function tableAssignmentToast(previousIds, nextIds) {
+  if (!nextIds.length) return 'Tavolo liberato';
+  if (previousIds.length) return 'Tavolo aggiornato';
+  return 'Tavolo assegnato';
 }
 
 function tableAssignmentError(error) {
