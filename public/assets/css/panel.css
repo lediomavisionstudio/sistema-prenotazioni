@@ -1064,14 +1064,14 @@ html[data-admin-theme="dark"] .topbar__link.is-active {
 }
 .table-map-modal__body {
   overflow: auto;
-  padding: 18px 22px 96px;
+  padding: 22px 22px 96px;
 }
 .table-map-legend {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 14px;
-  padding: 13px 22px;
-  border-bottom: 1px solid var(--line);
+  padding: 16px 22px;
+  border-bottom: 0;
   background: color-mix(in srgb, var(--surface-soft) 70%, transparent);
 }
 .table-map-legend span {
@@ -1095,12 +1095,12 @@ html[data-admin-theme="dark"] .topbar__link.is-active {
 .table-map-legend__dot.is-finished { color: #111827; background: #111827; }
 .table-map-legend__dot.is-busy { color: #dc2626; background: #dc2626; }
 .table-map-zone {
-  padding: 16px;
+  padding: 18px 16px 16px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--surface-soft) 45%, transparent);
 }
-.table-map-zone + .table-map-zone { margin-top: 18px; }
+.table-map-zone + .table-map-zone { margin-top: 22px; }
 .table-map-zone h3 {
   display: flex;
   align-items: center;
@@ -1122,6 +1122,7 @@ html[data-admin-theme="dark"] .topbar__link.is-active {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
   gap: 10px;
+  margin-top: 2px;
 }
 .table-map-table {
   position: relative;
