@@ -160,6 +160,35 @@ export function wirePartySizeEditing(container, onSave) {
   });
 }
 
+export function createPartySizeUpdater({ supabase, toast, getReservations, reload, rerender }) {
+  return async function updatePartySize(id, nextPartySize, previousPartySize) {
+    const reservation = getReservations().find((row) => row.id === id);
+    if (!reservation) return;
+    const partySize = Number.parseInt(nextPartySize, 10);
+    if (!Number.isInteger(partySize) || partySize < 1) {
+      toast('Inserisci un numero di coperti valido.', true);
+      return;
+    }
+    if (partySize === previousPartySize) {
+      rerender();
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('reservations')
+        .update({ party_size: partySize })
+        .eq('id', id);
+      if (error) throw error;
+      toast('Numero di coperti aggiornato.');
+      await reload();
+    } catch (error) {
+      console.error('[reservations] aggiornamento coperti fallito:', error);
+      toast('Impossibile aggiornare il numero di coperti.', true);
+      await reload();
+    }
+  };
+}
+
 export function wireTableAssignment(container, onAssign) {
   container.querySelectorAll('[data-table-picker]').forEach((picker) => {
     enforceTableSelectionMode(picker);

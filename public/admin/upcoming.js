@@ -5,7 +5,10 @@ import {
   supabase, requireSession, signOut, loadCurrentVenue,
   todayISO, addDays, formatLong, hhmm, escapeHtml, toast, STATUS_LABEL,
 } from './app.js';
-import { statusRank, reservationCardHtml, wirePartySizeEditing, wireRowActions, wireTableAssignment } from './resui.js';
+import {
+  createPartySizeUpdater, statusRank, reservationCardHtml,
+  wirePartySizeEditing, wireRowActions, wireTableAssignment,
+} from './resui.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -28,6 +31,14 @@ const FILTERS = {
   in_attesa: (r) => r.status === 'in_attesa',
   tutte: () => true,
 };
+
+const updatePartySize = createPartySizeUpdater({
+  supabase,
+  toast,
+  getReservations: () => state.reservations,
+  reload: load,
+  rerender: render,
+});
 
 async function init() {
   state.session = await requireSession();
@@ -252,33 +263,6 @@ async function changeStatus(id, to) {
   toast('Stato aggiornato: ' + STATUS_LABEL[to]);
   if (res) await notifyCustomerStatusEmail(res, to);
   await load();
-}
-
-async function updatePartySize(id, nextPartySize, previousPartySize) {
-  const reservation = state.reservations.find((r) => r.id === id);
-  if (!reservation) return;
-  const partySize = Number.parseInt(nextPartySize, 10);
-  if (!Number.isInteger(partySize) || partySize < 1) {
-    toast('Inserisci un numero di coperti valido.', true);
-    return;
-  }
-  if (partySize === previousPartySize) {
-    render();
-    return;
-  }
-  try {
-    const { error } = await supabase
-      .from('reservations')
-      .update({ party_size: partySize })
-      .eq('id', id);
-    if (error) throw error;
-    toast('Numero di coperti aggiornato.');
-    await load();
-  } catch (error) {
-    console.error('[reservations] aggiornamento coperti fallito:', error);
-    toast('Impossibile aggiornare il numero di coperti.', true);
-    await load();
-  }
 }
 
 function assignedCapacity(reservation) {

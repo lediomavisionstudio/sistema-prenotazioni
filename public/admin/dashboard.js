@@ -7,7 +7,7 @@ import {
   STATUS_LABEL,
 } from './app.js';
 import {
-  statusRank, reservationCardHtml, wireRowActions, wireTableAssignment,
+  createPartySizeUpdater, statusRank, reservationCardHtml, wirePartySizeEditing, wireRowActions, wireTableAssignment,
   waitlistCardHtml, wireWaitlistActions,
 } from './resui.js';
 import { createSharedCalendar } from '../assets/js/shared-calendar.js';
@@ -30,6 +30,14 @@ const state = {
   waitlist: [],        // voci in coda del giorno (status in_coda, tutti i turni)
   capacity: 0,         // somma seats_max tavoli attivi
 };
+
+const updatePartySize = createPartySizeUpdater({
+  supabase,
+  toast,
+  getReservations: () => state.reservations,
+  reload: loadDay,
+  rerender: render,
+});
 
 // ---------------------------------------------------------------------------
 // Avvio
@@ -305,9 +313,12 @@ function renderList() {
     timeLabel: shift ? hhmm(shift.start_time) : '',
     tableCode: tableCodes(r),
     tableOptions: tableOptionsForReservation(r),
+    canEditPartySize: true,
+    capacityWarning: hasInsufficientAssignedCapacity(r),
   })).join('');
 
   wireRowActions(list, changeStatus);
+  wirePartySizeEditing(list, updatePartySize);
   wireTableAssignment(list, assignTable);
 }
 
@@ -315,6 +326,10 @@ async function changeStatus(id, to) {
   const res = state.reservations.find((r) => r.id === id);
   if (to === 'confermata' && res && !reservationTableIds(res).length) {
     toast('Assegna un tavolo prima di confermare la prenotazione.', true);
+    return;
+  }
+  if (to === 'confermata' && res && hasInsufficientAssignedCapacity(res)) {
+    toast('La capienza dei tavoli assegnati non è più sufficiente. Modifica l’assegnazione dei tavoli.', true);
     return;
   }
   const { error } = await supabase.from('reservations').update({ status: to }).eq('id', id);
@@ -383,6 +398,15 @@ function tableAssignmentError(error) {
   if (raw.includes('TAVOLO_GIA_ASSEGNATO')) return 'Questo tavolo è già assegnato nello stesso turno.';
   if (raw.includes('TAVOLO_NON_VALIDO')) return 'Tavolo non valido.';
   return 'Impossibile assegnare il tavolo.';
+}
+
+function assignedCapacity(reservation) {
+  return reservationTableIds(reservation).reduce((sum, tableId) =>
+    sum + Number(state.tablesById.get(tableId)?.seats_max || 0), 0);
+}
+
+function hasInsufficientAssignedCapacity(reservation) {
+  return reservationTableIds(reservation).length > 0 && assignedCapacity(reservation) < Number(reservation.party_size || 0);
 }
 
 function reservationTableIds(reservation) {
