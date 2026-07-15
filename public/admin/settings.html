@@ -153,6 +153,40 @@
       display: none !important;
     }
 
+    .closures-form {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      align-items: end;
+    }
+
+    .closures-form .field--full {
+      grid-column: 1 / -1;
+    }
+
+    .closures-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .closure-row {
+      display: grid;
+      grid-template-columns: minmax(130px, 180px) minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .closure-row__date {
+      font-weight: 800;
+    }
+
+    .closure-row__reason {
+      min-width: 0;
+      color: var(--ink-soft);
+      font-size: .86rem;
+    }
+
     @media (max-width: 700px) {
       .schedule-mode-save,
       .schedule-day {
@@ -162,6 +196,15 @@
 
       .schedule-mode-save .btn {
         align-self: flex-start;
+      }
+
+      .closures-form,
+      .closure-row {
+        grid-template-columns: 1fr;
+      }
+
+      .closure-row .act {
+        justify-self: start;
       }
     }
   </style>
@@ -350,6 +393,31 @@
         <p style="margin:0 0 12px;color:var(--ink-soft);font-size:.88rem">Seleziona i giorni in cui il locale è sempre chiuso: non compariranno nel widget di prenotazione.</p>
         <div id="weekdayBoxes" style="display:flex;flex-wrap:wrap;gap:10px"></div>
         <button class="btn btn--primary btn--sm" id="saveClosure" type="button" style="margin-top:14px">Salva chiusure</button>
+      </div>
+    </section>
+    <!-- Chiusure straordinarie -->
+    <section class="section">
+      <div class="section__head"><h2 class="section__title">Chiusure</h2></div>
+      <div class="card">
+        <p style="margin:0 0 12px;color:var(--ink-soft);font-size:.88rem">Aggiungi giorni singoli o intervalli in cui il locale non accetta prenotazioni.</p>
+        <form id="closureAdd" class="closures-form">
+          <div class="field">
+            <label for="closureStart">Dal</label>
+            <input id="closureStart" type="date" required />
+          </div>
+          <div class="field">
+            <label for="closureEnd">Al</label>
+            <input id="closureEnd" type="date" />
+          </div>
+          <div class="field">
+            <label for="closureReason">Motivo facoltativo</label>
+            <input id="closureReason" maxlength="160" placeholder="es. ferie, evento privato" />
+          </div>
+          <div class="field field--full">
+            <button class="btn btn--primary btn--sm" id="addClosureBtn" type="submit">+ Aggiungi chiusura</button>
+          </div>
+        </form>
+        <div class="closures-list" id="closureRows"></div>
       </div>
     </section>
   </main>

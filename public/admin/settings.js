@@ -15,6 +15,7 @@ const state = {
   zones: [],
   tables: [],
   shifts: [],
+  closures: [],
   canEdit: false,
   dirtyTables: new Set(),
   scheduleConfig: null,
@@ -55,16 +56,18 @@ async function init() {
 }
 
 async function reloadAll() {
-  const [z, t, s] = await Promise.all([
+  const [z, t, s, c] = await Promise.all([
     supabase.from('zones').select('id, name, sort_order').eq('venue_id', state.venue.id).order('sort_order'),
     supabase.from('restaurant_tables').select('id, code, seats_max, zone_id, active').eq('venue_id', state.venue.id).order('code'),
     supabase.from('service_shifts').select('id, code, name, start_time, end_time, days_of_week, sort_order').eq('venue_id', state.venue.id).order('sort_order'),
+    supabase.from('venue_closures').select('id, closed_date, reason, created_at').eq('venue_id', state.venue.id).order('closed_date', { ascending: true }),
   ]);
-  if (z.error) throw z.error; if (t.error) throw t.error; if (s.error) throw s.error;
+  if (z.error) throw z.error; if (t.error) throw t.error; if (s.error) throw s.error; if (c.error) throw c.error;
   state.zones = z.data || [];
   state.tables = t.data || [];
   state.shifts = s.data || [];
-  renderZones(); renderTables(); renderShifts(); renderFreeHours(); fillZoneSelect();
+  state.closures = c.data || [];
+  renderZones(); renderTables(); renderShifts(); renderFreeHours(); renderClosures(); fillZoneSelect();
 }
 
 function dis() { return state.canEdit ? '' : 'disabled'; }
@@ -512,6 +515,97 @@ function renderWeekdays() {
   $('saveClosure').disabled = !state.canEdit;
 }
 
+// --- Chiusure straordinarie ----------------------------------------------
+function formatDateLabel(iso) {
+  if (!iso) return '—';
+  const [year, month, day] = String(iso).split('-').map(Number);
+  const date = new Date(year, month - 1, day, 12);
+  return date.toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function addDaysToIso(iso, amount) {
+  const [year, month, day] = String(iso).split('-').map(Number);
+  const date = new Date(year, month - 1, day, 12);
+  date.setDate(date.getDate() + amount);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function datesInRange(start, end) {
+  const dates = [];
+  let cursor = start;
+  while (cursor <= end && dates.length < 370) {
+    dates.push(cursor);
+    cursor = addDaysToIso(cursor, 1);
+  }
+  return dates;
+}
+
+function renderClosures() {
+  const rows = $('closureRows');
+  if (!rows) return;
+  $('closureStart').disabled = !state.canEdit;
+  $('closureEnd').disabled = !state.canEdit;
+  $('closureReason').disabled = !state.canEdit;
+  $('addClosureBtn').disabled = !state.canEdit;
+  rows.innerHTML = state.closures.length
+    ? state.closures.map((closure) => `
+      <div class="row-item closure-row">
+        <span class="closure-row__date">${escapeHtml(formatDateLabel(closure.closed_date))}</span>
+        <span class="closure-row__reason">${escapeHtml(closure.reason || 'Nessun motivo indicato')}</span>
+        <button class="act act--warn" data-del-closure="${escapeHtml(closure.id)}" ${dis()}>Elimina</button>
+      </div>`).join('')
+    : '<div class="res-empty">Nessuna chiusura straordinaria inserita.</div>';
+
+  rows.querySelectorAll('[data-del-closure]').forEach((button) =>
+    button.addEventListener('click', () => deleteClosure(button.dataset.delClosure)));
+}
+
+async function addClosure(event) {
+  event.preventDefault();
+  if (!state.canEdit) return;
+  const start = $('closureStart').value;
+  const end = $('closureEnd').value || start;
+  const reason = $('closureReason').value.trim() || null;
+  if (!start) { toast('Seleziona una data di chiusura.', true); return; }
+  if (end < start) { toast('La data finale deve essere successiva o uguale alla data iniziale.', true); return; }
+  const dates = datesInRange(start, end);
+  if (!dates.length) { toast('Intervallo non valido.', true); return; }
+  if (dates.length >= 370) { toast('Intervallo troppo lungo.', true); return; }
+
+  $('addClosureBtn').disabled = true;
+  try {
+    const payload = dates.map((closedDate) => ({
+      venue_id: state.venue.id,
+      closed_date: closedDate,
+      reason,
+    }));
+    const { error } = await supabase
+      .from('venue_closures')
+      .upsert(payload, { onConflict: 'venue_id,closed_date' });
+    if (error) throw error;
+    $('closureAdd').reset();
+    toast(dates.length === 1 ? 'Chiusura aggiunta.' : 'Intervallo di chiusura aggiunto.');
+    await reloadAll();
+  } catch (error) {
+    console.error(error);
+    toast(error.message?.includes('row-level') ? 'Permesso negato (solo titolare).' : 'Chiusura non salvata.', true);
+  } finally {
+    $('addClosureBtn').disabled = !state.canEdit;
+  }
+}
+
+async function deleteClosure(id) {
+  if (!state.canEdit || !id) return;
+  const { error } = await supabase.from('venue_closures').delete().eq('id', id);
+  if (error) {
+    console.error(error);
+    toast(error.message?.includes('row-level') ? 'Permesso negato (solo titolare).' : 'Eliminazione non riuscita.', true);
+    return;
+  }
+  toast('Chiusura eliminata.');
+  await reloadAll();
+}
+
 // --- Wiring ----------------------------------------------------------------
 function wire() {
   document.querySelectorAll('input[name="adminTheme"]').forEach((input) =>
@@ -545,6 +639,7 @@ function wire() {
   $('saveScheduleConfig').addEventListener('click', saveScheduleConfig);
   document.querySelectorAll('[data-schedule-tab]').forEach((button) =>
     button.addEventListener('click', () => setScheduleTab(button.dataset.scheduleTab)));
+  $('closureAdd').addEventListener('submit', addClosure);
 
   $('zoneAdd').addEventListener('submit', (e) => {
     e.preventDefault();
