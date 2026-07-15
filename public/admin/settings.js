@@ -3,7 +3,7 @@
 // 'owner'; per lo staff la pagina è in sola lettura.
 import {
   supabase, requireSession, confirmSignOut, loadCurrentVenue,
-  hhmm, escapeHtml, toast, WEEKDAYS,
+  hhmm, escapeHtml, toast, WEEKDAYS, setAdminLogo,
 } from './app.js';
 
 const $ = (id) => document.getElementById(id);
@@ -110,7 +110,7 @@ function renderVenueForm() {
   $('vLogo').value = v.logo_url || '';
   selectedLogoFile = null;
   clearSelectedLogoPreview();
-  renderLogoPreview(v.logo_url || '');
+  renderLogoButton(v.logo_url || '');
   $('vRetention').value = v.data_retention_months ?? '';
 
   const off = !state.canEdit;
@@ -123,17 +123,9 @@ function clearSelectedLogoPreview() {
   selectedLogoPreviewUrl = null;
 }
 
-function renderLogoPreview(src = '') {
-  const preview = $('vLogoPreview');
+function renderLogoButton(src = '') {
   const button = $('vLogoPick');
-  if (!preview || !button) return;
-  if (src) {
-    preview.innerHTML = `<img src="${escapeHtml(src)}" alt="Logo locale" />`;
-    button.textContent = 'Cambia logo';
-    return;
-  }
-  preview.innerHTML = '<span class="logo-upload__icon" aria-hidden="true"></span><span>Nessun logo</span>';
-  button.textContent = 'Carica logo';
+  if (button) button.textContent = src ? 'Cambia logo' : 'Carica logo';
 }
 
 function handleLogoFileChange() {
@@ -152,7 +144,7 @@ function handleLogoFileChange() {
   selectedLogoFile = file;
   clearSelectedLogoPreview();
   selectedLogoPreviewUrl = URL.createObjectURL(file);
-  renderLogoPreview(selectedLogoPreviewUrl);
+  renderLogoButton(selectedLogoPreviewUrl);
 }
 
 async function ensureLogoBucket() {
@@ -256,7 +248,8 @@ async function saveVenue() {
   $('vLogoFile').value = '';
   clearSelectedLogoPreview();
   $('vLogo').value = logoUrl || '';
-  renderLogoPreview(logoUrl || '');
+  renderLogoButton(logoUrl || '');
+  setAdminLogo(logoUrl || '');
   $('venueName').textContent = name;
   toast(hasNewLogo ? 'Logo aggiornato con successo.' : 'Dati locale salvati.');
 }

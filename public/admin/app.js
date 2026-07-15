@@ -101,14 +101,28 @@ function closeLogoutConfirm() {
 export async function loadCurrentVenue() {
   const { data, error } = await supabase
     .from('venue_staff')
-    .select('role, venue:venues(id, name, slug, timezone, closed_weekdays, active)')
+    .select('role, venue:venues(id, name, slug, timezone, closed_weekdays, active, logo_url)')
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle();
 
   if (error) throw error;
   if (!data || !data.venue) return null;
+  setAdminLogo(data.venue.logo_url);
   return { role: data.role, venue: data.venue };
+}
+
+export function setAdminLogo(logoUrl = '') {
+  const logo = document.getElementById('venueLogo');
+  if (!logo) return;
+  const src = String(logoUrl || '').trim();
+  if (!src) {
+    logo.removeAttribute('src');
+    logo.hidden = true;
+    return;
+  }
+  logo.src = src;
+  logo.hidden = false;
 }
 
 // --- Date helpers (ISO locale, senza slittamenti di fuso) ------------------

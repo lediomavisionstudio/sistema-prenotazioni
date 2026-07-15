@@ -62,8 +62,25 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
 .topbar__brand {
   min-width: 0;
   display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.topbar__brand-text {
+  min-width: 0;
+  display: flex;
   flex-direction: column;
   gap: 3px;
+}
+.topbar__logo {
+  width: 48px;
+  height: 48px;
+  display: block;
+  flex: 0 0 48px;
+  padding: 5px;
+  border: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 92%, var(--surface-soft));
+  object-fit: contain;
 }
 .topbar__venue {
   overflow: hidden;
@@ -211,120 +228,6 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
   padding: 10px 11px;
 }
 
-.field--logo {
-  align-self: start;
-}
-
-.form-grid.dati-locale-fields {
-  grid-template-columns: 120px repeat(2, minmax(0, 1fr));
-  gap: 16px 20px;
-  align-items: start;
-}
-
-.form-grid.dati-locale-fields > .field:nth-child(1) {
-  grid-column: 2;
-  grid-row: 1;
-}
-
-.form-grid.dati-locale-fields > .field:nth-child(2) {
-  grid-column: 3;
-  grid-row: 1;
-}
-
-.form-grid.dati-locale-fields > .field:nth-child(3) {
-  grid-column: 2;
-  grid-row: 2;
-}
-
-.form-grid.dati-locale-fields > .field:nth-child(4) {
-  grid-column: 3;
-  grid-row: 2;
-}
-
-.form-grid.dati-locale-fields > .field:nth-child(5) {
-  grid-column: 2;
-  grid-row: 3;
-}
-
-.form-grid.dati-locale-fields > .field:nth-child(7) {
-  grid-column: 3;
-  grid-row: 3;
-}
-
-.form-grid.dati-locale-fields > .field--logo {
-  grid-column: 1;
-  grid-row: 1 / span 3;
-}
-
-.logo-upload {
-  display: flex;
-  align-items: flex-start;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 0;
-}
-
-.logo-upload__preview {
-  width: 96px;
-  height: 96px;
-  display: grid;
-  place-items: center;
-  gap: 6px;
-  flex: 0 0 96px;
-  padding: 10px;
-  border: 1px solid color-mix(in srgb, var(--line) 86%, transparent);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--surface) 92%, var(--surface-soft));
-  color: var(--ink-soft);
-  font-size: .72rem;
-  font-weight: 700;
-  text-align: center;
-  overflow: hidden;
-}
-
-.logo-upload__preview img {
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: contain;
-}
-
-.logo-upload__icon {
-  width: 26px;
-  height: 26px;
-  display: block;
-  background: currentColor;
-  opacity: .55;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='14' rx='2'/%3E%3Ccircle cx='8.5' cy='10.5' r='1.5'/%3E%3Cpath d='m21 16-5-5L5 19'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='14' rx='2'/%3E%3Ccircle cx='8.5' cy='10.5' r='1.5'/%3E%3Cpath d='m21 16-5-5L5 19'/%3E%3C/svg%3E") center / contain no-repeat;
-}
-
-@media (max-width: 1023px) {
-  .form-grid.dati-locale-fields {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .form-grid.dati-locale-fields > .field,
-  .form-grid.dati-locale-fields > .field:nth-child(n),
-  .form-grid.dati-locale-fields > .field--logo {
-    grid-column: auto;
-    grid-row: auto;
-  }
-
-  .logo-upload__preview {
-    display: none;
-  }
-
-  .logo-upload .btn {
-    align-self: flex-start;
-  }
-}
-
-@media (max-width: 767px) {
-  .form-grid.dati-locale-fields {
-    grid-template-columns: 1fr;
-  }
-}
 .command-palette[hidden] {
   display: none !important;
 }
@@ -534,6 +437,13 @@ html[data-admin-theme="dark"] .topbar__link.is-active {
     grid-column: 1;
     min-width: 0;
     overflow: hidden;
+  }
+
+  .topbar__logo {
+    width: 40px;
+    height: 40px;
+    flex-basis: 40px;
+    padding: 4px;
   }
 
   .topbar__venue {
@@ -826,6 +736,13 @@ html[data-admin-theme="dark"] .topbar__link.is-active {
   .topbar__brand {
     grid-column: 1;
     grid-row: 1;
+  }
+
+  .topbar__logo {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+    padding: 3px;
   }
 
   .topbar__menu {
