@@ -287,7 +287,18 @@
               <input id="vBrand" maxlength="7" placeholder="#c8402a — vuoto = predefinito" style="flex:1" />
             </div>
           </div>
-          <div class="field"><label>Logo (URL immagine)</label><input id="vLogo" maxlength="500" placeholder="https://..." /></div>
+          <div class="field field--logo">
+            <label>Logo locale</label>
+            <input id="vLogo" type="hidden" />
+            <input id="vLogoFile" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+            <div class="logo-upload">
+              <div class="logo-upload__preview" id="vLogoPreview" aria-live="polite">
+                <span class="logo-upload__icon" aria-hidden="true"></span>
+                <span>Nessun logo</span>
+              </div>
+              <button class="btn btn--ghost btn--sm" id="vLogoPick" type="button">Carica logo</button>
+            </div>
+          </div>
           <div class="field"><label>Conservazione dati (mesi)</label><input id="vRetention" type="number" min="1" max="120" placeholder="24" /></div>
         </div>
         <button class="btn btn--primary btn--sm" id="saveVenue" type="button" style="margin-top:14px">Salva dati locale</button>

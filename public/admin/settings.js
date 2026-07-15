@@ -22,6 +22,15 @@ const state = {
 };
 
 const SCHEDULE_CONFIG_KEY = 'booking_admin_schedule_mode';
+const LOGO_BUCKET = 'logos';
+const LOGO_MAX_BYTES = 5 * 1024 * 1024;
+const LOGO_TYPES = new Map([
+  ['image/png', 'png'],
+  ['image/jpeg', 'jpg'],
+  ['image/webp', 'webp'],
+]);
+let selectedLogoFile = null;
+let selectedLogoPreviewUrl = null;
 
 async function init() {
   state.session = await requireSession();
@@ -99,11 +108,94 @@ function renderVenueForm() {
   $('vBrand').value = v.brand_primary || '';
   $('vBrandPick').value = /^#[0-9a-fA-F]{6}$/.test(v.brand_primary || '') ? v.brand_primary : '#c8402a';
   $('vLogo').value = v.logo_url || '';
+  selectedLogoFile = null;
+  clearSelectedLogoPreview();
+  renderLogoPreview(v.logo_url || '');
   $('vRetention').value = v.data_retention_months ?? '';
 
   const off = !state.canEdit;
-  ['vName', 'vPhone', 'vAddress', 'vEmail', 'vBrand', 'vBrandPick', 'vLogo', 'vRetention', 'saveVenue']
+  ['vName', 'vPhone', 'vAddress', 'vEmail', 'vBrand', 'vBrandPick', 'vLogoFile', 'vLogoPick', 'vRetention', 'saveVenue']
     .forEach((id) => { $(id).disabled = off; });
+}
+
+function clearSelectedLogoPreview() {
+  if (selectedLogoPreviewUrl) URL.revokeObjectURL(selectedLogoPreviewUrl);
+  selectedLogoPreviewUrl = null;
+}
+
+function renderLogoPreview(src = '') {
+  const preview = $('vLogoPreview');
+  const button = $('vLogoPick');
+  if (!preview || !button) return;
+  if (src) {
+    preview.innerHTML = `<img src="${escapeHtml(src)}" alt="Logo locale" />`;
+    button.textContent = 'Cambia logo';
+    return;
+  }
+  preview.innerHTML = '<span class="logo-upload__icon" aria-hidden="true"></span><span>Nessun logo</span>';
+  button.textContent = 'Carica logo';
+}
+
+function handleLogoFileChange() {
+  const file = $('vLogoFile').files?.[0];
+  if (!file) return;
+  if (!LOGO_TYPES.has(file.type)) {
+    $('vLogoFile').value = '';
+    toast('Formato logo non valido. Usa PNG, JPG, JPEG o WEBP.', true);
+    return;
+  }
+  if (file.size > LOGO_MAX_BYTES) {
+    $('vLogoFile').value = '';
+    toast('Il logo deve essere inferiore a 5 MB.', true);
+    return;
+  }
+  selectedLogoFile = file;
+  clearSelectedLogoPreview();
+  selectedLogoPreviewUrl = URL.createObjectURL(file);
+  renderLogoPreview(selectedLogoPreviewUrl);
+}
+
+async function ensureLogoBucket() {
+  const { error } = await supabase.storage.createBucket(LOGO_BUCKET, {
+    public: true,
+    fileSizeLimit: LOGO_MAX_BYTES,
+    allowedMimeTypes: [...LOGO_TYPES.keys()],
+  });
+  if (!error || /already exists|already_exist|Duplicate/i.test(error.message || '')) return;
+  if (/not authorized|permission|row-level|violates row-level|403/i.test(error.message || '')) {
+    console.info('[settings] bucket logos non creato dal client; uso configurazione Storage esistente.');
+    return;
+  }
+  throw error;
+}
+
+async function uploadSelectedLogo() {
+  if (!selectedLogoFile) return $('vLogo').value.trim() || null;
+  await ensureLogoBucket();
+
+  const ext = LOGO_TYPES.get(selectedLogoFile.type) || 'png';
+  const folder = state.venue.id;
+  const path = `${folder}/logo.${ext}`;
+
+  const listed = await supabase.storage.from(LOGO_BUCKET).list(folder, { limit: 20 });
+  if (listed.error) throw listed.error;
+  const oldFiles = (listed.data || []).map((item) => `${folder}/${item.name}`).filter((name) => name !== path);
+  if (oldFiles.length) {
+    const removed = await supabase.storage.from(LOGO_BUCKET).remove(oldFiles);
+    if (removed.error) throw removed.error;
+  }
+
+  const uploaded = await supabase.storage.from(LOGO_BUCKET).upload(path, selectedLogoFile, {
+    cacheControl: '3600',
+    contentType: selectedLogoFile.type,
+    upsert: true,
+  });
+  if (uploaded.error) throw uploaded.error;
+
+  const { data } = supabase.storage.from(LOGO_BUCKET).getPublicUrl(path);
+  const publicUrl = data?.publicUrl ? `${data.publicUrl}?v=${Date.now()}` : null;
+  if (!publicUrl) throw new Error('URL pubblico logo non disponibile.');
+  return publicUrl;
 }
 
 async function saveVenue() {
@@ -121,6 +213,16 @@ async function saveVenue() {
     toast('Mesi di conservazione non validi (1–120).', true); return;
   }
 
+  const hasNewLogo = !!selectedLogoFile;
+  let logoUrl = $('vLogo').value.trim() || null;
+  try {
+    logoUrl = await uploadSelectedLogo();
+  } catch (error) {
+    console.error('[settings] upload logo non riuscito:', error);
+    toast('Upload logo non riuscito: ' + (error.message || 'errore'), true);
+    return;
+  }
+
   const patch = {
     name,
     phone: $('vPhone').value.trim() || null,
@@ -130,7 +232,7 @@ async function saveVenue() {
     // Ricavato dal widget da brand_primary: azzerando qui evitiamo un "dark"
     // rimasto dal colore precedente e non più coerente.
     brand_primary_dark: null,
-    logo_url: $('vLogo').value.trim() || null,
+    logo_url: logoUrl,
   };
   // data_retention_months è NOT NULL: includilo solo se valorizzato, altrimenti
   // lascialo com'è (inviare null farebbe fallire tutto il salvataggio).
@@ -150,8 +252,13 @@ async function saveVenue() {
     return;
   }
   Object.assign(state.venue, patch);
+  selectedLogoFile = null;
+  $('vLogoFile').value = '';
+  clearSelectedLogoPreview();
+  $('vLogo').value = logoUrl || '';
+  renderLogoPreview(logoUrl || '');
   $('venueName').textContent = name;
-  toast('Dati locale salvati.');
+  toast(hasNewLogo ? 'Logo aggiornato con successo.' : 'Dati locale salvati.');
 }
 
 async function run(promise, okMsg) {
@@ -615,6 +722,8 @@ function wire() {
       renderThemeSettings();
     }));
   $('vBrandPick').addEventListener('input', () => { $('vBrand').value = $('vBrandPick').value; });
+  $('vLogoPick').addEventListener('click', () => $('vLogoFile').click());
+  $('vLogoFile').addEventListener('change', handleLogoFileChange);
   $('saveVenue').addEventListener('click', saveVenue);
   $('saveTableChanges').addEventListener('click', saveTableChanges);
   $('cancelTableChanges').addEventListener('click', cancelTableChanges);
