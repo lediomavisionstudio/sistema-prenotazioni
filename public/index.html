@@ -1160,8 +1160,14 @@
       requestId: null,
       currentSummary: null,
       statusChannel: null,
+      availabilityChannel: null,
+      availabilityRefreshTimer: null,
+      availabilityRefreshInFlight: false,
+      availabilityRefreshQueued: false,
+      availabilityMessage: '',
       statusPollingTimer: null,
       realtimeActive: false,
+      availabilityRealtimeActive: false,
       otp: {
         email: null,
         verifiedRequestId: null,
@@ -1816,6 +1822,177 @@
       }
     }
 
+    function setAvailabilityMessage(message = '') {
+      const previous = state.availabilityMessage;
+      state.availabilityMessage = message;
+      const box = $('formError');
+      if (!box) return;
+      if (message) {
+        box.textContent = message;
+        box.hidden = false;
+      } else if (previous && box.textContent === previous) {
+        box.hidden = true;
+      }
+    }
+
+    function clearAvailabilityMessage() {
+      const previous = state.availabilityMessage;
+      state.availabilityMessage = '';
+      const box = $('formError');
+      if (box && previous && box.textContent === previous) box.hidden = true;
+    }
+
+    function stopPublicAvailabilityWatch() {
+      if (state.availabilityRefreshTimer) {
+        window.clearTimeout(state.availabilityRefreshTimer);
+        state.availabilityRefreshTimer = null;
+      }
+      state.availabilityRefreshQueued = false;
+      state.availabilityRealtimeActive = false;
+      if (state.availabilityChannel && supabase) {
+        console.info('[availability-realtime] chiudo subscription');
+        try {
+          supabase.removeChannel(state.availabilityChannel);
+        } catch (err) {
+          console.error('[availability-realtime] errore chiusura subscription:', err);
+        }
+        state.availabilityChannel = null;
+      }
+    }
+
+    function startPublicAvailabilityWatch() {
+      if (!supabase || !state.venue || state.availabilityChannel || state.completed) return;
+      console.info('[availability-realtime] subscription avviata', { venue_id: state.venue.id });
+      state.availabilityChannel = supabase
+        .channel(`public-widget-availability:${state.venue.id}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'public_availability_events',
+          filter: `venue_id=eq.${state.venue.id}`,
+        }, (payload) => {
+          const event = payload && payload.new ? {
+            source_table: payload.new.source_table,
+            event_type: payload.new.event_type,
+            reservation_date: payload.new.reservation_date,
+            created_at: payload.new.created_at,
+          } : null;
+          console.info('[availability-realtime] evento ricevuto', event);
+          scheduleAvailabilityRefresh('realtime', event);
+        })
+        .subscribe((status, err) => {
+          console.info('[availability-realtime] stato Realtime:', status);
+          if (status === 'SUBSCRIBED') {
+            state.availabilityRealtimeActive = true;
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            state.availabilityRealtimeActive = false;
+            console.error('[availability-realtime] subscription non disponibile', { status, error: err || null });
+          }
+        });
+    }
+
+    function scheduleAvailabilityRefresh(source = 'manual', event = null) {
+      if (!supabase || !state.venue || state.completed) return;
+      if (state.availabilityRefreshTimer) window.clearTimeout(state.availabilityRefreshTimer);
+      state.availabilityRefreshTimer = window.setTimeout(() => {
+        state.availabilityRefreshTimer = null;
+        refreshPublicWidgetData(source, event);
+      }, 220);
+    }
+
+    async function refreshPublicWidgetData(source = 'manual', event = null) {
+      if (!supabase || !state.venue || state.completed) return;
+      if (state.availabilityRefreshInFlight) {
+        state.availabilityRefreshQueued = true;
+        return;
+      }
+      state.availabilityRefreshInFlight = true;
+      const previousDate = state.selDate;
+      const previousShiftId = state.selShift && state.selShift.shift_id;
+      try {
+        console.info('[availability-realtime] refresh disponibilita', { source, event });
+        const [venueResult, closuresResult, shiftsResult] = await Promise.all([
+          supabase
+            .from('venues')
+            .select('*')
+            .eq('slug', venueSlug)
+            .maybeSingle(),
+          supabase
+            .from('venue_closures')
+            .select('closed_date')
+            .eq('venue_id', state.venue.id),
+          supabase
+            .from('service_shifts')
+            .select('id, code, name, start_time, end_time, days_of_week, sort_order')
+            .eq('venue_id', state.venue.id)
+            .eq('active', true)
+            .order('sort_order'),
+        ]);
+
+        if (venueResult.error) throw venueResult.error;
+        if (!venueResult.data || !venueResult.data.active) {
+          fatal('Locale non trovato o non disponibile per le prenotazioni online.', true);
+          return;
+        }
+        if (closuresResult.error) throw closuresResult.error;
+        if (shiftsResult.error) throw shiftsResult.error;
+
+        state.venue = venueResult.data;
+        applyBranding(state.venue);
+        $('venueName').textContent = state.venue.name;
+        $('venueSub').textContent = [state.venue.address, state.venue.phone].filter(Boolean).join(' · ');
+        document.title = 'Prenota — ' + state.venue.name;
+        state.closures = new Set((closuresResult.data || []).map((c) => c.closed_date));
+        state.shifts = (shiftsResult.data || []).map((s) => ({ ...s, days: new Set((s.days_of_week || []).map(Number)) }));
+        state.closedWeekdays = new Set((state.venue.closed_weekdays || []).map(Number));
+        state.openWeekdays = new Set();
+        for (const s of state.shifts)
+          for (const dow of s.days)
+            if (!state.closedWeekdays.has(dow)) state.openWeekdays.add(dow);
+
+        if (previousDate && !isSelectable(isoToDate(previousDate))) {
+          state.selDate = null;
+          state.selShift = null;
+          state.dayShifts = [];
+          renderCalendar();
+          renderTimes();
+          updateSubmit();
+          goToStep('date', false);
+          setAvailabilityMessage('Il locale non è disponibile nella data selezionata.');
+          return;
+        }
+
+        renderCalendar();
+        if (state.selDate) await loadDayAvailability();
+
+        if (previousShiftId) {
+          const refreshedShift = state.dayShifts.find((shift) => shift.shift_id === previousShiftId);
+          if (!refreshedShift || refreshedShift.available === false) {
+            state.selShift = null;
+            renderTimes();
+            updateSubmit();
+            goToStep('time', false);
+            setAvailabilityMessage('Questo orario non è più disponibile. Seleziona un altro orario.');
+            return;
+          }
+          state.selShift = refreshedShift;
+          clearAvailabilityMessage();
+        }
+
+        renderTimes();
+        updateSubmit();
+        updateProgressNav();
+      } catch (err) {
+        console.error('[availability-realtime] refresh disponibilita fallito:', err);
+      } finally {
+        state.availabilityRefreshInFlight = false;
+        if (state.availabilityRefreshQueued) {
+          state.availabilityRefreshQueued = false;
+          scheduleAvailabilityRefresh('queued');
+        }
+      }
+    }
+
     async function restoreCompletedSummary() {
       let summary = readBookingSummary();
       if (!summary) {
@@ -2050,6 +2227,7 @@
         renderTimes();
         updateSubmit();
         updateProgressNav();
+        startPublicAvailabilityWatch();
       } catch (err) {
         bootError('Avvio fallito', err);
         fatal('Impossibile contattare il servizio prenotazioni. Controlla la connessione e riprova.', true);
@@ -2131,6 +2309,7 @@
       const next = normalizeCopertiValue(value);
       if (next === state.coperti) return;
       state.coperti = next;
+      clearAvailabilityMessage();
       syncCopertiUi();
       state.selShift = null;
       try {
@@ -2195,6 +2374,7 @@
     }
 
     async function selectDate(iso) {
+      clearAvailabilityMessage();
       state.selDate = iso;
       state.selShift = null;
       renderCalendar();
@@ -2250,6 +2430,7 @@
           timeContent +
           (s.available || isFreeHour ? '' : `<div class="time-slot__full">Completo · lista d'attesa</div>`);
         btn.addEventListener('click', () => {
+          clearAvailabilityMessage();
           state.selShift = s;
           renderTimes();
           updateSubmit();
@@ -2621,6 +2802,7 @@
     }
 
     function showConfirm(res, waitlist = false) {
+      stopPublicAvailabilityWatch();
       $('confirmModal').hidden = true;
       $('stateForm').classList.add('form-lock');
       const d = isoToDate(state.selDate);
@@ -2729,6 +2911,7 @@
       console.info('[booking-status] connessione ripristinata');
       refreshCurrentReservationStatus('online');
       if (state.currentSummary && !state.realtimeActive) startStatusPolling('online');
+      scheduleAvailabilityRefresh('online');
     });
     window.addEventListener('offline', () => {
       console.info('[booking-status] Realtime disconnesso: browser offline');
@@ -2738,7 +2921,11 @@
       if (document.visibilityState === 'visible') {
         console.info('[booking-status] app tornata visibile');
         refreshCurrentReservationStatus('visibility');
+        scheduleAvailabilityRefresh('visibility');
       }
+    });
+    window.addEventListener('pagehide', () => {
+      stopPublicAvailabilityWatch();
     });
     for (const step of progressSteps) {
       $(step.el).addEventListener('click', () => goToProgressStep(step.key));
