@@ -472,6 +472,7 @@ html[data-admin-theme="dark"] .topbar__link.is-active {
   border-radius: var(--radius-sm); padding: 14px 16px; box-shadow: var(--shadow-sm);
 }
 .kpi__val { font-family: var(--font-title); font-weight: 700; font-size: 1.7rem; line-height: 1; }
+.kpi__val--text { font-size: 1.05rem; line-height: 1.18; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kpi__label { font-size: 0.76rem; color: var(--ink-soft); margin-top: 5px; }
 @media (max-width: 520px) {
   .kpi__val { font-size: 1.35rem; }

@@ -252,6 +252,10 @@ function renderKpis() {
   const active = state.reservations.filter((r) => r.status !== 'annullata');
   const confirmed = state.reservations.filter((r) => r.status === 'confermata' || r.status === 'arrivato');
   const covers = confirmed.reduce((s, r) => s + r.party_size, 0);
+  const pending = state.reservations.filter((r) => r.status === 'in_attesa').length;
+  const noShows = state.reservations.filter((r) => r.status === 'no_show').length;
+  const completedTotal = confirmed.length + noShows;
+  const noShowRate = completedTotal > 0 ? Math.round((noShows / completedTotal) * 100) + '%' : '—';
 
   // Capienza teorica del giorno = posti a sedere × numero di turni.
   const denom = state.capacity * Math.max(1, scheduleItemsForDate(state.date).length);
@@ -260,6 +264,25 @@ function renderKpis() {
   $('kpiCovers').textContent = covers;
   $('kpiCount').textContent = active.length;
   $('kpiOcc').textContent = occ + '%';
+  $('kpiNextArrival').textContent = nextArrivalLabel(active);
+  $('kpiPending').textContent = pending;
+  $('kpiNoShowDay').textContent = noShowRate;
+}
+
+function nextArrivalLabel(rows) {
+  const candidates = rows
+    .filter((r) => r.status === 'confermata' || r.status === 'in_attesa')
+    .map((r) => ({ reservation: r, shift: state.shifts.find((shift) => shift.id === r.shift_id) }))
+    .filter((item) => item.shift)
+    .sort((a, b) => minutesOf(a.shift.start_time) - minutesOf(b.shift.start_time));
+  if (!candidates.length) return '—';
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const next = state.date === todayISO()
+    ? candidates.find((item) => minutesOf(item.shift.start_time) >= nowMinutes) || candidates[0]
+    : candidates[0];
+  const name = `${next.reservation.customer_first_name || ''} ${next.reservation.customer_last_name || ''}`.trim();
+  return `${hhmm(next.shift.start_time)} ${name || 'Prenotazione'}`;
 }
 
 // ---------------------------------------------------------------------------
