@@ -5,7 +5,7 @@ import { STATUS_LABEL, escapeHtml } from './app.js';
 // Transizioni di stato disponibili per ciascuno stato corrente.
 export const TRANSITIONS = {
   in_attesa:  [{ to: 'confermata', label: 'Conferma', cls: 'act--ok' }, { to: 'annullata', label: 'Rifiuta', cls: 'act--warn' }],
-  confermata: [{ to: 'arrivato', label: 'Arrivato', cls: 'act--go' }, { to: 'no_show', label: 'No-show', cls: 'act--warn' }, { to: 'annullata', label: 'Annulla', cls: 'act--mute' }],
+  confermata: [{ to: 'arrivato', label: 'Arrivato', cls: 'act--go' }, { to: 'no_show', label: 'Non presentato', cls: 'act--warn' }, { to: 'annullata', label: 'Annulla', cls: 'act--mute' }],
   arrivato:   [{ to: 'confermata', label: 'Ripristina', cls: 'act--mute' }],
   no_show:    [{ to: 'confermata', label: 'Ripristina', cls: 'act--mute' }],
   annullata:  [{ to: 'in_attesa', label: 'Ripristina', cls: 'act--mute' }],
@@ -23,6 +23,10 @@ export function reservationCardHtml(r, opts = {}) {
     `<button class="act ${t.cls}" data-id="${r.id}" data-to="${t.to}">${t.label}</button>`).join('');
   const emailBadge = emailVerificationBadgeHtml(r);
   const tableControl = tableAssignmentHtml(r, opts);
+  const partyControl = partySizeHtml(r, opts);
+  const capacityWarning = opts.capacityWarning
+    ? '<span class="party-capacity-warning">La capienza dei tavoli assegnati non è più sufficiente. Modifica l’assegnazione dei tavoli.</span>'
+    : '';
   return `
     <div class="res">
       <div class="res__time">${escapeHtml(opts.timeLabel || '')}</div>
@@ -31,10 +35,11 @@ export function reservationCardHtml(r, opts = {}) {
           ${r.source === 'widget' ? '<span class="pill">widget</span>' : ''}</div>
         <div class="res__meta">
           <a href="tel:${escapeHtml(r.customer_phone)}">${escapeHtml(r.customer_phone)}</a>
-          <span>${r.party_size} coperti</span>
+          ${partyControl}
           <span>${opts.tableCode ? 'Tavolo ' + escapeHtml(opts.tableCode) : 'Tavolo non assegnato'}</span>
           ${opts.shiftName ? `<span>${escapeHtml(opts.shiftName)}</span>` : ''}
           ${emailBadge}
+          ${capacityWarning}
         </div>
         ${tableControl}
         ${r.notes ? `<div class="res__notes">${escapeHtml(r.notes)}</div>` : ''}
@@ -42,6 +47,21 @@ export function reservationCardHtml(r, opts = {}) {
       <div class="res__side"><span class="badge badge--${r.status}">${STATUS_LABEL[r.status]}</span></div>
       ${acts ? `<div class="res__actions">${acts}</div>` : ''}
     </div>`;
+}
+
+function partySizeHtml(r, opts = {}) {
+  if (!opts.canEditPartySize) return `<span>${escapeHtml(r.party_size)} coperti</span>`;
+  return `<span class="party-editor" data-party-editor="${escapeHtml(r.id)}">
+    <span class="party-view" data-party-view>
+      <span><strong data-party-value>${escapeHtml(r.party_size)}</strong> coperti</span>
+      <button class="act act--mute" type="button" data-party-edit="${escapeHtml(r.id)}">Modifica</button>
+    </span>
+    <span class="party-view" data-party-form hidden>
+      <input class="party-edit-input" type="number" min="1" step="1" inputmode="numeric" value="${escapeHtml(r.party_size)}" data-party-input aria-label="Numero coperti" />
+      <button class="act act--ok" type="button" data-party-save="${escapeHtml(r.id)}">Salva</button>
+      <button class="act act--mute" type="button" data-party-cancel="${escapeHtml(r.id)}">Annulla</button>
+    </span>
+  </span>`;
 }
 
 function tableAssignmentHtml(r, opts = {}) {
@@ -98,6 +118,46 @@ function emailVerificationBadgeHtml(r) {
 export function wireRowActions(container, onChange) {
   container.querySelectorAll('.act[data-id][data-to]').forEach((b) =>
     b.addEventListener('click', () => onChange(b.dataset.id, b.dataset.to)));
+}
+
+export function wirePartySizeEditing(container, onSave) {
+  container.querySelectorAll('[data-party-editor]').forEach((editor) => {
+    const id = editor.dataset.partyEditor;
+    const view = editor.querySelector('[data-party-view]');
+    const form = editor.querySelector('[data-party-form]');
+    const input = editor.querySelector('[data-party-input]');
+    const value = parseInt(input?.value || '1', 10) || 1;
+
+    input?.addEventListener('input', () => {
+      input.value = String(input.value || '').replace(/\D/g, '');
+    });
+
+    editor.querySelector('[data-party-edit]')?.addEventListener('click', () => {
+      if (view) view.hidden = true;
+      if (form) form.hidden = false;
+      if (input) {
+        input.value = String(value);
+        input.focus({ preventScroll: true });
+        input.select();
+      }
+    });
+
+    editor.querySelector('[data-party-cancel]')?.addEventListener('click', () => {
+      if (input) input.value = String(value);
+      if (form) form.hidden = true;
+      if (view) view.hidden = false;
+    });
+
+    editor.querySelector('[data-party-save]')?.addEventListener('click', async () => {
+      const next = parseInt(String(input?.value || '').replace(/\D/g, ''), 10);
+      if (!Number.isInteger(next) || next < 1) {
+        if (input) input.value = String(value);
+        await onSave(id, next, value);
+        return;
+      }
+      await onSave(id, next, value);
+    });
+  });
 }
 
 export function wireTableAssignment(container, onAssign) {

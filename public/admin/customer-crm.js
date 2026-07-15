@@ -126,7 +126,7 @@ function renderCustomerCard(identity) {
     </div>
     <div class="crm-kpis">
       <div><strong>${stats.total}</strong><span>Prenotazioni</span></div>
-      <div><strong>${stats.noShows}</strong><span>No-show</span></div>
+      <div><strong>${stats.noShows}</strong><span>Non presentato</span></div>
       <div><strong>${stats.lastVisit || '—'}</strong><span>Ultima visita</span></div>
       <div><strong>${stats.avgCovers}</strong><span>Media coperti</span></div>
     </div>

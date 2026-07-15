@@ -3,9 +3,9 @@
 // live via Realtime così una nuova prenotazione dal widget compare da sola.
 import {
   supabase, requireSession, signOut, loadCurrentVenue,
-  todayISO, formatLong, hhmm, escapeHtml, toast, STATUS_LABEL,
+  todayISO, addDays, formatLong, hhmm, escapeHtml, toast, STATUS_LABEL,
 } from './app.js';
-import { statusRank, reservationCardHtml, wireRowActions, wireTableAssignment } from './resui.js';
+import { statusRank, reservationCardHtml, wirePartySizeEditing, wireRowActions, wireTableAssignment } from './resui.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -13,12 +13,18 @@ const state = {
   session: null, venue: null, role: null,
   shifts: [], shiftsById: new Map(),
   tablesById: new Map(),
+  tableAssignments: new Map(),
   reservations: [],
   filter: 'attive',
+  search: '',
+  dateFilter: 'all',
+  statusFilter: 'all',
+  shiftFilter: 'all',
+  tableFilter: 'all',
 };
 
 const FILTERS = {
-  attive: (r) => r.status === 'in_attesa' || r.status === 'confermata' || r.status === 'arrivato',
+  attive: (r) => r.status === 'confermata',
   in_attesa: (r) => r.status === 'in_attesa',
   tutte: () => true,
 };
@@ -60,6 +66,7 @@ async function loadConfig() {
   state.shifts = shifts || [];
   state.shiftsById = new Map(state.shifts.map((s) => [s.id, s]));
   state.tablesById = new Map((tables || []).map((t) => [t.id, t]));
+  populateShiftFilter();
 }
 
 async function load() {
@@ -71,8 +78,34 @@ async function load() {
     .gte('reservation_date', today)
     .order('reservation_date', { ascending: true });
   if (error) throw error;
-  state.reservations = await withEmailVerificationStatus(data || []);
+  state.reservations = await withEmailVerificationStatus(await withTableAssignments(data || []));
   render();
+}
+
+async function withTableAssignments(rows) {
+  state.tableAssignments = new Map();
+  const ids = rows.map((row) => row.id).filter(Boolean);
+  if (!ids.length) return rows.map((row) => ({ ...row, table_ids: row.table_id ? [row.table_id] : [] }));
+  try {
+    const { data, error } = await supabase
+      .from('reservation_tables')
+      .select('reservation_id, table_id')
+      .in('reservation_id', ids);
+    if (error) throw error;
+    const byReservation = new Map();
+    for (const row of data || []) {
+      if (!byReservation.has(row.reservation_id)) byReservation.set(row.reservation_id, []);
+      byReservation.get(row.reservation_id).push(row.table_id);
+    }
+    state.tableAssignments = byReservation;
+    return rows.map((row) => {
+      const assignedIds = byReservation.get(row.id);
+      return { ...row, table_ids: assignedIds?.length ? assignedIds : (row.table_id ? [row.table_id] : []) };
+    });
+  } catch (error) {
+    console.warn('[tables] assegnazioni multiple non disponibili:', error.message || error);
+    return rows.map((row) => ({ ...row, table_ids: row.table_id ? [row.table_id] : [] }));
+  }
 }
 
 async function withEmailVerificationStatus(rows) {
@@ -103,7 +136,7 @@ function render() {
   const pending = state.reservations.filter((r) => r.status === 'in_attesa').length;
   $('pendingCount').textContent = pending ? `${pending} da confermare` : 'nessuna da confermare';
 
-  const rows = state.reservations.filter(FILTERS[state.filter]);
+  const rows = filteredReservations();
   const box = $('upcoming');
 
   if (rows.length === 0) {
@@ -135,9 +168,11 @@ function render() {
       const shift = state.shiftsById.get(r.shift_id);
       return reservationCardHtml(r, {
         timeLabel: shift ? hhmm(shift.start_time) : '',
-        tableCode: r.table_id ? state.tablesById.get(r.table_id)?.code : null,
+        tableCode: tableCodes(r),
         shiftName: shift ? shift.name : '',
         tableOptions: tableOptionsForReservation(r),
+        canEditPartySize: true,
+        capacityWarning: hasInsufficientAssignedCapacity(r),
       });
     }).join('');
 
@@ -152,13 +187,64 @@ function render() {
   }).join('');
 
   wireRowActions(box, changeStatus);
+  wirePartySizeEditing(box, updatePartySize);
   wireTableAssignment(box, assignTable);
+}
+
+function filteredReservations() {
+  return state.reservations
+    .filter(FILTERS[state.filter])
+    .filter((r) => matchesDateFilter(r))
+    .filter((r) => state.statusFilter === 'all' || r.status === state.statusFilter)
+    .filter((r) => state.shiftFilter === 'all' || r.shift_id === state.shiftFilter)
+    .filter((r) => {
+      const hasTable = reservationTableIds(r).length > 0;
+      if (state.tableFilter === 'assigned') return hasTable;
+      if (state.tableFilter === 'unassigned') return !hasTable;
+      return true;
+    })
+    .filter((r) => matchesSearch(r));
+}
+
+function matchesDateFilter(r) {
+  const today = todayISO();
+  if (state.dateFilter === 'today') return r.reservation_date === today;
+  if (state.dateFilter === 'tomorrow') return r.reservation_date === addDays(today, 1);
+  if (state.dateFilter === 'next7') return r.reservation_date >= today && r.reservation_date <= addDays(today, 6);
+  return true;
+}
+
+function matchesSearch(r) {
+  const term = state.search.trim().toLowerCase();
+  if (!term) return true;
+  const tableCode = tableCodes(r);
+  const fields = [
+    r.customer_first_name,
+    r.customer_last_name,
+    `${r.customer_first_name || ''} ${r.customer_last_name || ''}`,
+    r.customer_phone,
+    r.customer_email,
+    tableCode,
+  ];
+  return fields.some((value) => String(value || '').toLowerCase().includes(term));
+}
+
+function populateShiftFilter() {
+  const select = $('shiftFilter');
+  if (!select) return;
+  select.innerHTML = '<option value="all">Tutti</option>' + state.shifts.map((shift) =>
+    `<option value="${escapeHtml(shift.id)}">${escapeHtml(shift.name)} (${hhmm(shift.start_time)})</option>`
+  ).join('');
 }
 
 async function changeStatus(id, to) {
   const res = state.reservations.find((r) => r.id === id);
-  if (to === 'confermata' && res && !res.table_id) {
+  if (to === 'confermata' && res && !reservationTableIds(res).length) {
     toast('Assegna un tavolo prima di confermare la prenotazione.', true);
+    return;
+  }
+  if (to === 'confermata' && res && hasInsufficientAssignedCapacity(res)) {
+    toast('La capienza dei tavoli assegnati non è più sufficiente. Modifica l’assegnazione dei tavoli.', true);
     return;
   }
   const { error } = await supabase.from('reservations').update({ status: to }).eq('id', id);
@@ -168,16 +254,64 @@ async function changeStatus(id, to) {
   await load();
 }
 
+async function updatePartySize(id, nextPartySize, previousPartySize) {
+  const reservation = state.reservations.find((r) => r.id === id);
+  if (!reservation) return;
+  const partySize = Number.parseInt(nextPartySize, 10);
+  if (!Number.isInteger(partySize) || partySize < 1) {
+    toast('Inserisci un numero di coperti valido.', true);
+    return;
+  }
+  if (partySize === previousPartySize) {
+    render();
+    return;
+  }
+  try {
+    const { error } = await supabase
+      .from('reservations')
+      .update({ party_size: partySize })
+      .eq('id', id);
+    if (error) throw error;
+    toast('Numero di coperti aggiornato.');
+    await load();
+  } catch (error) {
+    console.error('[reservations] aggiornamento coperti fallito:', error);
+    toast('Impossibile aggiornare il numero di coperti.', true);
+    await load();
+  }
+}
+
+function assignedCapacity(reservation) {
+  return reservationTableIds(reservation).reduce((sum, tableId) =>
+    sum + Number(state.tablesById.get(tableId)?.seats_max || 0), 0);
+}
+
+function hasInsufficientAssignedCapacity(reservation) {
+  return reservationTableIds(reservation).length > 0 && assignedCapacity(reservation) < Number(reservation.party_size || 0);
+}
+
+function reservationTableIds(reservation) {
+  if (Array.isArray(reservation.table_ids) && reservation.table_ids.length) return reservation.table_ids;
+  return reservation.table_id ? [reservation.table_id] : [];
+}
+
+function tableCodes(reservation) {
+  const codes = reservationTableIds(reservation)
+    .map((id) => state.tablesById.get(id)?.code)
+    .filter(Boolean);
+  return codes.length ? codes.join(' + ') : null;
+}
+
 function tableOptionsForReservation(reservation) {
+  const selected = new Set(reservationTableIds(reservation));
   const occupied = new Set(state.reservations
     .filter((r) =>
       r.id !== reservation.id &&
-      r.table_id &&
       r.reservation_date === reservation.reservation_date &&
       r.shift_id === reservation.shift_id &&
       r.status !== 'annullata' &&
       r.status !== 'no_show')
-    .map((r) => r.table_id));
+    .flatMap(reservationTableIds));
 
   return [...state.tablesById.values()].map((table) => {
     const busy = occupied.has(table.id);
@@ -186,7 +320,7 @@ function tableOptionsForReservation(reservation) {
       code: table.code,
       seatsMax: table.seats_max,
       busy,
-      disabled: busy && table.id !== reservation.table_id,
+      disabled: busy && !selected.has(table.id),
       label: `${table.code} (${table.seats_max})${busy ? ' - occupato' : ''}`,
     };
   });
@@ -194,12 +328,18 @@ function tableOptionsForReservation(reservation) {
 
 async function assignTable(id, tableId) {
   try {
-    const { error } = await supabase.rpc('assign_reservation_table', {
-      p_reservation_id: id,
-      p_table_id: tableId,
-    });
+    const tableIds = Array.isArray(tableId) ? tableId : (tableId ? [tableId] : []);
+    const { error } = Array.isArray(tableId)
+      ? await supabase.rpc('assign_reservation_tables', {
+          p_reservation_id: id,
+          p_table_ids: tableIds,
+        })
+      : await supabase.rpc('assign_reservation_table', {
+          p_reservation_id: id,
+          p_table_id: tableId,
+        });
     if (error) throw error;
-    toast(tableId ? 'Tavolo assegnato' : 'Tavolo rimosso');
+    toast(tableIds.length > 1 ? 'Tavoli assegnati' : tableIds.length ? 'Tavolo assegnato' : 'Tavolo rimosso');
     await load();
   } catch (error) {
     console.error('[tables] assegnazione tavolo fallita:', error);
@@ -209,6 +349,7 @@ async function assignTable(id, tableId) {
 
 function tableAssignmentError(error) {
   const raw = `${error?.message || ''} ${error?.details || ''}`;
+  if (raw.includes('CAPIENZA_INSUFFICIENTE')) return 'Seleziona altri tavoli: la capienza attuale non è sufficiente.';
   if (raw.includes('TAVOLO_NON_COMPATIBILE')) return 'Il tavolo non è compatibile con il numero di persone.';
   if (raw.includes('TAVOLO_GIA_ASSEGNATO')) return 'Questo tavolo è già assegnato nello stesso turno.';
   if (raw.includes('TAVOLO_NON_VALIDO')) return 'Tavolo non valido.';
@@ -263,12 +404,58 @@ async function notifyCustomerStatusEmail(reservation, status) {
 }
 
 function wireFilters() {
+  $('dateFilter').value = state.dateFilter;
+  $('statusFilter').value = state.statusFilter;
+  $('shiftFilter').value = state.shiftFilter;
+  $('tableFilter').value = state.tableFilter;
+
   $('filters').querySelectorAll('[data-filter]').forEach((b) =>
     b.addEventListener('click', () => {
       state.filter = b.dataset.filter;
       $('filters').querySelectorAll('.tab').forEach((t) => t.classList.toggle('is-active', t === b));
       render();
     }));
+
+  let searchTimer;
+  $('upcomingSearch').addEventListener('input', (event) => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      state.search = event.target.value || '';
+      render();
+    }, 160);
+  });
+
+  $('dateFilter').addEventListener('change', (event) => {
+    state.dateFilter = event.target.value;
+    render();
+  });
+  $('statusFilter').addEventListener('change', (event) => {
+    state.statusFilter = event.target.value;
+    render();
+  });
+  $('shiftFilter').addEventListener('change', (event) => {
+    state.shiftFilter = event.target.value;
+    render();
+  });
+  $('tableFilter').addEventListener('change', (event) => {
+    state.tableFilter = event.target.value;
+    render();
+  });
+  $('resetFilters').addEventListener('click', () => {
+    state.filter = 'attive';
+    state.search = '';
+    state.dateFilter = 'all';
+    state.statusFilter = 'all';
+    state.shiftFilter = 'all';
+    state.tableFilter = 'all';
+    $('upcomingSearch').value = '';
+    $('dateFilter').value = state.dateFilter;
+    $('statusFilter').value = state.statusFilter;
+    $('shiftFilter').value = state.shiftFilter;
+    $('tableFilter').value = state.tableFilter;
+    $('filters').querySelectorAll('.tab').forEach((t) => t.classList.toggle('is-active', t.dataset.filter === state.filter));
+    render();
+  });
 }
 
 let reloadTimer;

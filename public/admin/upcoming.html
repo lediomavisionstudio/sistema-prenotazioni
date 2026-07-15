@@ -49,6 +49,49 @@
       <button class="tab" data-filter="tutte"><span class="tab__name">Tutte</span></button>
     </div>
 
+    <div class="upcoming-tools" id="upcomingTools">
+      <div class="field upcoming-search">
+        <label for="upcomingSearch">Ricerca</label>
+        <input id="upcomingSearch" type="search" placeholder="Cerca per nome, cognome, telefono o email" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label for="dateFilter">Data</label>
+        <select id="dateFilter">
+          <option value="today">Oggi</option>
+          <option value="tomorrow">Domani</option>
+          <option value="next7">Prossimi 7 giorni</option>
+          <option value="all">Tutte le date</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="statusFilter">Stato</label>
+        <select id="statusFilter">
+          <option value="all">Tutti</option>
+          <option value="in_attesa">In attesa</option>
+          <option value="confermata">Confermata</option>
+          <option value="arrivato">Arrivato</option>
+          <option value="no_show">Non presentato</option>
+          <option value="rifiutata">Rifiutata</option>
+          <option value="annullata">Annullata</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="shiftFilter">Turno / Orario</label>
+        <select id="shiftFilter">
+          <option value="all">Tutti</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="tableFilter">Tavolo</label>
+        <select id="tableFilter">
+          <option value="all">Tutti</option>
+          <option value="assigned">Assegnato</option>
+          <option value="unassigned">Non assegnato</option>
+        </select>
+      </div>
+      <button class="btn btn--ghost btn--sm upcoming-reset" id="resetFilters" type="button">Reimposta filtri</button>
+    </div>
+
     <div id="upcoming"></div>
   </main>
 

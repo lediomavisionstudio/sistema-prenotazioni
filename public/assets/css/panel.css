@@ -136,6 +136,30 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
 .res__name { font-weight: 700; }
 .res__meta { font-size: 0.82rem; color: var(--ink-soft); display: flex; flex-wrap: wrap; gap: 3px 12px; margin-top: 2px; }
 .res__meta a { color: var(--ink-soft); text-decoration: none; }
+.party-editor,
+.party-view {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.party-edit-input {
+  width: 72px;
+  padding: 5px 8px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: .8rem;
+}
+.party-edit-input:focus { outline: none; border-color: var(--tomato); box-shadow: 0 0 0 3px var(--tomato-soft); }
+.party-capacity-warning {
+  flex-basis: 100%;
+  color: var(--tomato-dark);
+  font-weight: 700;
+  font-size: .78rem;
+}
 .res__table-assign { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: flex-start; }
 .res__table-assign select {
   min-width: 180px; flex: 1 1 180px; border: 1.5px solid var(--line);
@@ -288,6 +312,32 @@ h1, h2, h3 { font-family: var(--font-title); letter-spacing: -0.01em; }
 }
 .row-item__grow { flex: 1; min-width: 120px; }
 .pill { font-size: 0.72rem; background: var(--surface-soft); border-radius: 999px; padding: 3px 9px; color: var(--ink-soft); }
+
+.upcoming-tools {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) repeat(4, minmax(130px, 1fr)) auto;
+  gap: 10px;
+  align-items: end;
+  margin: -4px 0 18px;
+}
+.upcoming-tools .field { gap: 4px; }
+.upcoming-tools .field label { font-size: .74rem; color: var(--ink-soft); }
+.upcoming-tools .field input,
+.upcoming-tools .field select {
+  padding: 8px 10px;
+  font-size: .82rem;
+}
+.upcoming-reset { white-space: nowrap; }
+
+@media (max-width: 980px) {
+  .upcoming-tools { grid-template-columns: 1fr 1fr; }
+  .upcoming-search { grid-column: 1 / -1; }
+  .upcoming-reset { justify-self: start; }
+}
+
+@media (max-width: 620px) {
+  .upcoming-tools { grid-template-columns: 1fr; }
+}
 
 .spinner { width: 30px; height: 30px; border: 4px solid var(--line); border-top-color: var(--tomato); border-radius: 50%; animation: spin .8s linear infinite; margin: 40px auto; }
 @keyframes spin { to { transform: rotate(360deg); } }

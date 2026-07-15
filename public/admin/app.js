@@ -80,7 +80,7 @@ export const STATUS_LABEL = {
   in_attesa: 'In attesa di conferma',
   confermata: 'Confermata',
   arrivato: 'Arrivato',
-  no_show: 'No-show',
+  no_show: 'Non presentato',
   annullata: 'Annullata',
 };
 
