@@ -153,18 +153,22 @@ async function fetchReservations(from, to) {
   return data || [];
 }
 
-// Helper stato
-const isServed = (r) => r.status === 'confermata' || r.status === 'arrivato';
-const isActive = (r) => r.status !== 'annullata';
+// Helper stato: le statistiche considerano solo prenotazioni realmente valide/servite.
+const VALID_STATS_STATUSES = new Set(['confermata', 'arrivato', 'terminato', 'confirmed', 'arrived', 'terminated']);
+const NO_SHOW_STATUSES = new Set(['no_show']);
+const normalizedStatus = (status) => String(status || '').trim().toLowerCase();
+const isStatsValid = (r) => VALID_STATS_STATUSES.has(normalizedStatus(r.status));
+const isNoShow = (r) => NO_SHOW_STATUSES.has(normalizedStatus(r.status));
+const isServed = isStatsValid;
 
 // ---------------------------------------------------------------------------
 // KPI
 // ---------------------------------------------------------------------------
 function renderKpis(rows, prevRows, from, to) {
-  const active = rows.filter(isActive);
-  const covers = rows.filter(isServed).reduce((s, r) => s + r.party_size, 0);
+  const valid = rows.filter(isStatsValid);
+  const covers = valid.reduce((s, r) => s + r.party_size, 0);
 
-  $('kpiRes').textContent = active.length;
+  $('kpiRes').textContent = valid.length;
   $('kpiCovers').textContent = covers;
 
   const rate = noShowRate(rows);
@@ -182,15 +186,15 @@ function renderKpis(rows, prevRows, from, to) {
     else { trendEl.textContent = '▲ ' + delta + '%'; trendEl.className = 'trend trend--bad'; }
   }
 
-  const widgetCount = active.filter((r) => r.source === 'widget').length;
-  const widgetPct = active.length ? Math.round((widgetCount / active.length) * 100) : 0;
+  const widgetCount = valid.filter((r) => r.source === 'widget').length;
+  const widgetPct = valid.length ? Math.round((widgetCount / valid.length) * 100) : 0;
   $('kpiWidget').textContent = widgetPct + '%';
 }
 
 // Tasso no-show = no_show / (serviti + no_show). null se nessun dato utile.
 function noShowRate(rows) {
-  const noShow = rows.filter((r) => r.status === 'no_show').length;
-  const base = rows.filter((r) => isServed(r) || r.status === 'no_show').length;
+  const noShow = rows.filter(isNoShow).length;
+  const base = rows.filter((r) => isStatsValid(r) || isNoShow(r)).length;
   if (base === 0) return null;
   return (noShow / base) * 100;
 }
@@ -264,9 +268,9 @@ function renderShiftOccupancy(rows, from, to) {
 // Grafico: origine prenotazioni (ciambella widget vs manuali)
 // ---------------------------------------------------------------------------
 function renderSource(rows) {
-  const active = rows.filter(isActive);
-  const widget = active.filter((r) => r.source === 'widget').length;
-  const manual = active.filter((r) => r.source === 'manuale').length;
+  const valid = rows.filter(isStatsValid);
+  const widget = valid.filter((r) => r.source === 'widget').length;
+  const manual = valid.filter((r) => r.source === 'manuale').length;
 
   drawChart('chartSource', {
     type: 'doughnut',
@@ -331,7 +335,7 @@ function renderWeekday(rows, from, to) {
 // ---------------------------------------------------------------------------
 function renderTopCustomers(rows) {
   const byPhone = new Map();
-  for (const r of rows.filter(isActive)) {
+  for (const r of rows.filter(isStatsValid)) {
     const key = (r.customer_phone || '').trim() || `${r.customer_last_name} ${r.customer_first_name}`;
     if (!byPhone.has(key)) {
       byPhone.set(key, { name: `${r.customer_last_name} ${r.customer_first_name}`.trim(), phone: r.customer_phone, count: 0 });
