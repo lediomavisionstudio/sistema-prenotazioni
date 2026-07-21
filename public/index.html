@@ -61,7 +61,7 @@
 
     /* Card ---------------------------------------------------------------- */
     .wrap {
-      max-width: 480px;
+      max-width: 540px;
       margin: 0 auto;
       min-height: 100dvh;
       display: flex;
@@ -75,8 +75,10 @@
     .card {
       background: var(--surface);
       border: 1px solid var(--line);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
+      border-radius: 24px;
+      box-shadow:
+        0 22px 70px rgba(58, 43, 35, 0.13),
+        0 1px 0 rgba(255,255,255,.72) inset;
       overflow: hidden;
       flex: 1;
     }
@@ -84,9 +86,10 @@
 
     /* Header -------------------------------------------------------------- */
     .header {
-      padding: 26px 22px 20px;
+      padding: 28px 24px 22px;
       background:
-        radial-gradient(120% 100% at 50% 0%, rgba(200,64,42,0.10), transparent 60%),
+        linear-gradient(180deg, rgba(255,255,255,.42), rgba(255,255,255,0)),
+        radial-gradient(120% 100% at 50% 0%, rgba(200,64,42,0.10), transparent 62%),
         var(--surface);
       border-bottom: 1px solid var(--line);
       text-align: center;
@@ -118,6 +121,166 @@
 
     .body { padding: 20px 18px 8px; }
     .body.is-entering { animation: contentIn 240ms ease both; }
+
+    /* Home / menu --------------------------------------------------------- */
+    .home-view,
+    .menu-view {
+      padding: 22px 18px 24px;
+      animation: contentIn 240ms ease both;
+    }
+    .home-hero {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(227, 214, 186, .92);
+      border-radius: 22px;
+      padding: 24px 20px;
+      background:
+        linear-gradient(145deg, rgba(255,255,255,.66), rgba(247,239,219,.56)),
+        var(--surface-soft);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.78);
+    }
+    .home-hero__eyebrow,
+    .menu-panel__eyebrow {
+      display: inline-flex;
+      margin: 0 0 9px;
+      color: var(--tomato-dark);
+      font-size: .72rem;
+      font-weight: 800;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    .home-hero__title,
+    .menu-panel__title {
+      margin: 0;
+      font-family: var(--font-title);
+      font-size: clamp(1.65rem, 6vw, 2.25rem);
+      line-height: 1.02;
+      letter-spacing: -.018em;
+    }
+    .home-hero__text,
+    .menu-panel__text {
+      margin: 12px 0 0;
+      color: var(--ink-soft);
+      font-size: .95rem;
+      line-height: 1.55;
+    }
+    .home-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .home-actions .btn {
+      min-height: 52px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .home-info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .home-info-card {
+      min-height: 108px;
+      padding: 15px;
+      border: 1px solid rgba(227, 214, 186, .88);
+      border-radius: 18px;
+      background: rgba(255,253,246,.72);
+      box-shadow: 0 10px 24px rgba(58,43,35,.06);
+    }
+    .home-info-card__label {
+      margin: 0 0 6px;
+      color: var(--ink-soft);
+      font-size: .72rem;
+      font-weight: 800;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+    .home-info-card__value {
+      margin: 0;
+      color: var(--ink);
+      font-weight: 750;
+      line-height: 1.35;
+    }
+    .view-toolbar {
+      display: flex;
+      justify-content: flex-start;
+      margin: 0 0 16px;
+    }
+    .back-home {
+      appearance: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 40px;
+      padding: 9px 12px;
+      border: 1.5px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,253,246,.82);
+      color: var(--tomato-dark);
+      font: inherit;
+      font-size: .84rem;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 8px 18px rgba(58,43,35,.06);
+      transition: background 200ms ease, border-color 200ms ease, transform 120ms ease, box-shadow 200ms ease;
+    }
+    .back-home:hover {
+      background: var(--tomato-soft);
+      border-color: rgba(200,64,42,.36);
+      box-shadow: 0 12px 24px rgba(200,64,42,.1);
+      transform: translateY(-1px);
+    }
+    .back-home:focus-visible {
+      outline: 3px solid var(--tomato-soft);
+      outline-offset: 3px;
+    }
+    .menu-panel {
+      border: 1px solid rgba(227, 214, 186, .92);
+      border-radius: 22px;
+      padding: 22px 20px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.7), rgba(255,255,255,.12)),
+        var(--surface-soft);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.78);
+    }
+    .menu-card {
+      margin-top: 16px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--surface);
+    }
+    .menu-card__title {
+      margin: 0 0 6px;
+      font-family: var(--font-title);
+      font-size: 1.08rem;
+    }
+    .menu-card__text {
+      margin: 0 0 14px;
+      color: var(--ink-soft);
+      font-size: .9rem;
+    }
+    .menu-card .btn {
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      text-decoration: none;
+    }
+    @media (max-width: 420px) {
+      .home-actions,
+      .home-info-grid {
+        grid-template-columns: 1fr;
+      }
+      .home-view,
+      .menu-view {
+        padding: 18px 14px 22px;
+      }
+    }
 
     section.block { margin-bottom: 24px; }
     section.block { scroll-margin-top: 18px; }
@@ -819,8 +982,34 @@
         <button class="btn btn--primary" type="button" id="retryBootBtn" hidden>Riprova</button>
       </div>
 
+      <!-- Home -->
+      <div class="home-view" id="stateHome" hidden>
+        <section class="home-hero" aria-labelledby="homeTitle">
+          <p class="home-hero__eyebrow">Benvenuto</p>
+          <h2 class="home-hero__title" id="homeTitle">Prenota o consulta il menu</h2>
+          <p class="home-hero__text" id="homeLead">Scegli cosa vuoi fare: puoi prenotare il tuo tavolo in pochi passaggi o aprire il menu del locale.</p>
+          <div class="home-actions" aria-label="Azioni principali">
+            <button class="btn btn--primary" type="button" id="homeBookBtn">Prenota</button>
+            <button class="btn btn--ghost" type="button" id="homeMenuBtn">Menu</button>
+          </div>
+        </section>
+        <div class="home-info-grid" aria-label="Informazioni locale">
+          <article class="home-info-card">
+            <p class="home-info-card__label">Locale</p>
+            <p class="home-info-card__value" id="homeVenueName">-</p>
+          </article>
+          <article class="home-info-card">
+            <p class="home-info-card__label">Contatti</p>
+            <p class="home-info-card__value" id="homeVenueContact">-</p>
+          </article>
+        </div>
+      </div>
+
       <!-- Widget -->
       <div class="body" id="stateForm" hidden>
+        <div class="view-toolbar">
+          <button class="back-home" type="button" id="bookingHomeBtn" aria-label="Torna alla Home">← Torna alla Home</button>
+        </div>
         <nav class="progress-nav" aria-label="Avanzamento prenotazione">
           <button class="progress-nav__item" type="button" data-step="date" id="progressDate">
             <span class="progress-nav__marker" aria-hidden="true"></span>
@@ -957,6 +1146,19 @@
               <button class="btn btn--primary" type="submit" id="submitBtn" disabled>Prenota</button>
             </div>
           </form>
+        </section>
+      </div>
+
+      <!-- Menu -->
+      <div class="menu-view" id="stateMenu" hidden>
+        <div class="view-toolbar">
+          <button class="back-home" type="button" id="menuHomeBtn" aria-label="Torna alla Home">← Torna alla Home</button>
+        </div>
+        <section class="menu-panel" aria-labelledby="menuTitle">
+          <p class="menu-panel__eyebrow">Menu</p>
+          <h2 class="menu-panel__title" id="menuTitle">Il menu del locale</h2>
+          <p class="menu-panel__text" id="menuLead">Consulta la proposta del locale e poi torna qui per prenotare il tuo tavolo.</p>
+          <div class="menu-card" id="menuContent" aria-live="polite"></div>
         </section>
       </div>
 
@@ -1264,16 +1466,70 @@
     }
 
     function showState(which) {
-      ['Loading','Fatal','Form','Confirm'].forEach((s) =>
-        $('state' + s).hidden = (s !== which));
+      ['Loading','Fatal','Home','Form','Menu','Confirm'].forEach((s) => {
+        const el = $('state' + s);
+        if (el) el.hidden = (s !== which);
+      });
       $('bookingCard').classList.toggle('is-loading', which === 'Loading');
-      $('bookingCard').classList.toggle('is-ready', which === 'Form' || which === 'Confirm');
+      $('bookingCard').classList.toggle('is-ready', ['Home', 'Form', 'Menu', 'Confirm'].includes(which));
       $('pageFooter').hidden = which === 'Loading' || which === 'Form';
       if (which === 'Form') {
         $('stateForm').classList.remove('is-entering');
         void $('stateForm').offsetWidth;
         $('stateForm').classList.add('is-entering');
       }
+    }
+
+    function updateHomeInfo() {
+      if (!state.venue) return;
+      const contact = [state.venue.address, state.venue.phone].filter(Boolean).join(' · ');
+      $('homeVenueName').textContent = state.venue.name || 'Locale';
+      $('homeVenueContact').textContent = contact || 'Contatti disponibili nel locale';
+      $('homeLead').textContent = 'Scegli cosa vuoi fare: puoi prenotare il tuo tavolo in pochi passaggi o aprire il menu del locale.';
+    }
+
+    function menuUrlFromVenue() {
+      if (!state.venue) return '';
+      return state.venue.menu_url ||
+        state.venue.menu_pdf_url ||
+        state.venue.public_menu_url ||
+        state.venue.menu_link ||
+        state.venue.website_menu_url ||
+        '';
+    }
+
+    function renderMenuView() {
+      const url = menuUrlFromVenue();
+      const venueName = state.venue && state.venue.name ? state.venue.name : 'del locale';
+      $('menuTitle').textContent = `Menu ${venueName}`;
+      if (url) {
+        $('menuContent').innerHTML =
+          '<h3 class="menu-card__title">Consulta il menu</h3>' +
+          '<p class="menu-card__text">Apri il menu aggiornato del locale in una nuova scheda.</p>' +
+          `<a class="btn btn--primary" href="${escapeHtml(url)}" target="_blank" rel="noopener">Apri menu</a>`;
+      } else {
+        $('menuContent').innerHTML =
+          '<h3 class="menu-card__title">Menu non disponibile online</h3>' +
+          '<p class="menu-card__text">Il menu digitale non è ancora stato collegato. Puoi contattare il locale per maggiori informazioni.</p>' +
+          (state.venue && state.venue.phone
+            ? `<a class="btn btn--ghost" href="tel:${escapeHtml(state.venue.phone)}">Chiama il locale</a>`
+            : '<button class="btn btn--ghost" type="button" disabled>Menu in arrivo</button>');
+      }
+    }
+
+    function goHome() {
+      showState('Home');
+    }
+
+    function openBookingView() {
+      showState('Form');
+      updateProgressNav();
+      focusStep(state.progressStep || 'date');
+    }
+
+    function openMenuView() {
+      renderMenuView();
+      showState('Menu');
     }
 
     function fatal(msg, retry = false) {
@@ -1942,6 +2198,7 @@
         $('venueName').textContent = state.venue.name;
         $('venueSub').textContent = [state.venue.address, state.venue.phone].filter(Boolean).join(' · ');
         document.title = 'Prenota — ' + state.venue.name;
+        updateHomeInfo();
         state.closures = new Set((closuresResult.data || []).map((c) => c.closed_date));
         state.shifts = (shiftsResult.data || []).map((s) => ({ ...s, days: new Set((s.days_of_week || []).map(Number)) }));
         state.closedWeekdays = new Set((state.venue.closed_weekdays || []).map(Number));
@@ -2161,6 +2418,7 @@
         $('venueName').textContent = venue.name;
         $('venueSub').textContent = [venue.address, venue.phone].filter(Boolean).join(' · ');
         document.title = 'Prenota — ' + venue.name;
+        updateHomeInfo();
 
         // Chiusure straordinarie (per disabilitare quei giorni nel calendario)
         bootLog('carico chiusure');
@@ -2212,7 +2470,6 @@
 
         bootLog('renderizzo form');
         renderCalendar();
-        showState('Form');
         if (state.selDate) {
           try {
             await bootStep(
@@ -2227,6 +2484,7 @@
         renderTimes();
         updateSubmit();
         updateProgressNav();
+        showState('Home');
         startPublicAvailabilityWatch();
       } catch (err) {
         bootError('Avvio fallito', err);
@@ -2851,6 +3109,10 @@
     // -------------------------------------------------------------------
     // Wiring
     // -------------------------------------------------------------------
+    $('homeBookBtn').addEventListener('click', openBookingView);
+    $('homeMenuBtn').addEventListener('click', openMenuView);
+    $('bookingHomeBtn').addEventListener('click', goHome);
+    $('menuHomeBtn').addEventListener('click', goHome);
     $('coMinus').addEventListener('click', () => changeCoperti(-1));
     $('coPlus').addEventListener('click', () => changeCoperti(+1));
     $('coValue').min = String(MIN_PARTY);
