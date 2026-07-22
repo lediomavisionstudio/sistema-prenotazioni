@@ -1585,8 +1585,7 @@
     }
 
     function openMenuView() {
-      renderMenuView();
-      showState('Menu');
+      location.href = withLocale('menu.html');
     }
 
     function fatal(msg, retry = false) {

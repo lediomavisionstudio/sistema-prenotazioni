@@ -11,13 +11,365 @@
   <script src="../assets/js/admin-theme.js"></script>
   <link rel="stylesheet" href="../assets/css/theme.css" />
   <link rel="stylesheet" href="../assets/css/panel.css" />
-
-  <link rel="manifest" href="manifest.json" />
-  <link rel="apple-touch-icon" href="../assets/icons/icon.svg" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="Gestionale" />
+  <style>
+    .menu-shell {
+      display: grid;
+      gap: 18px;
+    }
+    .menu-hero {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background:
+        linear-gradient(135deg, color-mix(in srgb, var(--surface) 86%, transparent), color-mix(in srgb, var(--surface-soft) 88%, transparent)),
+        var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .menu-hero__eyebrow,
+    .menu-panel__eyebrow {
+      margin: 0 0 6px;
+      color: var(--tomato);
+      font-size: .72rem;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .menu-hero__title {
+      margin: 0;
+      font-family: var(--font-title);
+      font-size: clamp(1.7rem, 4vw, 2.45rem);
+      line-height: 1.02;
+    }
+    .menu-hero__text {
+      max-width: 680px;
+      margin: 10px 0 0;
+      color: var(--ink-soft);
+      font-size: .95rem;
+    }
+    .menu-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .menu-editor-grid {
+      display: grid;
+      grid-template-columns: minmax(280px, .8fr) minmax(0, 1.8fr);
+      gap: 18px;
+      align-items: start;
+    }
+    .menu-panel {
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .menu-panel__head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+    .menu-panel__title {
+      margin: 0;
+      font-family: var(--font-title);
+      font-size: 1.1rem;
+      line-height: 1.1;
+    }
+    .menu-panel__body {
+      padding: 16px;
+    }
+    .category-create {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .category-create__row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+    }
+    .category-presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .category-preset {
+      min-height: 34px;
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface-soft);
+      color: var(--ink);
+      font: inherit;
+      font-size: .78rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: border-color .18s ease, background .18s ease, transform .12s ease;
+    }
+    .category-preset:hover {
+      border-color: var(--tomato);
+      background: var(--tomato-soft);
+    }
+    .category-list,
+    .items-list {
+      display: grid;
+      gap: 10px;
+    }
+    .category-card {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--surface-soft);
+      transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+    }
+    .category-card.is-selected {
+      border-color: var(--tomato);
+      box-shadow: 0 12px 28px color-mix(in srgb, var(--tomato) 16%, transparent);
+    }
+    .category-card.is-dragging,
+    .menu-item-card.is-dragging {
+      opacity: .54;
+      transform: scale(.985);
+    }
+    .category-card.is-drop-target,
+    .items-list.is-drop-target,
+    .menu-item-card.is-drop-target {
+      outline: 2px dashed var(--tomato);
+      outline-offset: 4px;
+    }
+    .category-card__top {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+    }
+    .drag-handle {
+      display: inline-grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--ink-soft);
+      cursor: grab;
+      user-select: none;
+    }
+    .category-input,
+    .menu-input,
+    .menu-textarea,
+    .menu-select {
+      width: 100%;
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--surface);
+      color: var(--ink);
+      font: inherit;
+      padding: 11px 12px;
+    }
+    .category-input:focus,
+    .menu-input:focus,
+    .menu-textarea:focus,
+    .menu-select:focus {
+      outline: none;
+      border-color: var(--tomato);
+      box-shadow: 0 0 0 3px var(--tomato-soft);
+    }
+    .menu-textarea {
+      resize: vertical;
+      min-height: 82px;
+    }
+    .category-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--ink-soft);
+      font-size: .78rem;
+    }
+    .menu-switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--ink-soft);
+      font-size: .82rem;
+      font-weight: 700;
+    }
+    .menu-switch input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--tomato);
+    }
+    .category-actions,
+    .item-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .menu-button {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--surface);
+      color: var(--ink);
+      font: inherit;
+      font-size: .82rem;
+      font-weight: 800;
+      padding: 8px 11px;
+      cursor: pointer;
+      transition: background .18s ease, border-color .18s ease, transform .12s ease;
+    }
+    .menu-button:hover:not(:disabled) {
+      border-color: var(--tomato);
+      background: var(--tomato-soft);
+    }
+    .menu-button:focus-visible,
+    .category-preset:focus-visible,
+    .item-image-drop:focus-visible {
+      outline: 2px solid var(--tomato);
+      outline-offset: 3px;
+    }
+    .menu-button:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+    .menu-button--danger {
+      color: var(--tomato);
+    }
+    .items-empty,
+    .menu-empty {
+      padding: 22px;
+      border: 1px dashed var(--line);
+      border-radius: 16px;
+      background: var(--surface-soft);
+      color: var(--ink-soft);
+      text-align: center;
+    }
+    .menu-item-card {
+      display: grid;
+      grid-template-columns: 138px minmax(0, 1fr);
+      gap: 16px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--surface-soft);
+      transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+    }
+    .item-image-drop {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-height: 138px;
+      aspect-ratio: 1 / 1;
+      border: 1px dashed var(--line);
+      border-radius: 16px;
+      background: var(--surface);
+      overflow: hidden;
+      cursor: pointer;
+      text-align: center;
+      color: var(--ink-soft);
+      font-size: .82rem;
+      font-weight: 700;
+    }
+    .item-image-drop.is-over {
+      border-color: var(--tomato);
+      background: var(--tomato-soft);
+    }
+    .item-image-drop img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .item-image-drop span {
+      position: relative;
+      z-index: 1;
+      padding: 10px;
+    }
+    .menu-item-form {
+      display: grid;
+      gap: 12px;
+    }
+    .item-form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .menu-field {
+      display: grid;
+      gap: 5px;
+    }
+    .menu-field > span {
+      color: var(--ink-soft);
+      font-size: .76rem;
+      font-weight: 800;
+      letter-spacing: .02em;
+    }
+    .item-status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .autosave-indicator {
+      min-height: 24px;
+      color: var(--ink-soft);
+      font-size: .78rem;
+      font-weight: 700;
+    }
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+    }
+    @media (max-width: 1100px) {
+      .menu-editor-grid {
+        grid-template-columns: 1fr;
+      }
+      .settings-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+    @media (max-width: 760px) {
+      .menu-hero,
+      .menu-panel__head {
+        flex-direction: column;
+      }
+      .menu-toolbar,
+      .category-actions,
+      .item-actions {
+        width: 100%;
+      }
+      .menu-toolbar .btn,
+      .menu-button,
+      .category-create__row {
+        width: 100%;
+      }
+      .category-create__row,
+      .menu-item-card,
+      .item-form-grid,
+      .settings-grid {
+        grid-template-columns: 1fr;
+      }
+      .item-image-drop {
+        width: 100%;
+        max-width: 220px;
+      }
+    }
+  </style>
 </head>
 <body>
   <header class="topbar">
@@ -51,34 +403,92 @@
   </header>
 
   <main class="page" id="page" hidden>
-    <section class="section">
-      <div class="section__head">
+    <section class="menu-shell" aria-labelledby="menuPageTitle">
+      <div class="menu-hero">
         <div>
-          <h1 class="section__title">Menu</h1>
-          <p class="muted" style="margin:6px 0 0">Collega il menu digitale mostrato nell'interfaccia pubblica.</p>
+          <p class="menu-hero__eyebrow">Menu digitale</p>
+          <h1 class="menu-hero__title" id="menuPageTitle">Editor menu</h1>
+          <p class="menu-hero__text">Crea categorie, piatti, traduzioni e immagini. Ogni modifica viene salvata automaticamente.</p>
+        </div>
+        <div class="menu-toolbar">
+          <button class="btn btn--primary" id="addCategoryTop" type="button">+ Categoria</button>
+          <button class="btn btn--ghost" id="addItemTop" type="button">+ Piatto</button>
         </div>
       </div>
 
-      <div class="card">
-        <div class="grid-2">
-          <div class="field">
-            <label for="menuUrl">URL menu digitale</label>
-            <input id="menuUrl" type="url" inputmode="url" placeholder="https://..." autocomplete="url" />
-            <small class="muted">Inserisci il link al menu online o al PDF pubblico.</small>
+      <section class="menu-panel" aria-labelledby="settingsTitle">
+        <div class="menu-panel__head">
+          <div>
+            <p class="menu-panel__eyebrow">Configurazione</p>
+            <h2 class="menu-panel__title" id="settingsTitle">Impostazioni menu</h2>
           </div>
-          <div class="field">
-            <label>Anteprima</label>
-            <div class="card" style="box-shadow:none;padding:16px">
-              <strong id="menuPreviewTitle">Menu non collegato</strong>
-              <p class="muted" id="menuPreviewText" style="margin:6px 0 14px">Quando salvi un link, i clienti potranno aprirlo dal widget pubblico.</p>
-              <a class="btn btn--ghost btn--block" id="menuPreviewLink" href="#" target="_blank" rel="noopener" hidden>Apri menu</a>
+          <span class="autosave-indicator" id="saveState">Salvataggio automatico attivo</span>
+        </div>
+        <div class="menu-panel__body">
+          <div class="settings-grid" id="settingsForm">
+            <label class="menu-field">
+              <span>Lingua principale</span>
+              <select class="menu-select" id="defaultLanguage">
+                <option value="it">Italiano</option>
+                <option value="en">Inglese</option>
+              </select>
+            </label>
+            <label class="menu-field">
+              <span>Seconda lingua</span>
+              <select class="menu-select" id="secondaryLanguage">
+                <option value="en">Inglese</option>
+                <option value="it">Italiano</option>
+                <option value="">Nessuna</option>
+              </select>
+            </label>
+            <label class="menu-field">
+              <span>Valuta</span>
+              <input class="menu-input" id="currency" maxlength="3" value="EUR" />
+            </label>
+            <label class="menu-switch">
+              <input id="showPrices" type="checkbox" checked />
+              Mostra prezzi
+            </label>
+            <label class="menu-switch">
+              <input id="showImages" type="checkbox" checked />
+              Mostra immagini
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <div class="menu-editor-grid">
+        <section class="menu-panel" aria-labelledby="categoriesTitle">
+          <div class="menu-panel__head">
+            <div>
+              <p class="menu-panel__eyebrow">Organizzazione</p>
+              <h2 class="menu-panel__title" id="categoriesTitle">Categorie</h2>
             </div>
           </div>
-        </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
-          <button class="btn btn--primary" id="saveMenu" type="button">Salva menu</button>
-          <button class="btn btn--ghost" id="clearMenu" type="button">Rimuovi link</button>
-        </div>
+          <div class="menu-panel__body">
+            <div class="category-create">
+              <div class="category-create__row">
+                <input class="menu-input" id="newCategoryName" type="text" placeholder="Nome categoria" />
+                <button class="menu-button" id="addCategoryBtn" type="button">Aggiungi</button>
+              </div>
+              <div class="category-presets" id="categoryPresets" aria-label="Categorie rapide"></div>
+            </div>
+            <div class="category-list" id="categoryList"></div>
+          </div>
+        </section>
+
+        <section class="menu-panel" aria-labelledby="itemsTitle">
+          <div class="menu-panel__head">
+            <div>
+              <p class="menu-panel__eyebrow" id="selectedCategoryLabel">Piatti</p>
+              <h2 class="menu-panel__title" id="itemsTitle">Seleziona una categoria</h2>
+            </div>
+            <button class="btn btn--primary" id="addItemBtn" type="button">+ Nuovo piatto</button>
+          </div>
+          <div class="menu-panel__body">
+            <div class="items-list" id="itemsList"></div>
+          </div>
+        </section>
       </div>
     </section>
   </main>
