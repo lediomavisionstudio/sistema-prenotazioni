@@ -98,6 +98,20 @@ where language is null;
 alter table menu_category_translations
   alter column language set not null;
 
+with ranked_category_translations as (
+  select
+    id,
+    row_number() over (
+      partition by category_id, language
+      order by id
+    ) as duplicate_rank
+  from menu_category_translations
+)
+delete from menu_category_translations t
+using ranked_category_translations r
+where t.id = r.id
+  and r.duplicate_rank > 1;
+
 alter table menu_item_translations
   add column if not exists language text;
 
@@ -107,6 +121,20 @@ where language is null;
 
 alter table menu_item_translations
   alter column language set not null;
+
+with ranked_item_translations as (
+  select
+    id,
+    row_number() over (
+      partition by item_id, language
+      order by id
+    ) as duplicate_rank
+  from menu_item_translations
+)
+delete from menu_item_translations t
+using ranked_item_translations r
+where t.id = r.id
+  and r.duplicate_rank > 1;
 
 alter table menu_settings
   add column if not exists default_language text not null default 'it',
