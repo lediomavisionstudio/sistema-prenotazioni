@@ -89,6 +89,17 @@ comment on table menu_settings is 'Impostazioni pubbliche del menu digitale di u
 -- additivo le sole colonne/vincoli necessari prima di creare indici e policy.
 
 alter table menu_category_translations
+  add column if not exists id uuid default gen_random_uuid();
+
+update menu_category_translations
+set id = gen_random_uuid()
+where id is null;
+
+alter table menu_category_translations
+  alter column id set default gen_random_uuid(),
+  alter column id set not null;
+
+alter table menu_category_translations
   add column if not exists language text;
 
 update menu_category_translations
@@ -111,6 +122,17 @@ delete from menu_category_translations t
 using ranked_category_translations r
 where t.id = r.id
   and r.duplicate_rank > 1;
+
+alter table menu_item_translations
+  add column if not exists id uuid default gen_random_uuid();
+
+update menu_item_translations
+set id = gen_random_uuid()
+where id is null;
+
+alter table menu_item_translations
+  alter column id set default gen_random_uuid(),
+  alter column id set not null;
 
 alter table menu_item_translations
   add column if not exists language text;
@@ -136,6 +158,17 @@ using ranked_item_translations r
 where t.id = r.id
   and r.duplicate_rank > 1;
 
+alter table menu_options
+  add column if not exists id uuid default gen_random_uuid();
+
+update menu_options
+set id = gen_random_uuid()
+where id is null;
+
+alter table menu_options
+  alter column id set default gen_random_uuid(),
+  alter column id set not null;
+
 alter table menu_settings
   add column if not exists default_language text not null default 'it',
   add column if not exists secondary_language text default 'en',
@@ -153,6 +186,42 @@ alter table menu_item_translations
 
 do $$
 begin
+  if not exists (
+    select 1
+    from pg_index i
+    join pg_class c on c.oid = i.indrelid
+    where c.oid = 'menu_category_translations'::regclass
+      and i.indisprimary
+  ) then
+    alter table menu_category_translations
+      add constraint menu_category_translations_pkey
+      primary key (id);
+  end if;
+
+  if not exists (
+    select 1
+    from pg_index i
+    join pg_class c on c.oid = i.indrelid
+    where c.oid = 'menu_item_translations'::regclass
+      and i.indisprimary
+  ) then
+    alter table menu_item_translations
+      add constraint menu_item_translations_pkey
+      primary key (id);
+  end if;
+
+  if not exists (
+    select 1
+    from pg_index i
+    join pg_class c on c.oid = i.indrelid
+    where c.oid = 'menu_options'::regclass
+      and i.indisprimary
+  ) then
+    alter table menu_options
+      add constraint menu_options_pkey
+      primary key (id);
+  end if;
+
   if not exists (
     select 1 from pg_constraint
     where conname = 'menu_category_translations_category_id_language_key'
