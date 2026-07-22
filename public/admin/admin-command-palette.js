@@ -28,7 +28,8 @@ function actions() {
     { id: 'dashboard', title: 'Apri Dashboard', hint: 'Navigazione', run: () => (location.href = 'dashboard.html') },
     { id: 'upcoming', title: 'Apri Prenotazioni', hint: 'Navigazione', run: () => (location.href = 'upcoming.html') },
     { id: 'stats', title: 'Apri Statistiche', hint: 'Navigazione', run: () => (location.href = 'stats.html') },
-    { id: 'communications', title: 'Apri Comunicazioni', hint: 'Navigazione', run: () => (location.href = 'communications.html') },
+    { id: 'menu', title: 'Apri Menu', hint: 'Impostazioni', run: () => (location.href = 'settings.html?tab=menu') },
+    { id: 'communications', title: 'Apri Comunicazioni', hint: 'Impostazioni', run: () => (location.href = 'settings.html?tab=comunicazioni') },
     { id: 'settings', title: 'Apri Impostazioni', hint: 'Navigazione', run: () => (location.href = 'settings.html') },
     {
       id: 'theme',
@@ -121,6 +122,7 @@ function mountPalette() {
 }
 
 (async function initCommandPalette() {
+  if (window.ADMIN_EMBED) return;
   const session = await requireSession();
   if (!session) return;
   mountPalette();

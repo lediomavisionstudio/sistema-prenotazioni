@@ -261,7 +261,93 @@
       letter-spacing: .04em;
     }
 
+    .settings-main-tabs {
+      position: sticky;
+      top: calc(var(--topbar-height, 76px) + 10px);
+      z-index: 8;
+      display: flex;
+      gap: 8px;
+      width: 100%;
+      margin: 0 0 20px;
+      padding: 7px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: color-mix(in srgb, var(--surface) 94%, transparent);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(16px);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .settings-main-tabs::-webkit-scrollbar {
+      display: none;
+    }
+
+    .settings-main-tab {
+      flex: 1 0 max(140px, 0px);
+      min-height: 42px;
+      border: 0;
+      border-radius: 13px;
+      background: transparent;
+      color: var(--ink-soft);
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+      transition: background .2s ease, color .2s ease, box-shadow .2s ease, transform .16s ease;
+      white-space: nowrap;
+    }
+
+    .settings-main-tab:hover,
+    .settings-main-tab:focus-visible {
+      background: var(--surface-soft);
+      color: var(--ink);
+      outline: none;
+    }
+
+    .settings-main-tab[aria-selected="true"] {
+      background: var(--tomato);
+      color: #fff;
+      box-shadow: 0 12px 28px color-mix(in srgb, var(--tomato) 22%, transparent);
+    }
+
+    .settings-main-panel[hidden] {
+      display: none !important;
+    }
+
+    .settings-embedded-panel {
+      display: grid;
+      gap: 0;
+    }
+
+    .settings-embedded-frame {
+      display: block;
+      width: 100%;
+      min-height: 760px;
+      border: 0;
+      background: transparent;
+      overflow: hidden;
+    }
+
+    .settings-embedded-state {
+      display: grid;
+      place-items: center;
+      min-height: 220px;
+      color: var(--ink-soft);
+      font-weight: 700;
+    }
+
     @media (max-width: 700px) {
+      .settings-main-tabs {
+        top: calc(var(--topbar-height, 106px) + 8px);
+        margin-inline: -2px;
+        padding: 6px;
+      }
+
+      .settings-main-tab {
+        flex: 0 0 auto;
+        min-width: 132px;
+      }
+
       .schedule-mode-save,
       .schedule-day {
         align-items: stretch;
@@ -323,9 +409,7 @@
         </div>
         <a class="topbar__link" href="dashboard.html">Dashboard</a>
         <a class="topbar__link" href="upcoming.html">Prenotazioni</a>
-        <a class="topbar__link" href="menu.html">Menu</a>
         <a class="topbar__link" href="stats.html">Statistiche</a>
-        <a class="topbar__link" href="communications.html">Comunicazioni</a>
         <a class="topbar__link is-active" href="settings.html">Impostazioni</a>
         <button class="btn btn--ghost btn--sm" id="logoutBtn" type="button">Esci</button>
       </nav>
@@ -334,6 +418,13 @@
   </header>
 
   <main class="page" id="page" hidden>
+    <div class="settings-main-tabs" id="settingsMainTabs" role="tablist" aria-label="Sezioni impostazioni">
+      <button class="settings-main-tab" id="settingsTabGenerali" type="button" role="tab" aria-selected="true" aria-controls="settingsPanelGenerali" data-settings-tab="generali">Generali</button>
+      <button class="settings-main-tab" id="settingsTabMenu" type="button" role="tab" aria-selected="false" aria-controls="settingsPanelMenu" data-settings-tab="menu">Menu</button>
+      <button class="settings-main-tab" id="settingsTabComunicazioni" type="button" role="tab" aria-selected="false" aria-controls="settingsPanelComunicazioni" data-settings-tab="comunicazioni">Comunicazioni</button>
+    </div>
+
+    <section class="settings-main-panel" id="settingsPanelGenerali" role="tabpanel" aria-labelledby="settingsTabGenerali">
     <p class="form-error" id="readonlyBanner" hidden style="margin-bottom:18px">
       Solo il titolare può modificare la configurazione. Puoi consultarla in sola lettura.
     </p>
@@ -564,6 +655,17 @@
           </div>
         </div>
       </div>
+    </section>
+    </section>
+
+    <section class="settings-main-panel settings-embedded-panel" id="settingsPanelMenu" role="tabpanel" aria-labelledby="settingsTabMenu" hidden>
+      <div class="settings-embedded-state" data-embedded-loading="menu">Caricamento menu...</div>
+      <iframe class="settings-embedded-frame" id="settingsMenuFrame" title="Menu digitale" data-src="menu.html?embed=1" hidden></iframe>
+    </section>
+
+    <section class="settings-main-panel settings-embedded-panel" id="settingsPanelComunicazioni" role="tabpanel" aria-labelledby="settingsTabComunicazioni" hidden>
+      <div class="settings-embedded-state" data-embedded-loading="comunicazioni">Caricamento comunicazioni...</div>
+      <iframe class="settings-embedded-frame" id="settingsComunicazioniFrame" title="Comunicazioni" data-src="communications.html?embed=1" hidden></iframe>
     </section>
   </main>
 

@@ -33,6 +33,7 @@ const LOGO_TYPES = new Map([
   ['image/jpeg', 'jpg'],
   ['image/webp', 'webp'],
 ]);
+const SETTINGS_TABS = ['generali', 'menu', 'comunicazioni'];
 const RESTORE_TABLE_ORDER = [
   'zones',
   'service_shifts',
@@ -1111,8 +1112,90 @@ async function confirmRestoreBackup() {
   }
 }
 
+// --- Tab principali Impostazioni ------------------------------------------
+function initialSettingsTab() {
+  const params = new URLSearchParams(window.location.search);
+  const requested = String(params.get('tab') || '').toLowerCase();
+  return SETTINGS_TABS.includes(requested) ? requested : 'generali';
+}
+
+function setSettingsTab(tab, options = {}) {
+  const active = SETTINGS_TABS.includes(tab) ? tab : 'generali';
+  document.querySelectorAll('[data-settings-tab]').forEach((button) => {
+    const selected = button.dataset.settingsTab === active;
+    button.setAttribute('aria-selected', selected ? 'true' : 'false');
+    button.tabIndex = selected ? 0 : -1;
+  });
+  document.querySelectorAll('.settings-main-panel[role="tabpanel"]').forEach((panel) => {
+    panel.hidden = panel.id !== panelIdForSettingsTab(active);
+  });
+
+  loadEmbeddedPanel(active);
+  if (!options.replace) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', active);
+    history.pushState({ settingsTab: active }, '', url);
+  } else {
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', active);
+    history.replaceState({ settingsTab: active }, '', url);
+  }
+}
+
+function panelIdForSettingsTab(tab) {
+  return {
+    generali: 'settingsPanelGenerali',
+    menu: 'settingsPanelMenu',
+    comunicazioni: 'settingsPanelComunicazioni',
+  }[tab];
+}
+
+function loadEmbeddedPanel(tab) {
+  const frame = tab === 'menu'
+    ? $('settingsMenuFrame')
+    : tab === 'comunicazioni'
+      ? $('settingsComunicazioniFrame')
+      : null;
+  if (!frame || frame.dataset.loaded === '1') return;
+  frame.dataset.loaded = '1';
+  frame.src = frame.dataset.src;
+  frame.addEventListener('load', () => {
+    const loading = frame.parentElement.querySelector('[data-embedded-loading]');
+    if (loading) loading.hidden = true;
+    frame.hidden = false;
+  }, { once: true });
+}
+
+function wireSettingsTabs() {
+  const tabs = [...document.querySelectorAll('[data-settings-tab]')];
+  tabs.forEach((button, index) => {
+    button.addEventListener('click', () => setSettingsTab(button.dataset.settingsTab));
+    button.addEventListener('keydown', (event) => {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      const nextIndex = event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? tabs.length - 1
+          : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+      tabs[nextIndex].focus();
+      setSettingsTab(tabs[nextIndex].dataset.settingsTab);
+    });
+  });
+  window.addEventListener('popstate', () => setSettingsTab(initialSettingsTab(), { replace: true }));
+  window.addEventListener('message', (event) => {
+    if (!event.data || event.data.type !== 'admin-embedded-resize') return;
+    if (!['menu', 'comunicazioni'].includes(event.data.panel)) return;
+    const frame = event.data.panel === 'menu' ? $('settingsMenuFrame') : $('settingsComunicazioniFrame');
+    const height = Math.max(520, Math.min(Number(event.data.height) || 0, 6000));
+    if (frame && height) frame.style.height = `${height}px`;
+  });
+  setSettingsTab(initialSettingsTab(), { replace: true });
+}
+
 // --- Wiring ----------------------------------------------------------------
 function wire() {
+  wireSettingsTabs();
   document.querySelectorAll('input[name="adminTheme"]').forEach((input) =>
     input.addEventListener('change', () => {
       if (!input.checked) return;

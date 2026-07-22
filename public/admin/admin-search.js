@@ -162,6 +162,7 @@ function mountSearch() {
 }
 
 (async function initGlobalSearch() {
+  if (window.ADMIN_EMBED) return;
   const session = await requireSession();
   if (!session) return;
   mountSearch();

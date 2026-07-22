@@ -6,7 +6,7 @@ const PROMPT_KEY = 'onesignal-admin-prompt-dismissed-v1';
 let initialized = false;
 let venueContext = null;
 
-initAdminPush();
+if (!window.ADMIN_EMBED) initAdminPush();
 
 async function initAdminPush() {
   if (!supabase || !isSupported()) return;
