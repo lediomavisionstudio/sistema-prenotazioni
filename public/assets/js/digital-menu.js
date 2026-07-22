@@ -9,6 +9,9 @@ const CONFIG = Object.assign({
 const params = new URLSearchParams(location.search);
 const venueSlug = params.get('locale') || params.get('venue') || CONFIG.DEFAULT_VENUE_SLUG;
 const CACHE_KEY = venueSlug ? `digital-menu:${venueSlug}` : '';
+const INSTALL_LAST_SHOWN_KEY = 'digital-menu-install-last-shown-v1';
+const INSTALL_INSTALLED_KEY = 'digital-menu-install-installed-v1';
+const INSTALL_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 
 function readStorage(key) {
   try {
@@ -34,6 +37,75 @@ const state = {
   language: readStorage('digital-menu-language') || 'it',
   query: '',
   observer: null,
+  installPrompt: null,
+  installModal: null,
+};
+
+const UI = {
+  it: {
+    kicker: 'Menu digitale',
+    search: 'Cerca nel menu',
+    home: 'Torna in Home',
+    available: 'Disponibile',
+    unavailable: 'Non disponibile',
+    new: 'Novità',
+    recommended: 'Consigliato',
+    itemSingular: 'piatto',
+    itemPlural: 'piatti',
+    emptySearch: 'Nessun piatto corrisponde alla ricerca.',
+    emptyMenu: 'Il menu non è ancora disponibile.',
+    fatal: 'Menu non disponibile.',
+    untitledCategory: 'Categoria senza nome',
+    untitledItem: 'Piatto senza nome',
+    installTitle: "Installa l'app",
+    installText: "Installa l'app sul tuo telefono per prenotare più velocemente, consultare il menu anche dalla Home e ricevere notifiche.",
+    installCta: 'Installa',
+    later: 'Più tardi',
+    iosTitle: "Aggiungi l'app alla Home",
+    iosText: "Apri il menu Condividi di Safari e seleziona 'Aggiungi a Home'.",
+  },
+  en: {
+    kicker: 'Digital menu',
+    search: 'Search the menu',
+    home: 'Back to Home',
+    available: 'Available',
+    unavailable: 'Unavailable',
+    new: 'New',
+    recommended: 'Recommended',
+    itemSingular: 'item',
+    itemPlural: 'items',
+    emptySearch: 'No dishes match your search.',
+    emptyMenu: 'The menu is not available yet.',
+    fatal: 'Menu unavailable.',
+    untitledCategory: 'Untitled category',
+    untitledItem: 'Untitled item',
+    installTitle: 'Install the app',
+    installText: 'Install the app on your phone to book faster, check the menu from your Home screen and receive notifications.',
+    installCta: 'Install',
+    later: 'Later',
+    iosTitle: 'Add the app to Home',
+    iosText: "Open Safari's Share menu and choose 'Add to Home Screen'.",
+  },
+};
+
+const CATEGORY_FALLBACKS = {
+  antipasti: 'Starters',
+  primi: 'First courses',
+  'primi piatti': 'First courses',
+  secondi: 'Main courses',
+  'secondi piatti': 'Main courses',
+  contorni: 'Sides',
+  dessert: 'Desserts',
+  dolci: 'Desserts',
+  bibite: 'Drinks',
+  bevande: 'Drinks',
+  vini: 'Wines',
+  pizze: 'Pizzas',
+  pizza: 'Pizza',
+  birre: 'Beers',
+  caffe: 'Coffee',
+  caffè: 'Coffee',
+  digestivi: 'Digestifs',
 };
 
 const $ = (id) => document.getElementById(id);
@@ -56,6 +128,7 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => 
   "'": '&#39;',
 }[char]));
 const normalize = (value) => String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const t = (key) => (UI[state.language] || UI.it)[key] || UI.it[key] || key;
 
 let supabase = null;
 
@@ -90,6 +163,10 @@ function withLocale(path) {
   return `${path}${sep}locale=${encodeURIComponent(venueSlug)}`;
 }
 
+function homeUrl() {
+  return withLocale('index.html');
+}
+
 function setBrandColor(venue) {
   if (!venue?.brand_primary) return;
   const root = document.documentElement.style;
@@ -110,21 +187,31 @@ function hexToRgba(hex, alpha) {
   return `rgba(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}, ${alpha})`;
 }
 
-function tr(entity, fallbackLanguage = 'it') {
-  const translations = entity.translations || {};
-  return translations[state.language] || translations[fallbackLanguage] || translations.it || translations.en || {};
+function selectedTr(entity) {
+  return entity.translations?.[state.language] || {};
+}
+
+function fallbackTr(entity) {
+  return entity.translations?.it || entity.translations?.en || {};
 }
 
 function categoryTitle(category) {
-  return tr(category).name || (state.language === 'en' ? 'Untitled category' : 'Categoria senza nome');
+  const translated = selectedTr(category).name;
+  if (translated) return translated;
+  if (state.language === 'en') {
+    const italian = category.translations?.it?.name || '';
+    const fallback = CATEGORY_FALLBACKS[normalize(italian)];
+    if (fallback) return fallback;
+  }
+  return fallbackTr(category).name || t('untitledCategory');
 }
 
 function itemTitle(item) {
-  return tr(item).name || (state.language === 'en' ? 'Untitled item' : 'Piatto senza nome');
+  return selectedTr(item).name || fallbackTr(item).name || t('untitledItem');
 }
 
 function itemDescription(item) {
-  return tr(item).description || '';
+  return selectedTr(item).description || fallbackTr(item).description || '';
 }
 
 function isNew(item) {
@@ -136,7 +223,8 @@ function renderVenue() {
   document.title = state.venue ? `Menu - ${state.venue.name}` : 'Menu Digitale';
   $('venueName').textContent = state.venue?.name || 'Menu';
   $('venueSub').textContent = [state.venue?.address, state.venue?.phone].filter(Boolean).join(` ${String.fromCharCode(183)} `);
-  $('bookingLink').href = withLocale('index.html');
+  $('bookingLink').href = homeUrl();
+  $('fatalHomeLink').href = homeUrl();
   if (state.venue?.logo_url) {
     $('venueLogo').src = state.venue.logo_url;
     $('venueLogo').alt = state.venue.name || '';
@@ -167,8 +255,11 @@ function renderLanguage() {
     button.classList.toggle('is-active', active);
     button.setAttribute('aria-pressed', active ? 'true' : 'false');
   });
-  $('menuSearch').placeholder = state.language === 'en' ? 'Search the menu' : 'Cerca nel menu';
-  $('bookingLink').textContent = state.language === 'en' ? 'Book a table' : 'Prenota un tavolo';
+  document.documentElement.lang = state.language;
+  document.querySelector('.brand-kicker').textContent = t('kicker');
+  $('menuSearch').placeholder = t('search');
+  $('bookingLink').textContent = t('home');
+  $('fatalHomeLink').textContent = t('home');
 }
 
 function renderCategoryStrip(categories) {
@@ -195,9 +286,9 @@ function renderItem(item) {
         </div>
         ${itemDescription(item) ? `<p class="dish-description">${escapeHtml(itemDescription(item))}</p>` : ''}
         <div class="dish-badges">
-          <span class="badge badge--ok">${state.language === 'en' ? 'Available' : 'Disponibile'}</span>
-          ${isNew(item) ? `<span class="badge badge--new">${state.language === 'en' ? 'New' : 'Novita'}</span>` : ''}
-          ${item.featured ? `<span class="badge badge--featured">${state.language === 'en' ? 'Recommended' : 'Consigliato'}</span>` : ''}
+          <span class="badge ${item.available === false ? 'badge--off' : 'badge--ok'}">${item.available === false ? t('unavailable') : t('available')}</span>
+          ${isNew(item) ? `<span class="badge badge--new">${t('new')}</span>` : ''}
+          ${item.featured ? `<span class="badge badge--featured">${t('recommended')}</span>` : ''}
         </div>
       </div>
     </article>
@@ -212,8 +303,8 @@ function renderMenu() {
   if (!categories.length) {
     if (state.observer) state.observer.disconnect();
     $('menuContent').innerHTML = `<div class="empty-card">${state.query
-      ? (state.language === 'en' ? 'No dishes match your search.' : 'Nessun piatto corrisponde alla ricerca.')
-      : (state.language === 'en' ? 'The menu is not available yet.' : 'Il menu non e ancora disponibile.')}</div>`;
+      ? t('emptySearch')
+      : t('emptyMenu')}</div>`;
     $('menuContent').hidden = false;
     return;
   }
@@ -222,7 +313,7 @@ function renderMenu() {
     <section class="menu-section" id="cat-${category.id}" data-category-section="${category.id}">
       <div class="menu-section__head">
         <h2 class="menu-section__title">${escapeHtml(categoryTitle(category))}</h2>
-        <span class="menu-section__count">${category.items.length} ${category.items.length === 1 ? (state.language === 'en' ? 'item' : 'piatto') : (state.language === 'en' ? 'items' : 'piatti')}</span>
+        <span class="menu-section__count">${category.items.length} ${category.items.length === 1 ? t('itemSingular') : t('itemPlural')}</span>
       </div>
       <div class="items-grid">${category.items.map(renderItem).join('')}</div>
     </section>
@@ -301,7 +392,6 @@ async function loadMenu() {
         .from('menu_items')
         .select('id, category_id, price, image_url, sort_order, available, featured, created_at')
         .in('category_id', categoryIds)
-        .eq('available', true)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: true }),
     ]);
@@ -351,8 +441,140 @@ function showFatal(error) {
   $('skeleton').hidden = true;
   $('categoryWrap').hidden = true;
   $('menuContent').hidden = true;
-  $('fatalText').textContent = error.message || 'Menu non disponibile.';
+  renderLanguage();
+  $('fatalText').textContent = error.message || t('fatal');
   $('fatalState').hidden = false;
+}
+
+function isInstalled() {
+  return window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true
+    || readStorage(INSTALL_INSTALLED_KEY) === '1';
+}
+
+function installRecentlyShown() {
+  const last = Number(readStorage(INSTALL_LAST_SHOWN_KEY) || 0);
+  return last && Date.now() - last < INSTALL_INTERVAL_MS;
+}
+
+function canShowInstallPrompt() {
+  return !isInstalled() && !installRecentlyShown();
+}
+
+function markInstallShown() {
+  writeStorage(INSTALL_LAST_SHOWN_KEY, String(Date.now()));
+}
+
+function markInstalled() {
+  writeStorage(INSTALL_INSTALLED_KEY, '1');
+}
+
+function isIosSafari() {
+  const ua = navigator.userAgent || '';
+  const ios = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const safari = /^((?!CriOS|FxiOS|EdgiOS|OPiOS).)*Safari/i.test(ua);
+  return ios && safari;
+}
+
+function installIcon(isIos = false) {
+  return isIos
+    ? '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg>'
+    : '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/><path d="M9 6h6"/></svg>';
+}
+
+function showInstallModal(mode = 'native') {
+  if (!canShowInstallPrompt() || state.installModal) return;
+  markInstallShown();
+  const isIos = mode === 'ios';
+  const modal = document.createElement('div');
+  modal.className = 'install-modal';
+  modal.id = 'installModal';
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.setAttribute('aria-labelledby', 'installTitle');
+  modal.innerHTML = `
+    <div class="install-card">
+      <div class="install-icon">${installIcon(isIos)}</div>
+      <h2 class="install-title" id="installTitle">${escapeHtml(isIos ? t('iosTitle') : t('installTitle'))}</h2>
+      <p class="install-text">${escapeHtml(isIos ? t('iosText') : t('installText'))}</p>
+      <div class="install-actions">
+        ${isIos ? '' : `<button class="install-btn install-btn--primary" type="button" data-install-action="install">${escapeHtml(t('installCta'))}</button>`}
+        <button class="install-btn" type="button" data-install-action="later">${escapeHtml(t('later'))}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  state.installModal = modal;
+  requestAnimationFrame(() => modal.classList.add('is-visible'));
+
+  modal.addEventListener('click', (event) => {
+    const action = event.target.closest('[data-install-action]')?.dataset.installAction;
+    if (action === 'install') installPwa();
+    if (action === 'later') closeInstallModal();
+  });
+}
+
+function closeInstallModal() {
+  const modal = state.installModal;
+  if (!modal) return;
+  modal.classList.remove('is-visible');
+  state.installModal = null;
+  setTimeout(() => modal.remove(), 240);
+}
+
+async function installPwa() {
+  const promptEvent = state.installPrompt;
+  state.installPrompt = null;
+  if (!promptEvent) {
+    closeInstallModal();
+    return;
+  }
+  try {
+    await promptEvent.prompt();
+    const choice = await promptEvent.userChoice;
+    if (choice?.outcome === 'accepted') markInstalled();
+  } catch (error) {
+    console.error('[digital-menu] prompt installazione non completato:', error);
+  } finally {
+    closeInstallModal();
+  }
+}
+
+function initInstallPrompt() {
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    state.installPrompt = event;
+    window.setTimeout(() => showInstallModal('native'), 900);
+  });
+  window.addEventListener('appinstalled', () => {
+    markInstalled();
+    closeInstallModal();
+    state.installPrompt = null;
+  });
+  window.addEventListener('load', () => {
+    if (isIosSafari()) {
+      window.setTimeout(() => showInstallModal('ios'), 1200);
+    }
+  });
+}
+
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  window.addEventListener('load', () => {
+    const registration = navigator.serviceWorker.register('/sw.js');
+    const timeout = new Promise((_, reject) => {
+      window.setTimeout(() => reject(new Error('SERVICE_WORKER_TIMEOUT')), 5000);
+    });
+    Promise.race([registration, timeout])
+      .then((reg) => {
+        if (reg?.update) reg.update().catch((error) => {
+          console.warn('[digital-menu] aggiornamento service worker non riuscito:', error);
+        });
+      })
+      .catch((error) => {
+        console.warn('[digital-menu] service worker non registrato:', error);
+      });
+  });
 }
 
 function wire() {
@@ -377,6 +599,8 @@ function wire() {
     });
     document.getElementById(`cat-${chip.dataset.target}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
+  initInstallPrompt();
+  registerServiceWorker();
 }
 
 async function init() {

@@ -6,6 +6,12 @@
   <meta name="theme-color" content="#c8402a" />
   <meta name="description" content="Menu digitale del locale." />
   <title>Menu Digitale</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="assets/icons/icon.svg" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Menu" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -202,6 +208,12 @@
       font-weight: 800;
       text-decoration: none;
       white-space: nowrap;
+      transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+    }
+    .home-link:hover {
+      transform: translateY(-1px);
+      border-color: rgba(200,64,42,.42);
+      box-shadow: 0 12px 28px rgba(58,43,35,.08);
     }
     .category-strip-wrap {
       position: sticky;
@@ -360,6 +372,7 @@
       line-height: 1;
     }
     .badge--ok { color: #226747; background: #ddf7e9; border-color: #aee7c7; }
+    .badge--off { color: #7a4b42; background: #f4e5df; border-color: #e4c4ba; }
     .badge--new { color: #94530d; background: #fff1d7; border-color: #f5c983; }
     .badge--featured { color: var(--tomato-dark); background: var(--tomato-soft); border-color: rgba(200,64,42,.28); }
     .state {
@@ -396,6 +409,89 @@
       color: var(--ink-soft);
       text-align: center;
     }
+    .install-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      display: grid;
+      place-items: end center;
+      padding: 18px;
+      background: rgba(58,43,35,.26);
+      backdrop-filter: blur(10px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .22s ease;
+    }
+    .install-modal.is-visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .install-card {
+      width: min(440px, 100%);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: var(--surface);
+      color: var(--ink);
+      box-shadow: 0 24px 80px rgba(58,43,35,.24);
+      padding: 20px;
+      transform: translateY(14px) scale(.98);
+      transition: transform .22s ease;
+    }
+    .install-modal.is-visible .install-card {
+      transform: translateY(0) scale(1);
+    }
+    .install-icon {
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 12px;
+      border-radius: 15px;
+      background: var(--tomato-soft);
+      color: var(--tomato-dark);
+    }
+    .install-icon svg {
+      width: 26px;
+      height: 26px;
+      display: block;
+    }
+    .install-title {
+      margin: 0;
+      font-family: var(--font-title);
+      font-size: 1.38rem;
+      line-height: 1.05;
+    }
+    .install-text {
+      margin: 10px 0 0;
+      color: var(--ink-soft);
+      line-height: 1.5;
+      font-size: .93rem;
+    }
+    .install-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .install-btn {
+      min-height: 46px;
+      flex: 1;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--surface);
+      color: var(--ink);
+      font-weight: 900;
+      cursor: pointer;
+      transition: background .2s ease, transform .16s ease, border-color .2s ease;
+    }
+    .install-btn:hover {
+      transform: translateY(-1px);
+      border-color: rgba(200,64,42,.36);
+    }
+    .install-btn--primary {
+      border-color: var(--tomato);
+      background: var(--tomato);
+      color: #fff;
+    }
     @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes shimmer { to { background-position: -220% 0; } }
     @keyframes sectionIn {
@@ -422,6 +518,9 @@
       .dish-card { grid-template-columns: 1fr; }
       .dish-media, .dish-placeholder { min-height: 190px; }
       .dish-title-row { align-items: flex-start; }
+      .install-modal { place-items: end center; padding: 12px; }
+      .install-card { border-radius: 22px; padding: 18px; }
+      .install-actions { flex-direction: column; }
     }
   </style>
 </head>
@@ -448,7 +547,7 @@
             <span aria-hidden="true">⌕</span>
             <input id="menuSearch" type="search" placeholder="Cerca nel menu" autocomplete="off" />
           </label>
-          <a class="home-link" id="bookingLink" href="index.html">Prenota un tavolo</a>
+          <a class="home-link" id="bookingLink" href="index.html">Torna in Home</a>
         </div>
       </div>
     </section>
@@ -467,7 +566,7 @@
 
     <section class="state" id="fatalState" hidden>
       <p id="fatalText">Menu non disponibile.</p>
-      <a class="home-link" href="index.html">Torna alla prenotazione</a>
+      <a class="home-link" id="fatalHomeLink" href="index.html">Torna in Home</a>
     </section>
   </main>
 
