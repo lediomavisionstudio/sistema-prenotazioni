@@ -264,6 +264,7 @@ async function changeStatus(id, to) {
   if (error) { console.error(error); toast('Impossibile aggiornare lo stato.', true); return; }
   toast(to === 'in_attesa' ? 'Prenotazione ripristinata' : 'Stato aggiornato: ' + STATUS_LABEL[to]);
   if (res) await notifyCustomerStatusEmail(res, to);
+  if (res && to === 'annullata') notifyAdminCancellationPush(res);
   await load();
 }
 
@@ -411,6 +412,17 @@ async function notifyCustomerStatusEmail(reservation, status) {
   } catch (err) {
     console.error('[notifications] email cliente non inviata:', err);
     toast('Stato aggiornato, ma email cliente non inviata.', true);
+  }
+}
+
+async function notifyAdminCancellationPush(reservation) {
+  try {
+    const { data, error } = await supabase.functions.invoke('send-push-notification', {
+      body: { action: 'admin_booking_cancelled', reservation_id: reservation.id },
+    });
+    if (error || data?.error) console.warn('[push] notifica cancellazione admin non inviata:', error || data);
+  } catch (error) {
+    console.warn('[push] invoke cancellazione admin fallito:', error);
   }
 }
 

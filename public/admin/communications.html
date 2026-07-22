@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#c8402a" />
+  <title>Comunicazioni - Pannello gestionale</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="../assets/js/admin-theme.js"></script>
+  <link rel="stylesheet" href="../assets/css/theme.css" />
+  <link rel="stylesheet" href="../assets/css/panel.css" />
+  <style>
+    .communications-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(320px, .65fr);
+      gap: 18px;
+      align-items: start;
+    }
+    .communication-card {
+      display: grid;
+      gap: 14px;
+    }
+    .communication-stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .communication-stat {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      background: var(--surface-soft);
+    }
+    .communication-stat strong {
+      display: block;
+      font-size: 1.35rem;
+    }
+    .campaign-row {
+      display: grid;
+      grid-template-columns: minmax(120px, .8fr) minmax(0, 1.5fr) minmax(110px, .6fr) repeat(3, minmax(76px, .4fr));
+      gap: 10px;
+      align-items: center;
+    }
+    .campaign-row strong {
+      display: block;
+    }
+    .campaign-row span {
+      color: var(--ink-soft);
+      font-size: .84rem;
+    }
+    @media (max-width: 900px) {
+      .communications-grid,
+      .campaign-row,
+      .communication-stats {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar__inner">
+      <div class="topbar__brand">
+        <img class="topbar__logo" id="venueLogo" alt="" hidden />
+        <span class="topbar__brand-text">
+          <span class="topbar__venue" id="venueName">-</span>
+          <span class="topbar__role" id="userRole"></span>
+        </span>
+      </div>
+      <input class="topbar__toggle" id="adminNavToggle" type="checkbox" aria-label="Apri menu" />
+      <label class="topbar__menu" for="adminNavToggle" aria-hidden="true"><span></span><span></span><span></span></label>
+      <nav class="topbar__nav" aria-label="Navigazione gestionale">
+        <div class="topbar__nav-head">
+          <div>
+            <span class="topbar__nav-title"></span>
+            <span class="topbar__nav-role"></span>
+          </div>
+          <label class="topbar__nav-close" for="adminNavToggle" role="button" tabindex="0" aria-label="Chiudi menu"><span></span></label>
+        </div>
+        <a class="topbar__link" href="dashboard.html">Dashboard</a>
+        <a class="topbar__link" href="upcoming.html">Prenotazioni</a>
+        <a class="topbar__link" href="menu.html">Menu</a>
+        <a class="topbar__link" href="stats.html">Statistiche</a>
+        <a class="topbar__link is-active" href="communications.html">Comunicazioni</a>
+        <a class="topbar__link" href="settings.html">Impostazioni</a>
+        <button class="btn btn--ghost btn--sm" id="logoutBtn" type="button">Esci</button>
+      </nav>
+      <label class="topbar__scrim" for="adminNavToggle" aria-hidden="true"></label>
+    </div>
+  </header>
+
+  <main class="page" id="page" hidden>
+    <div class="section__head">
+      <h1 class="section__title" style="font-size:1.3rem">Comunicazioni</h1>
+      <span class="pill" id="pushStatus">Push PWA</span>
+    </div>
+
+    <div class="tabs" id="communicationTabs" style="margin-bottom:18px">
+      <button class="tab is-active" type="button" data-tab="notifications"><span class="tab__name">Notifiche</span></button>
+      <button class="tab" type="button" data-tab="campaigns"><span class="tab__name">Campagne</span></button>
+    </div>
+
+    <section id="notificationsPanel" class="communications-grid">
+      <form class="card communication-card" id="notificationForm">
+        <div class="section__head" style="margin:0">
+          <h2 class="section__title">Nuova notifica</h2>
+        </div>
+        <div class="form-grid">
+          <div class="field"><label for="pushTitle">Titolo</label><input id="pushTitle" maxlength="90" required /></div>
+          <div class="field"><label for="pushAudience">Destinatari</label>
+            <select id="pushAudience">
+              <option value="all">Tutti</option>
+              <option value="marketing">Clienti marketing</option>
+              <option value="loyal">Clienti fedeli</option>
+              <option value="waitlist">Waiting list</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div class="field field--full"><label for="pushMessage">Messaggio</label><textarea id="pushMessage" rows="4" maxlength="240" required></textarea></div>
+          <div class="field"><label for="pushImage">Immagine opzionale</label><input id="pushImage" type="url" maxlength="500" placeholder="https://..." /></div>
+          <div class="field"><label for="pushLink">Link opzionale</label><input id="pushLink" type="url" maxlength="500" placeholder="https://..." /></div>
+          <div class="field"><label for="pushSchedule">Programmare</label>
+            <select id="pushSchedule">
+              <option value="now">Subito</option>
+              <option value="future">Data futura</option>
+            </select>
+          </div>
+          <div class="field" id="pushDateField" hidden><label for="pushScheduledFor">Data e ora</label><input id="pushScheduledFor" type="datetime-local" /></div>
+        </div>
+        <button class="btn btn--primary" id="sendPushBtn" type="submit">Invia notifica</button>
+      </form>
+
+      <aside class="card communication-card">
+        <h2 class="section__title">Notifiche automatiche</h2>
+        <p style="margin:0;color:var(--ink-soft);font-size:.9rem">Attive per nuova prenotazione admin, cancellazione, promemoria cliente, tavolo disponibile e evento imminente. Promemoria ed eventi sono predisposti per Cron/Edge Function.</p>
+        <div class="communication-stats">
+          <div class="communication-stat"><strong id="subscribersCount">0</strong><span>Device</span></div>
+          <div class="communication-stat"><strong id="adminSubscribersCount">0</strong><span>Admin</span></div>
+          <div class="communication-stat"><strong id="customerSubscribersCount">0</strong><span>Clienti</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <section id="campaignsPanel" hidden>
+      <div class="card">
+        <div class="section__head" style="margin:0 0 14px">
+          <h2 class="section__title">Storico campagne</h2>
+          <button class="btn btn--ghost btn--sm" id="refreshCampaigns" type="button">Aggiorna</button>
+        </div>
+        <div class="rows" id="campaignRows"></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="spinner" id="pageSpinner"></div>
+
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/pwa.js"></script>
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script type="module" src="./admin-push.js"></script>
+  <script type="module" src="./admin-search.js"></script>
+  <script type="module" src="./admin-command-palette.js"></script>
+  <script type="module" src="./communications.js"></script>
+</body>
+</html>

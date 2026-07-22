@@ -9,7 +9,7 @@
 //
 // Per rilasciare un aggiornamento degli asset, incrementa CACHE_VERSION.
 
-const CACHE_VERSION = 'v7';
+const CACHE_VERSION = 'v8';
 const CACHE = 'prenotazioni-' + CACHE_VERSION;
 
 // App shell: file che (quando presenti) precarichiamo all'installazione.
@@ -31,15 +31,22 @@ const CORE = [
   './admin/index.html',
   './admin/dashboard.html',
   './admin/upcoming.html',
+  './admin/menu.html',
+  './admin/communications.html',
   './admin/settings.html',
   './admin/stats.html',
   './admin/manifest.json',
+  './OneSignalSDKWorker.js',
   './admin/app.js',
+  './admin/admin-push.js',
+  './admin/admin-search.js',
+  './admin/admin-command-palette.js',
   './admin/resui.js',
   './admin/dashboard.js',
   './admin/upcoming.js',
   './admin/settings.js',
   './admin/stats.js',
+  './admin/communications.js',
 ];
 
 self.addEventListener('install', (event) => {

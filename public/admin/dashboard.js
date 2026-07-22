@@ -441,6 +441,7 @@ async function changeStatus(id, to) {
   if (error) { console.error(error); toast('Impossibile aggiornare lo stato.', true); return; }
   toast(to === 'in_attesa' ? 'Prenotazione ripristinata' : 'Stato aggiornato: ' + STATUS_LABEL[to]);
   if (res) await notifyCustomerStatusEmail(res, to);
+  if (res && to === 'annullata') notifyAdminCancellationPush(res);
 
   // Turno liberato: promuovi automaticamente il primo in lista d'attesa.
   if ((to === 'annullata' || to === 'no_show' || to === 'terminato') && res) {
@@ -596,6 +597,17 @@ async function notifyCustomerStatusEmail(reservation, status) {
   }
 }
 
+async function notifyAdminCancellationPush(reservation) {
+  try {
+    const { data, error } = await supabase.functions.invoke('send-push-notification', {
+      body: { action: 'admin_booking_cancelled', reservation_id: reservation.id },
+    });
+    if (error || data?.error) console.warn('[push] notifica cancellazione admin non inviata:', error || data);
+  } catch (error) {
+    console.warn('[push] invoke cancellazione admin fallito:', error);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Lista d'attesa
 // ---------------------------------------------------------------------------
@@ -626,6 +638,19 @@ function notifyPromotion(p) {
   if (!p) return;
   console.log(`NOTIFICA: ${p.first_name} ${p.last_name} promosso dalla lista d'attesa, tavolo da assegnare`);
   toast(`${p.first_name} promosso dalla lista d'attesa`);
+  notifyWaitlistPush(p.reservation_id);
+}
+
+async function notifyWaitlistPush(reservationId) {
+  if (!reservationId || !supabase.functions) return;
+  try {
+    const { data, error } = await supabase.functions.invoke('send-push-notification', {
+      body: { action: 'waitlist_table_available', reservation_id: reservationId },
+    });
+    if (error || data?.error) console.warn('[push] notifica lista attesa non inviata:', error || data);
+  } catch (error) {
+    console.warn('[push] invoke lista attesa fallito:', error);
+  }
 }
 
 async function promoteWaitlist(id) {

@@ -1262,6 +1262,8 @@
 
   <script src="/assets/js/config.js"></script>
   <script src="assets/js/pwa.js"></script>
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script type="module" src="assets/js/customer-push.js"></script>
   <script src="assets/js/cookie-consent.js"></script>
   <script>
     window.__BOOKING_BOOT_STATUS = { done: false };
@@ -3035,10 +3037,28 @@
           return { sent: false, error: error || data };
         }
         console.info('[notifications] send-admin-booking-email completata:', data);
+        notifyAdminPush(result, waitlist);
         return data;
       } catch (err) {
         console.error('[notifications] send-admin-booking-email errore invoke:', err);
         return { sent: false, error: err };
+      }
+    }
+
+    async function notifyAdminPush(result, waitlist = false) {
+      const id = result && (result.reservation_id || result.waitlist_id);
+      if (!id || !supabase.functions) return;
+      try {
+        const payload = {
+          action: 'admin_new_booking',
+          reservation_id: waitlist ? null : id,
+          waitlist_id: waitlist ? id : null,
+        };
+        console.info('[push] invoco notifica admin:', payload);
+        const { data, error } = await supabase.functions.invoke('send-push-notification', { body: payload });
+        if (error || data?.error) console.warn('[push] notifica admin non inviata:', error || data);
+      } catch (error) {
+        console.warn('[push] invoke notifica admin fallito:', error);
       }
     }
 
@@ -3124,7 +3144,11 @@
         reservationId: res && res.reservation_id,
         waitlistId: res && res.waitlist_id,
         waitlist,
+        venueId: state.venue.id,
         venueName: state.venue.name,
+        customerEmail: $('email').value.trim() || null,
+        customerPhone: $('phone').value.trim() || null,
+        marketingConsent: $('marketingConsent').checked,
         dateText: cap(dfFull.format(d)),
         shiftText: isFreeHourDayShift(state.selShift)
           ? hhmm(state.selShift.start_time)
@@ -3140,6 +3164,9 @@
       renderConfirmSummary(summary);
       showState('Confirm');
       startReservationStatusWatch(summary);
+      if (window.BookingPush && (summary.reservationId || summary.waitlistId)) {
+        window.BookingPush.registerReservation(summary);
+      }
     }
 
     function reset() {

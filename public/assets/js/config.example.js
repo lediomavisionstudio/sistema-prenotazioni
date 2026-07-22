@@ -7,6 +7,7 @@
 window.APP_CONFIG = {
   SUPABASE_URL: 'https://xxxxxxxxxxxx.supabase.co',
   SUPABASE_ANON_KEY: 'eyJhbGciOi...',
+  ONESIGNAL_APP_ID: '',
 
   // Slug del locale di default se non presente ?locale= nell'URL.
   // In produzione ogni locale riceve un link tipo: https://.../?locale=pizzeria-da-mario

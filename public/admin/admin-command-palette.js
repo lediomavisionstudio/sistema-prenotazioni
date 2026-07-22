@@ -28,6 +28,7 @@ function actions() {
     { id: 'dashboard', title: 'Apri Dashboard', hint: 'Navigazione', run: () => (location.href = 'dashboard.html') },
     { id: 'upcoming', title: 'Apri Prenotazioni', hint: 'Navigazione', run: () => (location.href = 'upcoming.html') },
     { id: 'stats', title: 'Apri Statistiche', hint: 'Navigazione', run: () => (location.href = 'stats.html') },
+    { id: 'communications', title: 'Apri Comunicazioni', hint: 'Navigazione', run: () => (location.href = 'communications.html') },
     { id: 'settings', title: 'Apri Impostazioni', hint: 'Navigazione', run: () => (location.href = 'settings.html') },
     {
       id: 'theme',

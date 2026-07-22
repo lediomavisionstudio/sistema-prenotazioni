@@ -3,6 +3,7 @@
 window.APP_CONFIG = {
   SUPABASE_URL: 'https://qwttfqezoopuxgeplrcg.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_bVB7SOy-VPiTGItYMgADsw_GSUMybU8',
+  ONESIGNAL_APP_ID: '',
   DEFAULT_VENUE_SLUG: 'pizzeria-da-mario',
   PRIVACY_URL: 'privacy-policy.html',
 };
