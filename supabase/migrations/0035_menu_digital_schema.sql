@@ -88,19 +88,55 @@ comment on table menu_settings is 'Impostazioni pubbliche del menu digitale di u
 -- incompleta, create table if not exists le salta. Allineiamo quindi in modo
 -- additivo le sole colonne/vincoli necessari prima di creare indici e policy.
 
+alter table menu_categories
+  add column if not exists id uuid default gen_random_uuid(),
+  add column if not exists venue_id uuid,
+  add column if not exists sort_order int not null default 0,
+  add column if not exists is_visible boolean not null default true,
+  add column if not exists created_at timestamptz not null default now(),
+  add column if not exists updated_at timestamptz not null default now();
+
+update menu_categories
+set id = gen_random_uuid()
+where id is null;
+
+update menu_categories
+set
+  sort_order = coalesce(sort_order, 0),
+  is_visible = coalesce(is_visible, true),
+  created_at = coalesce(created_at, now()),
+  updated_at = coalesce(updated_at, now());
+
+alter table menu_categories
+  alter column id set default gen_random_uuid(),
+  alter column id set not null,
+  alter column sort_order set default 0,
+  alter column sort_order set not null,
+  alter column is_visible set default true,
+  alter column is_visible set not null,
+  alter column created_at set default now(),
+  alter column created_at set not null,
+  alter column updated_at set default now(),
+  alter column updated_at set not null;
+
 alter table menu_category_translations
-  add column if not exists id uuid default gen_random_uuid();
+  add column if not exists id uuid default gen_random_uuid(),
+  add column if not exists category_id uuid,
+  add column if not exists language text,
+  add column if not exists name text;
 
 update menu_category_translations
 set id = gen_random_uuid()
 where id is null;
 
-alter table menu_category_translations
-  alter column id set default gen_random_uuid(),
-  alter column id set not null;
+update menu_category_translations
+set name = ''
+where name is null;
 
 alter table menu_category_translations
-  add column if not exists language text;
+  alter column id set default gen_random_uuid(),
+  alter column id set not null,
+  alter column name set not null;
 
 update menu_category_translations
 set language = 'it'
@@ -123,19 +159,62 @@ using ranked_category_translations r
 where t.id = r.id
   and r.duplicate_rank > 1;
 
+alter table menu_items
+  add column if not exists id uuid default gen_random_uuid(),
+  add column if not exists category_id uuid,
+  add column if not exists price numeric(10, 2),
+  add column if not exists image_url text,
+  add column if not exists sort_order int not null default 0,
+  add column if not exists available boolean not null default true,
+  add column if not exists featured boolean not null default false,
+  add column if not exists created_at timestamptz not null default now(),
+  add column if not exists updated_at timestamptz not null default now();
+
+update menu_items
+set id = gen_random_uuid()
+where id is null;
+
+update menu_items
+set
+  sort_order = coalesce(sort_order, 0),
+  available = coalesce(available, true),
+  featured = coalesce(featured, false),
+  created_at = coalesce(created_at, now()),
+  updated_at = coalesce(updated_at, now());
+
+alter table menu_items
+  alter column id set default gen_random_uuid(),
+  alter column id set not null,
+  alter column sort_order set default 0,
+  alter column sort_order set not null,
+  alter column available set default true,
+  alter column available set not null,
+  alter column featured set default false,
+  alter column featured set not null,
+  alter column created_at set default now(),
+  alter column created_at set not null,
+  alter column updated_at set default now(),
+  alter column updated_at set not null;
+
 alter table menu_item_translations
-  add column if not exists id uuid default gen_random_uuid();
+  add column if not exists id uuid default gen_random_uuid(),
+  add column if not exists item_id uuid,
+  add column if not exists language text,
+  add column if not exists name text,
+  add column if not exists description text;
 
 update menu_item_translations
 set id = gen_random_uuid()
 where id is null;
 
-alter table menu_item_translations
-  alter column id set default gen_random_uuid(),
-  alter column id set not null;
+update menu_item_translations
+set name = ''
+where name is null;
 
 alter table menu_item_translations
-  add column if not exists language text;
+  alter column id set default gen_random_uuid(),
+  alter column id set not null,
+  alter column name set not null;
 
 update menu_item_translations
 set language = 'it'
@@ -159,17 +238,26 @@ where t.id = r.id
   and r.duplicate_rank > 1;
 
 alter table menu_options
-  add column if not exists id uuid default gen_random_uuid();
+  add column if not exists id uuid default gen_random_uuid(),
+  add column if not exists item_id uuid,
+  add column if not exists name text,
+  add column if not exists price numeric(10, 2);
 
 update menu_options
 set id = gen_random_uuid()
 where id is null;
 
+update menu_options
+set name = ''
+where name is null;
+
 alter table menu_options
   alter column id set default gen_random_uuid(),
-  alter column id set not null;
+  alter column id set not null,
+  alter column name set not null;
 
 alter table menu_settings
+  add column if not exists venue_id uuid,
   add column if not exists default_language text not null default 'it',
   add column if not exists secondary_language text default 'en',
   add column if not exists show_prices boolean not null default true,
@@ -177,6 +265,45 @@ alter table menu_settings
   add column if not exists currency text not null default 'EUR',
   add column if not exists cover_image text,
   add column if not exists updated_at timestamptz not null default now();
+
+update menu_settings
+set
+  default_language = coalesce(default_language, 'it'),
+  secondary_language = coalesce(secondary_language, 'en'),
+  show_prices = coalesce(show_prices, true),
+  show_images = coalesce(show_images, true),
+  currency = coalesce(currency, 'EUR'),
+  updated_at = coalesce(updated_at, now());
+
+delete from menu_settings
+where venue_id is null;
+
+with ranked_menu_settings as (
+  select
+    ctid,
+    row_number() over (
+      partition by venue_id
+      order by updated_at desc nulls last
+    ) as duplicate_rank
+  from menu_settings
+)
+delete from menu_settings s
+using ranked_menu_settings r
+where s.ctid = r.ctid
+  and r.duplicate_rank > 1;
+
+alter table menu_settings
+  alter column default_language set default 'it',
+  alter column default_language set not null,
+  alter column secondary_language set default 'en',
+  alter column show_prices set default true,
+  alter column show_prices set not null,
+  alter column show_images set default true,
+  alter column show_images set not null,
+  alter column currency set default 'EUR',
+  alter column currency set not null,
+  alter column updated_at set default now(),
+  alter column updated_at set not null;
 
 alter table menu_category_translations
   drop constraint if exists menu_category_translations_category_id_key;
@@ -186,6 +313,42 @@ alter table menu_item_translations
 
 do $$
 begin
+  if not exists (
+    select 1
+    from pg_index i
+    join pg_class c on c.oid = i.indrelid
+    where c.oid = 'menu_categories'::regclass
+      and i.indisprimary
+  ) then
+    alter table menu_categories
+      add constraint menu_categories_pkey
+      primary key (id);
+  end if;
+
+  if not exists (
+    select 1
+    from pg_index i
+    join pg_class c on c.oid = i.indrelid
+    where c.oid = 'menu_items'::regclass
+      and i.indisprimary
+  ) then
+    alter table menu_items
+      add constraint menu_items_pkey
+      primary key (id);
+  end if;
+
+  if not exists (
+    select 1
+    from pg_index i
+    join pg_class c on c.oid = i.indrelid
+    where c.oid = 'menu_settings'::regclass
+      and i.indisprimary
+  ) then
+    alter table menu_settings
+      add constraint menu_settings_pkey
+      primary key (venue_id);
+  end if;
+
   if not exists (
     select 1
     from pg_index i
@@ -220,6 +383,66 @@ begin
     alter table menu_options
       add constraint menu_options_pkey
       primary key (id);
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'menu_categories_venue_id_fkey'
+      and conrelid = 'menu_categories'::regclass
+  ) then
+    alter table menu_categories
+      add constraint menu_categories_venue_id_fkey
+      foreign key (venue_id) references venues(id) on delete cascade not valid;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'menu_category_translations_category_id_fkey'
+      and conrelid = 'menu_category_translations'::regclass
+  ) then
+    alter table menu_category_translations
+      add constraint menu_category_translations_category_id_fkey
+      foreign key (category_id) references menu_categories(id) on delete cascade not valid;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'menu_items_category_id_fkey'
+      and conrelid = 'menu_items'::regclass
+  ) then
+    alter table menu_items
+      add constraint menu_items_category_id_fkey
+      foreign key (category_id) references menu_categories(id) on delete cascade not valid;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'menu_item_translations_item_id_fkey'
+      and conrelid = 'menu_item_translations'::regclass
+  ) then
+    alter table menu_item_translations
+      add constraint menu_item_translations_item_id_fkey
+      foreign key (item_id) references menu_items(id) on delete cascade not valid;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'menu_options_item_id_fkey'
+      and conrelid = 'menu_options'::regclass
+  ) then
+    alter table menu_options
+      add constraint menu_options_item_id_fkey
+      foreign key (item_id) references menu_items(id) on delete cascade not valid;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'menu_settings_venue_id_fkey'
+      and conrelid = 'menu_settings'::regclass
+  ) then
+    alter table menu_settings
+      add constraint menu_settings_venue_id_fkey
+      foreign key (venue_id) references venues(id) on delete cascade not valid;
   end if;
 
   if not exists (
