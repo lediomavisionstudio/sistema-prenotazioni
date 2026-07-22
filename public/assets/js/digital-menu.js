@@ -296,7 +296,7 @@ async function loadMenu() {
   let itemTranslations = [];
   if (categoryIds.length) {
     const [catTrResult, itemResult] = await Promise.all([
-      supabase.from('menu_category_translations').select('*').in('category_id', categoryIds),
+      supabase.from('menu_category_translations').select('id, category_id, language, name').in('category_id', categoryIds),
       supabase
         .from('menu_items')
         .select('id, category_id, price, image_url, sort_order, available, featured, created_at')
@@ -313,7 +313,7 @@ async function loadMenu() {
 
   const itemIds = items.map((item) => item.id);
   if (itemIds.length) {
-    const trResult = await supabase.from('menu_item_translations').select('*').in('item_id', itemIds);
+    const trResult = await supabase.from('menu_item_translations').select('id, item_id, language, name, description').in('item_id', itemIds);
     if (trResult.error) throw trResult.error;
     itemTranslations = trResult.data || [];
   }
@@ -337,8 +337,10 @@ async function loadMenu() {
 function groupTranslations(rows, key) {
   const map = new Map();
   (rows || []).forEach((row) => {
+    const language = row.language || row.locale;
+    if (!language) return;
     if (!map.has(row[key])) map.set(row[key], {});
-    map.get(row[key])[row.language] = row;
+    map.get(row[key])[language] = { ...row, language };
   });
   return map;
 }

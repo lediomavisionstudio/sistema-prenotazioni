@@ -31,10 +31,47 @@ function langMap(rows, key) {
   const map = new Map();
   (rows || []).forEach((row) => {
     const id = row[key];
+    const language = row.language || row.locale;
+    if (!language) return;
     if (!map.has(id)) map.set(id, {});
-    map.get(id)[row.language] = row;
+    map.get(id)[language] = { ...row, language };
   });
   return map;
+}
+
+function isLegacyLocaleError(error) {
+  const message = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`;
+  return message.includes('column "locale"')
+    || message.includes('null value in column "locale"')
+    || message.includes('Could not find the \'language\' column');
+}
+
+function mirrorLegacyLocale(row) {
+  return row && row.language ? { ...row, locale: row.language } : row;
+}
+
+async function insertTranslation(table, row) {
+  const result = await supabase.from(table).insert(row);
+  if (result.error && isLegacyLocaleError(result.error)) {
+    return supabase.from(table).insert(mirrorLegacyLocale(row));
+  }
+  return result;
+}
+
+async function insertTranslations(table, rows) {
+  const result = await supabase.from(table).insert(rows);
+  if (result.error && isLegacyLocaleError(result.error)) {
+    return supabase.from(table).insert(rows.map(mirrorLegacyLocale));
+  }
+  return result;
+}
+
+async function upsertTranslation(table, row, onConflict) {
+  const result = await supabase.from(table).upsert(row, { onConflict });
+  if (result.error && isLegacyLocaleError(result.error)) {
+    return supabase.from(table).upsert(mirrorLegacyLocale(row), { onConflict });
+  }
+  return result;
 }
 
 function categoryName(category) {
@@ -113,7 +150,7 @@ async function loadMenuData() {
 
   if (categoryIds.length) {
     const [catTr, itemRows] = await Promise.all([
-      supabase.from('menu_category_translations').select('*').in('category_id', categoryIds),
+      supabase.from('menu_category_translations').select('id, category_id, language, name').in('category_id', categoryIds),
       supabase
         .from('menu_items')
         .select('id, category_id, price, image_url, sort_order, available, featured, created_at, updated_at')
@@ -129,7 +166,7 @@ async function loadMenuData() {
 
   const itemIds = items.map((item) => item.id);
   if (itemIds.length) {
-    const tr = await supabase.from('menu_item_translations').select('*').in('item_id', itemIds);
+    const tr = await supabase.from('menu_item_translations').select('id, item_id, language, name, description').in('item_id', itemIds);
     if (tr.error) throw tr.error;
     itemTranslations = tr.data || [];
   }
@@ -315,9 +352,7 @@ async function createCategory(name) {
     .select('id, venue_id, sort_order, is_visible, created_at, updated_at')
     .maybeSingle();
   if (error) throw error;
-  const tr = await supabase
-    .from('menu_category_translations')
-    .insert({ category_id: data.id, language: 'it', name: clean });
+  const tr = await insertTranslation('menu_category_translations', { category_id: data.id, language: 'it', name: clean });
   if (tr.error) throw tr.error;
   state.selectedCategoryId = data.id;
   $('newCategoryName').value = '';
@@ -338,9 +373,11 @@ async function saveCategoryName(categoryId, value) {
   if (category) {
     category.translations.it = { ...(category.translations.it || {}), category_id: categoryId, language: 'it', name };
   }
-  const { error } = await supabase
-    .from('menu_category_translations')
-    .upsert({ category_id: categoryId, language: 'it', name }, { onConflict: 'category_id,language' });
+  const { error } = await upsertTranslation(
+    'menu_category_translations',
+    { category_id: categoryId, language: 'it', name },
+    'category_id,language'
+  );
   if (error) throw error;
 }
 
@@ -381,9 +418,10 @@ async function createItem(categoryId = state.selectedCategoryId) {
     .select('id, category_id, price, image_url, sort_order, available, featured, created_at, updated_at')
     .maybeSingle();
   if (error) throw error;
-  const tr = await supabase
-    .from('menu_item_translations')
-    .insert({ item_id: data.id, language: 'it', name: 'Nuovo piatto', description: null });
+  const tr = await insertTranslation(
+    'menu_item_translations',
+    { item_id: data.id, language: 'it', name: 'Nuovo piatto', description: null }
+  );
   if (tr.error) throw tr.error;
   state.selectedCategoryId = category.id;
   await loadMenuData();
@@ -423,9 +461,11 @@ async function saveItemTranslation(itemId, language) {
   if (item) {
     item.translations[language] = { item_id: itemId, language, name, description };
   }
-  const { error } = await supabase
-    .from('menu_item_translations')
-    .upsert({ item_id: itemId, language, name, description }, { onConflict: 'item_id,language' });
+  const { error } = await upsertTranslation(
+    'menu_item_translations',
+    { item_id: itemId, language, name, description },
+    'item_id,language'
+  );
   if (error) throw error;
 }
 
@@ -482,7 +522,7 @@ async function duplicateItem(itemId) {
     description: tr.description || null,
   }));
   if (translations.length) {
-    const inserted = await supabase.from('menu_item_translations').insert(translations);
+    const inserted = await insertTranslations('menu_item_translations', translations);
     if (inserted.error) throw inserted.error;
   }
   await loadMenuData();
