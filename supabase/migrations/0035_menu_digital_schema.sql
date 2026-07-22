@@ -82,6 +82,121 @@ comment on table menu_options is 'Opzioni o supplementi collegati a un elemento 
 comment on table menu_settings is 'Impostazioni pubbliche del menu digitale di un locale.';
 
 -- ---------------------------------------------------------------------------
+-- Compatibilita' con bozze precedenti del modulo Menu
+-- ---------------------------------------------------------------------------
+-- Se il database remoto contiene gia' le tabelle Menu create da una bozza
+-- incompleta, create table if not exists le salta. Allineiamo quindi in modo
+-- additivo le sole colonne/vincoli necessari prima di creare indici e policy.
+
+alter table menu_category_translations
+  add column if not exists language text;
+
+update menu_category_translations
+set language = 'it'
+where language is null;
+
+alter table menu_category_translations
+  alter column language set not null;
+
+alter table menu_item_translations
+  add column if not exists language text;
+
+update menu_item_translations
+set language = 'it'
+where language is null;
+
+alter table menu_item_translations
+  alter column language set not null;
+
+alter table menu_settings
+  add column if not exists default_language text not null default 'it',
+  add column if not exists secondary_language text default 'en',
+  add column if not exists show_prices boolean not null default true,
+  add column if not exists show_images boolean not null default true,
+  add column if not exists currency text not null default 'EUR',
+  add column if not exists cover_image text,
+  add column if not exists updated_at timestamptz not null default now();
+
+alter table menu_category_translations
+  drop constraint if exists menu_category_translations_category_id_key;
+
+alter table menu_item_translations
+  drop constraint if exists menu_item_translations_item_id_key;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'menu_category_translations_category_id_language_key'
+      and conrelid = 'menu_category_translations'::regclass
+  ) then
+    alter table menu_category_translations
+      add constraint menu_category_translations_category_id_language_key
+      unique (category_id, language);
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'menu_item_translations_item_id_language_key'
+      and conrelid = 'menu_item_translations'::regclass
+  ) then
+    alter table menu_item_translations
+      add constraint menu_item_translations_item_id_language_key
+      unique (item_id, language);
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'menu_category_translations_language_check'
+      and conrelid = 'menu_category_translations'::regclass
+  ) then
+    alter table menu_category_translations
+      add constraint menu_category_translations_language_check
+      check (language ~ '^[a-z]{2}(-[A-Z]{2})?$');
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'menu_item_translations_language_check'
+      and conrelid = 'menu_item_translations'::regclass
+  ) then
+    alter table menu_item_translations
+      add constraint menu_item_translations_language_check
+      check (language ~ '^[a-z]{2}(-[A-Z]{2})?$');
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'menu_settings_default_language_check'
+      and conrelid = 'menu_settings'::regclass
+  ) then
+    alter table menu_settings
+      add constraint menu_settings_default_language_check
+      check (default_language ~ '^[a-z]{2}(-[A-Z]{2})?$');
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'menu_settings_secondary_language_check'
+      and conrelid = 'menu_settings'::regclass
+  ) then
+    alter table menu_settings
+      add constraint menu_settings_secondary_language_check
+      check (secondary_language is null or secondary_language ~ '^[a-z]{2}(-[A-Z]{2})?$');
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'menu_settings_currency_check'
+      and conrelid = 'menu_settings'::regclass
+  ) then
+    alter table menu_settings
+      add constraint menu_settings_currency_check
+      check (currency ~ '^[A-Z]{3}$');
+  end if;
+end $$;
+
+-- ---------------------------------------------------------------------------
 -- Indici
 -- ---------------------------------------------------------------------------
 
