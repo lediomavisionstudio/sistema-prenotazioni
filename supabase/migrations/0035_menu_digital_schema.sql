@@ -342,6 +342,19 @@ alter table menu_item_translations enable row level security;
 alter table menu_options enable row level security;
 alter table menu_settings enable row level security;
 
+drop policy if exists menu_categories_select_public_or_staff on menu_categories;
+drop policy if exists menu_categories_write_owner on menu_categories;
+drop policy if exists menu_category_translations_select_public_or_staff on menu_category_translations;
+drop policy if exists menu_category_translations_write_owner on menu_category_translations;
+drop policy if exists menu_items_select_public_or_staff on menu_items;
+drop policy if exists menu_items_write_owner on menu_items;
+drop policy if exists menu_item_translations_select_public_or_staff on menu_item_translations;
+drop policy if exists menu_item_translations_write_owner on menu_item_translations;
+drop policy if exists menu_options_select_public_or_staff on menu_options;
+drop policy if exists menu_options_write_owner on menu_options;
+drop policy if exists menu_settings_select_public_or_staff on menu_settings;
+drop policy if exists menu_settings_write_owner on menu_settings;
+
 create policy menu_categories_select_public_or_staff
   on menu_categories for select
   to anon, authenticated
