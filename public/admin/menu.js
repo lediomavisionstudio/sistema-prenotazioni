@@ -28,7 +28,7 @@ function renderPreview(url = '') {
   const hasUrl = !!clean;
   $('menuPreviewTitle').textContent = hasUrl ? 'Menu collegato' : 'Menu non collegato';
   $('menuPreviewText').textContent = hasUrl
-    ? 'Questo link sara visibile nella sezione Menu dell'interfaccia pubblica.'
+    ? "Questo link sara visibile nella sezione Menu dell'interfaccia pubblica."
     : 'Quando salvi un link, i clienti potranno aprirlo dal widget pubblico.';
   $('menuPreviewLink').hidden = !hasUrl;
   if (hasUrl) $('menuPreviewLink').href = clean;
