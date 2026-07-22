@@ -3,11 +3,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const oneSignalAppId = Deno.env.get("ONESIGNAL_APP_ID") || "";
 
 const supabase = createClient(supabaseUrl, serviceRoleKey, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -19,6 +20,7 @@ Deno.serve(async (req) => {
   try {
     if (!supabaseUrl || !serviceRoleKey) throw new Error("Supabase service secrets mancanti");
     const body = await req.json().catch(() => ({})) as {
+      action?: "config";
       venue_id?: string;
       audience?: "admin" | "customer";
       reservation_id?: string | null;
@@ -34,6 +36,14 @@ Deno.serve(async (req) => {
       device_label?: string | null;
       pwa_installed?: boolean;
     };
+
+    if (req.method === "GET" || body.action === "config") {
+      return json({
+        ok: true,
+        app_id: oneSignalAppId || null,
+        app_id_configured: Boolean(oneSignalAppId),
+      });
+    }
 
     if (!body.subscription_id) return json({ error: "subscription_id richiesto" }, 400);
     const authUser = await getOptionalUser(req);

@@ -10,6 +10,7 @@ const state = {
   role: null,
   subscriptions: [],
   campaigns: [],
+  diagnostics: null,
 };
 
 init();
@@ -49,6 +50,7 @@ async function reload() {
   state.campaigns = campaigns.data || [];
   renderStats();
   renderCampaigns();
+  await loadDiagnostics();
 }
 
 function wire() {
@@ -60,14 +62,17 @@ function wire() {
   });
   $('notificationForm').addEventListener('submit', sendNotification);
   $('refreshCampaigns').addEventListener('click', reload);
+  $('refreshOneSignalStatus').addEventListener('click', loadDiagnostics);
 }
 
 function setTab(tab) {
-  const active = tab === 'campaigns' ? 'campaigns' : 'notifications';
+  const active = ['notifications', 'campaigns', 'status'].includes(tab) ? tab : 'notifications';
   $('notificationsPanel').hidden = active !== 'notifications';
   $('campaignsPanel').hidden = active !== 'campaigns';
+  $('statusPanel').hidden = active !== 'status';
   $('communicationTabs').querySelectorAll('[data-tab]').forEach((button) =>
     button.classList.toggle('is-active', button.dataset.tab === active));
+  if (active === 'status') loadDiagnostics();
 }
 
 function renderStats() {
@@ -115,17 +120,131 @@ async function sendNotification(event) {
   $('sendPushBtn').disabled = true;
   try {
     const { data, error } = await supabase.functions.invoke('send-push-notification', { body: payload });
-    if (error || data?.error) throw error || new Error(data.error);
+    if (error || data?.error) throw new Error(await getInvokeErrorMessage(error, data));
     toast(data?.scheduled ? 'Notifica programmata.' : 'Notifica inviata.');
     $('notificationForm').reset();
     $('pushDateField').hidden = true;
     await reload();
   } catch (error) {
     console.error('[communications] invio push fallito:', error);
-    toast('Invio notifica non riuscito.', true);
+    toast(getPushErrorMessage(error), true);
   } finally {
     $('sendPushBtn').disabled = false;
   }
+}
+
+async function loadDiagnostics() {
+  const browser = await getBrowserDiagnostics();
+  let server = null;
+  let serverError = null;
+
+  try {
+    const { data, error } = await supabase.functions.invoke('send-push-notification', {
+      body: { action: 'diagnostics', venue_id: state.venue.id },
+    });
+    if (error || data?.error) throw new Error(await getInvokeErrorMessage(error, data));
+    server = data;
+  } catch (error) {
+    console.error('[communications] diagnostica OneSignal fallita:', error);
+    serverError = getPushErrorMessage(error);
+  }
+
+  state.diagnostics = { browser, server, serverError };
+  renderDiagnostics();
+}
+
+async function getBrowserDiagnostics() {
+  const appId = ((window.APP_CONFIG || {}).ONESIGNAL_APP_ID || '').trim();
+  const sdkInstalled = Boolean(window.OneSignal || window.OneSignalDeferred);
+  const secureDomain = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  let workerAvailable = false;
+  let workerActive = false;
+
+  if ('serviceWorker' in navigator) {
+    try {
+      const response = await fetch('/OneSignalSDKWorker.js', { cache: 'no-store' });
+      workerAvailable = response.ok && (response.headers.get('content-type') || '').includes('javascript');
+    } catch (error) {
+      console.error('[communications] OneSignalSDKWorker.js non raggiungibile:', error);
+    }
+
+    try {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      workerActive = registrations.some((registration) => {
+        const urls = [registration.active?.scriptURL, registration.installing?.scriptURL, registration.waiting?.scriptURL].filter(Boolean);
+        return urls.some((url) => url.includes('OneSignalSDKWorker.js') || url.includes('OneSignalSDK.sw.js'));
+      });
+    } catch (error) {
+      console.error('[communications] controllo service worker fallito:', error);
+    }
+  }
+
+  return { appId, sdkInstalled, secureDomain, workerAvailable, workerActive };
+}
+
+function renderDiagnostics() {
+  const diagnostics = state.diagnostics || {};
+  const browser = diagnostics.browser || {};
+  const server = diagnostics.server || {};
+  const subscriptions = server.subscriptions || {};
+  const serverAppConfigured = server.server?.app_id_configured === true;
+  const missing = [];
+
+  setStatusText('onesignalSdkStatus', browser.sdkInstalled, 'OK', 'Manca');
+  setStatusText('onesignalSwStatus', browser.workerAvailable && (browser.workerActive || browser.sdkInstalled), 'OK', browser.workerAvailable ? 'Non attivo' : 'Manca');
+  setStatusText('onesignalDomainStatus', browser.secureDomain, 'OK', 'Non sicuro');
+  setStatusText('onesignalAppIdStatus', Boolean(browser.appId) || serverAppConfigured, 'OK', 'Manca');
+  setStatusText('onesignalRestStatus', server.server?.rest_api_configured, 'OK', 'Manca');
+  $('onesignalRegisteredDevices').textContent = subscriptions.total ?? state.subscriptions.length;
+
+  if (!browser.appId && !serverAppConfigured) missing.push('ONESIGNAL_APP_ID nei Supabase Secrets o nel config pubblico');
+  if (server.server?.app_id_configured === false) missing.push('ONESIGNAL_APP_ID nei Supabase Secrets');
+  if (server.server?.rest_api_configured === false) missing.push('ONESIGNAL_REST_API_KEY nei Supabase Secrets');
+  if (server.server?.cron_secret_configured === false) missing.push('PUSH_CRON_SECRET nei Supabase Secrets');
+  if (diagnostics.serverError) missing.push(diagnostics.serverError);
+
+  $('onesignalLastSuccess').textContent = formatLog(server.last_success);
+  $('onesignalLastError').textContent = server.last_error
+    ? `${formatDate(server.last_error.created_at)} - ${server.last_error.error || server.last_error.title || 'Errore push'}`
+    : (diagnostics.serverError || '-');
+
+  const missingBox = $('onesignalMissingConfig');
+  missingBox.hidden = !missing.length;
+  if (missing.length) {
+    missingBox.querySelector('span').textContent = missing.join(' · ');
+  }
+}
+
+function setStatusText(id, ok, yes, no) {
+  $(id).textContent = ok ? yes : no;
+}
+
+function formatLog(log) {
+  if (!log) return '-';
+  const delivered = Number.isFinite(Number(log.delivered_count)) ? ` · ${log.delivered_count} destinatari` : '';
+  return `${formatDate(log.created_at)} - ${log.title || log.kind || 'Push'}${delivered}`;
+}
+
+function getPushErrorMessage(error) {
+  const message = error?.context?.json?.error || error?.message || String(error || '');
+  if (!message) return 'Invio notifica non riuscito.';
+  if (message.includes('ONESIGNAL_APP_ID')) return 'Configurazione mancante: ONESIGNAL_APP_ID.';
+  if (message.includes('ONESIGNAL_REST_API_KEY')) return 'Configurazione mancante: ONESIGNAL_REST_API_KEY.';
+  if (message.includes('PUSH_CRON_SECRET')) return 'Configurazione mancante: PUSH_CRON_SECRET.';
+  if (message.includes('NO_SUBSCRIPTIONS')) return 'Nessun dispositivo registrato per questi destinatari.';
+  return message;
+}
+
+async function getInvokeErrorMessage(error, data) {
+  if (data?.error) return data.error;
+  const response = error?.context;
+  if (response && typeof response.clone === 'function') {
+    try {
+      const body = await response.clone().json();
+      if (body?.error) return body.error;
+    } catch (_) {}
+  }
+  return getPushErrorMessage(error);
 }
 
 function formatDate(value) {

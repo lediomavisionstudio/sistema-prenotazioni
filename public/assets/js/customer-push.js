@@ -1,7 +1,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
 const CONFIG = window.APP_CONFIG || {};
-const APP_ID = CONFIG.ONESIGNAL_APP_ID || '';
+let appId = CONFIG.ONESIGNAL_APP_ID || '';
 const PROMPT_KEY = 'onesignal-customer-prompt-dismissed-v1';
 let client = null;
 let initialized = false;
@@ -20,8 +20,13 @@ window.addEventListener('click', markInteracted, true);
 window.addEventListener('keydown', markInteracted, true);
 
 async function registerReservation(summary) {
-  if (!APP_ID || !client || !summary) return;
+  if (!client || !summary) return;
   if (!isSupported()) return;
+  appId = await resolveOneSignalAppId();
+  if (!appId) {
+    console.warn('[customer-push] ONESIGNAL_APP_ID non configurato');
+    return;
+  }
   await waitForInteraction();
   if (localStorage.getItem(PROMPT_KEY) === '1') return;
   try {
@@ -34,6 +39,23 @@ async function registerReservation(summary) {
     await saveSubscription(summary);
   } catch (error) {
     console.warn('[customer-push] registrazione non riuscita:', error);
+  }
+}
+
+async function resolveOneSignalAppId() {
+  if (appId) return appId;
+  try {
+    const { data, error } = await client.functions.invoke('register-push-subscription', {
+      body: { action: 'config' },
+    });
+    if (error || !data?.app_id) {
+      if (error) console.warn('[customer-push] lettura config OneSignal fallita:', error);
+      return '';
+    }
+    return data.app_id;
+  } catch (error) {
+    console.warn('[customer-push] config OneSignal non disponibile:', error);
+    return '';
   }
 }
 
@@ -65,7 +87,7 @@ async function initOneSignal(summary) {
   await new Promise((resolve) => {
     window.OneSignalDeferred.push(async (OneSignal) => {
       await OneSignal.init({
-        appId: APP_ID,
+        appId,
         serviceWorkerPath: '/OneSignalSDKWorker.js',
         allowLocalhostAsSecureOrigin: true,
       });

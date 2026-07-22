@@ -22,11 +22,12 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return json({ ok: true });
 
   try {
-    if (!supabaseUrl || !serviceRoleKey) throw new Error("Supabase service secrets mancanti");
-    if (!oneSignalAppId || !oneSignalRestApiKey) throw new Error("Secret OneSignal mancanti");
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new Error("Configurazione mancante: SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY");
+    }
 
     const body = await req.json().catch(() => ({})) as {
-      action?: "manual" | "campaign" | "process_scheduled" | "admin_new_booking" | "admin_booking_cancelled" | "customer_reminder" | "waitlist_table_available" | "upcoming_event";
+      action?: "manual" | "campaign" | "process_scheduled" | "admin_new_booking" | "admin_booking_cancelled" | "customer_reminder" | "waitlist_table_available" | "upcoming_event" | "diagnostics";
       venue_id?: string;
       reservation_id?: string | null;
       waitlist_id?: string | null;
@@ -40,12 +41,25 @@ Deno.serve(async (req) => {
     };
 
     const action = body.action || "manual";
+    const user = await getOptionalUser(req);
+    if (action === "diagnostics") {
+      if (!user) throw new Error("Utente non autenticato");
+      if (!body.venue_id) throw new Error("venue_id richiesto");
+      await requireStaff(user.id, body.venue_id);
+      return await getDiagnostics(body.venue_id);
+    }
+
     if (action === "process_scheduled") {
-      if (!pushCronSecret || body.cron_secret !== pushCronSecret) throw new Error("Cron secret non valido");
+      if (!pushCronSecret) throw new Error("Configurazione mancante: PUSH_CRON_SECRET non impostato nei Supabase Secrets");
+      if (body.cron_secret !== pushCronSecret) throw new Error("Cron secret non valido");
+      if (!oneSignalAppId) throw new Error("Configurazione mancante: ONESIGNAL_APP_ID non impostato nei Supabase Secrets");
+      if (!oneSignalRestApiKey) throw new Error("Configurazione mancante: ONESIGNAL_REST_API_KEY non impostata nei Supabase Secrets");
       return await processScheduledCampaigns();
     }
 
-    const user = await getOptionalUser(req);
+    if (!oneSignalAppId) throw new Error("Configurazione mancante: ONESIGNAL_APP_ID non impostato nei Supabase Secrets");
+    if (!oneSignalRestApiKey) throw new Error("Configurazione mancante: ONESIGNAL_REST_API_KEY non impostata nei Supabase Secrets");
+
     if (action === "manual" || action === "campaign" || action === "upcoming_event") {
       if (!user) throw new Error("Utente non autenticato");
       if (!body.venue_id) throw new Error("venue_id richiesto");
@@ -64,6 +78,71 @@ Deno.serve(async (req) => {
     return json({ error: error instanceof Error ? error.message : "Invio push non riuscito" }, 500);
   }
 });
+
+async function getDiagnostics(venueId: string) {
+  const [
+    totalSubscriptions,
+    adminSubscriptions,
+    customerSubscriptions,
+    lastSuccess,
+    lastError,
+  ] = await Promise.all([
+    supabase
+      .from("push_subscriptions")
+      .select("id", { count: "exact", head: true })
+      .eq("venue_id", venueId),
+    supabase
+      .from("push_subscriptions")
+      .select("id", { count: "exact", head: true })
+      .eq("venue_id", venueId)
+      .eq("audience", "admin"),
+    supabase
+      .from("push_subscriptions")
+      .select("id", { count: "exact", head: true })
+      .eq("venue_id", venueId)
+      .neq("audience", "admin"),
+    supabase
+      .from("push_notification_logs")
+      .select("title, kind, audience, created_at, delivered_count, provider_notification_id")
+      .eq("venue_id", venueId)
+      .eq("status", "sent")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("push_notification_logs")
+      .select("title, kind, audience, created_at, error")
+      .eq("venue_id", venueId)
+      .eq("status", "failed")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  const errors = [
+    totalSubscriptions.error,
+    adminSubscriptions.error,
+    customerSubscriptions.error,
+    lastSuccess.error,
+    lastError.error,
+  ].filter(Boolean);
+  if (errors.length) throw errors[0];
+
+  return json({
+    server: {
+      app_id_configured: Boolean(oneSignalAppId),
+      rest_api_configured: Boolean(oneSignalRestApiKey),
+      cron_secret_configured: Boolean(pushCronSecret),
+    },
+    subscriptions: {
+      total: totalSubscriptions.count || 0,
+      admin: adminSubscriptions.count || 0,
+      customer: customerSubscriptions.count || 0,
+    },
+    last_success: lastSuccess.data || null,
+    last_error: lastError.data || null,
+  });
+}
 
 async function sendManual(body: any, userId: string) {
   const audience = normalizeAudience(body.audience);

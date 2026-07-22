@@ -1,7 +1,7 @@
 import { supabase, requireSession, loadCurrentVenue } from './app.js';
 
 const CONFIG = window.APP_CONFIG || {};
-const APP_ID = CONFIG.ONESIGNAL_APP_ID || '';
+let appId = CONFIG.ONESIGNAL_APP_ID || '';
 const PROMPT_KEY = 'onesignal-admin-prompt-dismissed-v1';
 let initialized = false;
 let venueContext = null;
@@ -9,10 +9,15 @@ let venueContext = null;
 initAdminPush();
 
 async function initAdminPush() {
-  if (!APP_ID || !supabase || !isSupported()) return;
+  if (!supabase || !isSupported()) return;
   const session = await requireSession();
   if (!session) return;
   try {
+    appId = await resolveOneSignalAppId();
+    if (!appId) {
+      console.warn('[push] ONESIGNAL_APP_ID non configurato');
+      return;
+    }
     venueContext = await loadCurrentVenue();
     if (!venueContext?.venue?.id) return;
     await waitForOneSignal();
@@ -20,6 +25,23 @@ async function initAdminPush() {
     registerAfterInteraction(session.user.id);
   } catch (error) {
     console.warn('[push] inizializzazione admin non riuscita:', error);
+  }
+}
+
+async function resolveOneSignalAppId() {
+  if (appId) return appId;
+  try {
+    const { data, error } = await supabase.functions.invoke('register-push-subscription', {
+      body: { action: 'config' },
+    });
+    if (error || !data?.app_id) {
+      if (error) console.warn('[push] lettura config OneSignal fallita:', error);
+      return '';
+    }
+    return data.app_id;
+  } catch (error) {
+    console.warn('[push] config OneSignal non disponibile:', error);
+    return '';
   }
 }
 
@@ -39,7 +61,7 @@ async function initOneSignal(userId) {
   await new Promise((resolve) => {
     window.OneSignalDeferred.push(async (OneSignal) => {
       await OneSignal.init({
-        appId: APP_ID,
+        appId,
         serviceWorkerPath: '/OneSignalSDKWorker.js',
         allowLocalhostAsSecureOrigin: true,
       });
