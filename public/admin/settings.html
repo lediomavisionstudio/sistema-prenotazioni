@@ -187,6 +187,80 @@
       font-size: .86rem;
     }
 
+    .backup-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .backup-panel {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      background: var(--card);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .backup-panel h3 {
+      margin: 0 0 6px;
+      font-size: 1rem;
+    }
+
+    .backup-panel p,
+    .backup-note {
+      margin: 0 0 14px;
+      color: var(--ink-soft);
+      font-size: .88rem;
+      line-height: 1.5;
+    }
+
+    .backup-actions,
+    .backup-auto-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .backup-summary {
+      margin-top: 14px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      background: color-mix(in srgb, var(--card) 88%, var(--brand) 12%);
+    }
+
+    .backup-summary[hidden] {
+      display: none !important;
+    }
+
+    .backup-summary__grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin: 12px 0;
+    }
+
+    .backup-summary__item {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      background: var(--card);
+    }
+
+    .backup-summary__item strong {
+      display: block;
+      font-size: 1.1rem;
+    }
+
+    .backup-summary__item span {
+      color: var(--ink-soft);
+      font-size: .78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
     @media (max-width: 700px) {
       .schedule-mode-save,
       .schedule-day {
@@ -201,6 +275,16 @@
       .closures-form,
       .closure-row {
         grid-template-columns: 1fr;
+      }
+
+      .backup-grid,
+      .backup-summary__grid {
+        grid-template-columns: 1fr;
+      }
+
+      .backup-auto-row {
+        align-items: stretch;
+        flex-direction: column;
       }
 
       .closure-row .act {
@@ -433,6 +517,51 @@
           </div>
         </form>
         <div class="closures-list" id="closureRows"></div>
+      </div>
+    </section>
+
+    <!-- Backup -->
+    <section class="section">
+      <div class="section__head"><h2 class="section__title">Backup</h2></div>
+      <div class="card">
+        <p class="backup-note">Esporta e ripristina i dati principali del gestionale con un file JSON validato.</p>
+        <div class="backup-grid">
+          <div class="backup-panel">
+            <h3>Backup manuale</h3>
+            <p>Scarica dati locale, impostazioni, tavoli, zone, turni, menu, clienti e prenotazioni.</p>
+            <button class="btn btn--primary btn--sm" id="createBackupBtn" type="button">Crea backup</button>
+          </div>
+          <div class="backup-panel">
+            <h3>Ripristino</h3>
+            <p>Importa un backup esportato da questo gestionale. Prima del ripristino viene scaricato un backup dello stato corrente.</p>
+            <input id="restoreBackupFile" type="file" accept="application/json" hidden />
+            <button class="btn btn--ghost btn--sm" id="pickRestoreBackupBtn" type="button">Ripristina backup</button>
+          </div>
+        </div>
+
+        <div class="backup-summary" id="backupRestoreSummary" hidden>
+          <strong>Riepilogo backup</strong>
+          <p id="backupRestoreMeta" class="backup-note" style="margin-top:6px"></p>
+          <div class="backup-summary__grid" id="backupRestoreCounts"></div>
+          <div class="backup-actions">
+            <button class="btn btn--ghost btn--sm" id="cancelRestoreBackupBtn" type="button">Annulla</button>
+            <button class="btn btn--primary btn--sm" id="confirmRestoreBackupBtn" type="button">Conferma ripristino</button>
+          </div>
+        </div>
+
+        <div class="backup-panel" style="margin-top:14px">
+          <h3>Backup automatico</h3>
+          <p>Configurazione predisposta per un futuro Cron o Edge Function: il frontend non esegue scheduler proprietari.</p>
+          <div class="backup-auto-row">
+            <label class="pill" style="cursor:pointer"><input type="checkbox" id="backupAutoEnabled" /> Backup automatico</label>
+            <select id="backupAutoFrequency" aria-label="Frequenza backup automatico">
+              <option value="daily">Giornaliero</option>
+              <option value="weekly">Settimanale</option>
+            </select>
+            <input id="backupAutoTime" type="time" value="03:00" aria-label="Ora backup automatico" />
+            <button class="btn btn--ghost btn--sm" id="saveBackupSettingsBtn" type="button">Salva impostazione</button>
+          </div>
+        </div>
       </div>
     </section>
   </main>

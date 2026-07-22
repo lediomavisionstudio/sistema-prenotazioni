@@ -19,9 +19,13 @@ const state = {
   canEdit: false,
   dirtyTables: new Set(),
   scheduleConfig: null,
+  pendingRestoreBackup: null,
 };
 
 const SCHEDULE_CONFIG_KEY = 'booking_admin_schedule_mode';
+const BACKUP_SETTINGS_KEY = 'booking_admin_backup_settings';
+const BACKUP_SCHEMA = 'sistema-prenotazioni-backup';
+const BACKUP_VERSION = 1;
 const LOGO_BUCKET = 'logos';
 const LOGO_MAX_BYTES = 5 * 1024 * 1024;
 const LOGO_TYPES = new Map([
@@ -29,6 +33,42 @@ const LOGO_TYPES = new Map([
   ['image/jpeg', 'jpg'],
   ['image/webp', 'webp'],
 ]);
+const RESTORE_TABLE_ORDER = [
+  'zones',
+  'service_shifts',
+  'restaurant_tables',
+  'venue_closures',
+  'reservations',
+  'reservation_tables',
+  'waitlist',
+  'customer_profiles',
+  'menu_settings',
+  'menu_categories',
+  'menu_category_translations',
+  'menu_items',
+  'menu_item_translations',
+  'menu_options',
+];
+const VENUE_RESTORE_FIELDS = [
+  'name',
+  'phone',
+  'address',
+  'active',
+  'widget_booking_window_days',
+  'closed_weekdays',
+  'booking_interval_minutes',
+  'brand_primary',
+  'brand_primary_dark',
+  'logo_url',
+  'contact_email',
+  'data_retention_months',
+  'menu_url',
+  'customer_email_enabled',
+  'admin_email_enabled',
+  'booking_same_mode_all_days',
+  'booking_mode',
+  'booking_mode_by_weekday',
+];
 let selectedLogoFile = null;
 let selectedLogoPreviewUrl = null;
 
@@ -53,6 +93,7 @@ async function init() {
     renderVenueForm();
     renderWeekdays();
     renderScheduleConfig();
+    renderBackupSettings();
     wire();
 
     $('pageSpinner').hidden = true;
@@ -706,6 +747,370 @@ async function deleteClosure(id) {
   await reloadAll();
 }
 
+// --- Backup e ripristino --------------------------------------------------
+function backupStorageKey() {
+  return `${BACKUP_SETTINGS_KEY}:${state.venue?.id || 'default'}`;
+}
+
+function loadBackupSettings() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(backupStorageKey()) || 'null');
+    if (!parsed || typeof parsed !== 'object') return { enabled: false, frequency: 'daily', time: '03:00' };
+    return {
+      enabled: !!parsed.enabled,
+      frequency: parsed.frequency === 'weekly' ? 'weekly' : 'daily',
+      time: /^\d{2}:\d{2}$/.test(parsed.time || '') ? parsed.time : '03:00',
+    };
+  } catch (error) {
+    console.warn('[settings] configurazione backup locale non valida:', error);
+    return { enabled: false, frequency: 'daily', time: '03:00' };
+  }
+}
+
+function renderBackupSettings() {
+  const settings = loadBackupSettings();
+  $('backupAutoEnabled').checked = settings.enabled;
+  $('backupAutoFrequency').value = settings.frequency;
+  $('backupAutoTime').value = settings.time;
+  ['createBackupBtn', 'pickRestoreBackupBtn', 'backupAutoEnabled', 'backupAutoFrequency', 'backupAutoTime', 'saveBackupSettingsBtn']
+    .forEach((id) => { $(id).disabled = !state.canEdit; });
+}
+
+function saveBackupSettings() {
+  if (!state.canEdit) return;
+  const settings = {
+    enabled: $('backupAutoEnabled').checked,
+    frequency: $('backupAutoFrequency').value === 'weekly' ? 'weekly' : 'daily',
+    time: $('backupAutoTime').value || '03:00',
+    scheduler: 'cron_or_edge_function',
+    updated_at: new Date().toISOString(),
+  };
+  localStorage.setItem(backupStorageKey(), JSON.stringify(settings));
+  toast('Impostazione backup salvata.');
+}
+
+async function selectBackupRows(label, query, optional = true) {
+  const { data, error } = await query;
+  if (!error) return data || [];
+  if (optional && /does not exist|schema cache|Could not find|column .* does not exist/i.test(error.message || '')) {
+    console.warn(`[backup] ${label} non disponibile:`, error);
+    return [];
+  }
+  console.error(`[backup] errore lettura ${label}:`, error);
+  throw error;
+}
+
+async function selectBackupSingle(label, query, optional = true) {
+  const { data, error } = await query;
+  if (!error) return data || null;
+  if (optional && /does not exist|schema cache|Could not find|column .* does not exist/i.test(error.message || '')) {
+    console.warn(`[backup] ${label} non disponibile:`, error);
+    return null;
+  }
+  console.error(`[backup] errore lettura ${label}:`, error);
+  throw error;
+}
+
+function inOrEmpty(table, column, ids) {
+  if (!ids.length) return Promise.resolve({ data: [], error: null });
+  return supabase.from(table).select('*').in(column, ids);
+}
+
+async function buildBackupPayload(reason = 'manual') {
+  const venueId = state.venue.id;
+  const venue = await selectBackupSingle('venues', supabase.from('venues').select('*').eq('id', venueId).maybeSingle(), false);
+  const [
+    zones,
+    tables,
+    shifts,
+    closures,
+    reservations,
+    waitlist,
+    customerProfiles,
+    menuSettings,
+    menuCategories,
+  ] = await Promise.all([
+    selectBackupRows('zones', supabase.from('zones').select('*').eq('venue_id', venueId).order('sort_order')),
+    selectBackupRows('restaurant_tables', supabase.from('restaurant_tables').select('*').eq('venue_id', venueId).order('code')),
+    selectBackupRows('service_shifts', supabase.from('service_shifts').select('*').eq('venue_id', venueId).order('sort_order')),
+    selectBackupRows('venue_closures', supabase.from('venue_closures').select('*').eq('venue_id', venueId).order('closed_date', { ascending: true })),
+    selectBackupRows('reservations', supabase.from('reservations').select('*').eq('venue_id', venueId).order('reservation_date', { ascending: true })),
+    selectBackupRows('waitlist', supabase.from('waitlist').select('*').eq('venue_id', venueId).order('created_at', { ascending: true })),
+    selectBackupRows('customer_profiles', supabase.from('customer_profiles').select('*').eq('venue_id', venueId).order('updated_at', { ascending: false })),
+    selectBackupSingle('menu_settings', supabase.from('menu_settings').select('*').eq('venue_id', venueId).maybeSingle()),
+    selectBackupRows('menu_categories', supabase.from('menu_categories').select('*').eq('venue_id', venueId).order('sort_order')),
+  ]);
+
+  const reservationIds = reservations.map((row) => row.id).filter(Boolean);
+  const categoryIds = menuCategories.map((row) => row.id).filter(Boolean);
+  const [reservationTables, menuCategoryTranslations, menuItems] = await Promise.all([
+    selectBackupRows('reservation_tables', inOrEmpty('reservation_tables', 'reservation_id', reservationIds)),
+    selectBackupRows('menu_category_translations', inOrEmpty('menu_category_translations', 'category_id', categoryIds)),
+    selectBackupRows('menu_items', inOrEmpty('menu_items', 'category_id', categoryIds)),
+  ]);
+  const itemIds = menuItems.map((row) => row.id).filter(Boolean);
+  const [menuItemTranslations, menuOptions] = await Promise.all([
+    selectBackupRows('menu_item_translations', inOrEmpty('menu_item_translations', 'item_id', itemIds)),
+    selectBackupRows('menu_options', inOrEmpty('menu_options', 'item_id', itemIds)),
+  ]);
+
+  return {
+    schema: BACKUP_SCHEMA,
+    version: BACKUP_VERSION,
+    created_at: new Date().toISOString(),
+    reason,
+    app: 'SISTEMA PRENOTAZIONI',
+    venue: {
+      id: venueId,
+      name: venue?.name || state.venue.name || '',
+    },
+    backup_settings: loadBackupSettings(),
+    data: {
+      venue,
+      zones,
+      restaurant_tables: tables,
+      service_shifts: shifts,
+      venue_closures: closures,
+      reservations,
+      reservation_tables: reservationTables,
+      waitlist,
+      customer_profiles: customerProfiles,
+      menu_settings: menuSettings,
+      menu_categories: menuCategories,
+      menu_category_translations: menuCategoryTranslations,
+      menu_items: menuItems,
+      menu_item_translations: menuItemTranslations,
+      menu_options: menuOptions,
+    },
+  };
+}
+
+function downloadJson(filename, payload) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1200);
+}
+
+function backupFilename(reason = 'backup') {
+  const name = String(state.venue?.name || 'locale').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'locale';
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  return `${name}-${reason}-${stamp}.json`;
+}
+
+async function createBackup(reason = 'backup') {
+  let payload = null;
+  try {
+    const { data, error } = await supabase.functions.invoke('admin-backup', {
+      body: { action: 'export', venue_id: state.venue.id },
+    });
+    if (error) throw error;
+    payload = data?.backup || null;
+  } catch (error) {
+    console.warn('[backup] export backend non disponibile, uso fallback client:', error);
+  }
+  if (!payload) payload = await buildBackupPayload(reason);
+  downloadJson(backupFilename(reason), payload);
+  return payload;
+}
+
+async function handleCreateBackup() {
+  if (!state.canEdit) return;
+  $('createBackupBtn').disabled = true;
+  try {
+    await createBackup('backup');
+    toast('Backup creato.');
+  } catch (error) {
+    console.error('[backup] creazione fallita:', error);
+    toast('Backup non riuscito: ' + (error.message || 'errore'), true);
+  } finally {
+    $('createBackupBtn').disabled = !state.canEdit;
+  }
+}
+
+function arrayCount(data, key) {
+  return Array.isArray(data?.[key]) ? data[key].length : (data?.[key] ? 1 : 0);
+}
+
+function validateBackupPayload(payload) {
+  if (!payload || typeof payload !== 'object') throw new Error('File JSON non valido.');
+  if (payload.schema !== BACKUP_SCHEMA) throw new Error('Il file non appartiene a questo sistema.');
+  if (payload.version !== BACKUP_VERSION) throw new Error(`Versione backup non compatibile: ${payload.version || 'sconosciuta'}.`);
+  if (!payload.data || typeof payload.data !== 'object') throw new Error('Il backup non contiene dati ripristinabili.');
+  if (!payload.data.venue || typeof payload.data.venue !== 'object') throw new Error('Dati locale mancanti nel backup.');
+  RESTORE_TABLE_ORDER.forEach((key) => {
+    if (key === 'menu_settings') return;
+    if (payload.data[key] !== undefined && !Array.isArray(payload.data[key])) {
+      throw new Error(`Sezione ${key} non valida.`);
+    }
+  });
+  return true;
+}
+
+function renderRestoreSummary(payload) {
+  const data = payload.data || {};
+  $('backupRestoreMeta').textContent = `${payload.venue?.name || data.venue?.name || 'Locale'} - creato il ${new Date(payload.created_at).toLocaleString('it-IT')}`;
+  const rows = [
+    ['Zone', arrayCount(data, 'zones')],
+    ['Tavoli', arrayCount(data, 'restaurant_tables')],
+    ['Turni', arrayCount(data, 'service_shifts')],
+    ['Prenotazioni', arrayCount(data, 'reservations')],
+    ['Clienti', arrayCount(data, 'customer_profiles')],
+    ['Categorie menu', arrayCount(data, 'menu_categories')],
+    ['Piatti', arrayCount(data, 'menu_items')],
+    ['Chiusure', arrayCount(data, 'venue_closures')],
+  ];
+  $('backupRestoreCounts').innerHTML = rows.map(([label, count]) => `
+    <div class="backup-summary__item"><strong>${count}</strong><span>${escapeHtml(label)}</span></div>
+  `).join('');
+  $('backupRestoreSummary').hidden = false;
+}
+
+async function readRestoreFile(file) {
+  const text = await file.text();
+  const payload = JSON.parse(text);
+  validateBackupPayload(payload);
+  state.pendingRestoreBackup = payload;
+  renderRestoreSummary(payload);
+  toast('Backup caricato. Controlla il riepilogo prima di confermare.');
+}
+
+function cancelRestoreBackup() {
+  state.pendingRestoreBackup = null;
+  $('restoreBackupFile').value = '';
+  $('backupRestoreSummary').hidden = true;
+}
+
+function remapVenueRows(rows) {
+  return (rows || []).map((row) => ({ ...row, venue_id: state.venue.id }));
+}
+
+function normalizeReservationRows(rows) {
+  return remapVenueRows(rows).map((row) => ({ ...row, created_by: null }));
+}
+
+function normalizeVenuePatch(venue) {
+  return VENUE_RESTORE_FIELDS.reduce((patch, key) => {
+    if (Object.prototype.hasOwnProperty.call(venue || {}, key)) patch[key] = venue[key];
+    return patch;
+  }, {});
+}
+
+async function deleteByVenue(table, label) {
+  const { error } = await supabase.from(table).delete().eq('venue_id', state.venue.id);
+  if (error) {
+    console.error(`[backup] eliminazione ${label} fallita:`, error);
+    throw error;
+  }
+}
+
+async function deleteByIds(table, column, ids, label) {
+  if (!ids.length) return;
+  const { error } = await supabase.from(table).delete().in(column, ids);
+  if (error) {
+    console.error(`[backup] eliminazione ${label} fallita:`, error);
+    throw error;
+  }
+}
+
+async function upsertRows(table, rows, label) {
+  if (!rows || !rows.length) return;
+  const { error } = await supabase.from(table).upsert(rows);
+  if (error) {
+    console.error(`[backup] ripristino ${label} fallito:`, error);
+    throw error;
+  }
+}
+
+async function restoreBackup(payload) {
+  validateBackupPayload(payload);
+  const data = payload.data;
+  const currentCategories = await selectBackupRows('menu_categories attuali', supabase.from('menu_categories').select('id').eq('venue_id', state.venue.id));
+  const currentCategoryIds = currentCategories.map((row) => row.id).filter(Boolean);
+  const currentItems = await selectBackupRows('menu_items attuali', inOrEmpty('menu_items', 'category_id', currentCategoryIds));
+  const currentItemIds = currentItems.map((row) => row.id).filter(Boolean);
+  const currentReservations = await selectBackupRows('reservations attuali', supabase.from('reservations').select('id').eq('venue_id', state.venue.id));
+  const currentReservationIds = currentReservations.map((row) => row.id).filter(Boolean);
+
+  await deleteByIds('menu_options', 'item_id', currentItemIds, 'opzioni menu');
+  await deleteByIds('menu_item_translations', 'item_id', currentItemIds, 'traduzioni piatti');
+  await deleteByIds('menu_items', 'category_id', currentCategoryIds, 'piatti');
+  await deleteByIds('menu_category_translations', 'category_id', currentCategoryIds, 'traduzioni categorie');
+  await deleteByVenue('menu_categories', 'categorie menu');
+  await deleteByVenue('menu_settings', 'impostazioni menu');
+  await deleteByIds('reservation_tables', 'reservation_id', currentReservationIds, 'tavoli prenotazioni');
+  await deleteByVenue('waitlist', 'lista attesa');
+  await deleteByVenue('reservations', 'prenotazioni');
+  await deleteByVenue('customer_profiles', 'clienti');
+  await deleteByVenue('venue_closures', 'chiusure');
+  await deleteByVenue('restaurant_tables', 'tavoli');
+  await deleteByVenue('service_shifts', 'turni');
+  await deleteByVenue('zones', 'zone');
+
+  const venuePatch = normalizeVenuePatch(data.venue);
+  if (Object.keys(venuePatch).length) {
+    const { error } = await supabase.from('venues').update(venuePatch).eq('id', state.venue.id);
+    if (error) throw error;
+  }
+
+  await upsertRows('zones', remapVenueRows(data.zones), 'zone');
+  await upsertRows('service_shifts', remapVenueRows(data.service_shifts), 'turni');
+  await upsertRows('restaurant_tables', remapVenueRows(data.restaurant_tables), 'tavoli');
+  await upsertRows('venue_closures', remapVenueRows(data.venue_closures), 'chiusure');
+  await upsertRows('customer_profiles', remapVenueRows(data.customer_profiles), 'clienti');
+  await upsertRows('reservations', normalizeReservationRows(data.reservations), 'prenotazioni');
+  await upsertRows('reservation_tables', data.reservation_tables || [], 'tavoli prenotazioni');
+  await upsertRows('waitlist', remapVenueRows(data.waitlist), 'lista attesa');
+  if (data.menu_settings) await upsertRows('menu_settings', [{ ...data.menu_settings, venue_id: state.venue.id }], 'impostazioni menu');
+  await upsertRows('menu_categories', remapVenueRows(data.menu_categories), 'categorie menu');
+  await upsertRows('menu_category_translations', data.menu_category_translations || [], 'traduzioni categorie');
+  await upsertRows('menu_items', data.menu_items || [], 'piatti');
+  await upsertRows('menu_item_translations', data.menu_item_translations || [], 'traduzioni piatti');
+  await upsertRows('menu_options', data.menu_options || [], 'opzioni menu');
+
+  if (payload.backup_settings) {
+    localStorage.setItem(backupStorageKey(), JSON.stringify(payload.backup_settings));
+  }
+}
+
+async function confirmRestoreBackup() {
+  if (!state.canEdit || !state.pendingRestoreBackup) return;
+  $('confirmRestoreBackupBtn').disabled = true;
+  $('cancelRestoreBackupBtn').disabled = true;
+  try {
+    const { data, error } = await supabase.functions.invoke('admin-backup', {
+      body: {
+        action: 'restore',
+        venue_id: state.venue.id,
+        backup: state.pendingRestoreBackup,
+      },
+    });
+    if (error) throw error;
+    if (data?.before_backup) {
+      downloadJson(backupFilename('pre-ripristino'), data.before_backup);
+    }
+    cancelRestoreBackup();
+    await loadVenueDetails();
+    await reloadAll();
+    renderVenueForm();
+    renderWeekdays();
+    renderScheduleConfig();
+    renderBackupSettings();
+    toast('Backup ripristinato.');
+  } catch (error) {
+    console.error('[backup] ripristino fallito:', error);
+    toast('Ripristino non riuscito: ' + (error.message || 'errore'), true);
+  } finally {
+    $('confirmRestoreBackupBtn').disabled = !state.canEdit;
+    $('cancelRestoreBackupBtn').disabled = !state.canEdit;
+  }
+}
+
 // --- Wiring ----------------------------------------------------------------
 function wire() {
   document.querySelectorAll('input[name="adminTheme"]').forEach((input) =>
@@ -718,6 +1123,22 @@ function wire() {
   $('vLogoPick').addEventListener('click', () => $('vLogoFile').click());
   $('vLogoFile').addEventListener('change', handleLogoFileChange);
   $('saveVenue').addEventListener('click', saveVenue);
+  $('createBackupBtn').addEventListener('click', handleCreateBackup);
+  $('pickRestoreBackupBtn').addEventListener('click', () => $('restoreBackupFile').click());
+  $('restoreBackupFile').addEventListener('change', async () => {
+    const file = $('restoreBackupFile').files?.[0];
+    if (!file) return;
+    try {
+      await readRestoreFile(file);
+    } catch (error) {
+      console.error('[backup] file non valido:', error);
+      cancelRestoreBackup();
+      toast('File backup non valido: ' + (error.message || 'errore'), true);
+    }
+  });
+  $('cancelRestoreBackupBtn').addEventListener('click', cancelRestoreBackup);
+  $('confirmRestoreBackupBtn').addEventListener('click', confirmRestoreBackup);
+  $('saveBackupSettingsBtn').addEventListener('click', saveBackupSettings);
   $('saveTableChanges').addEventListener('click', saveTableChanges);
   $('cancelTableChanges').addEventListener('click', cancelTableChanges);
   $('scheduleSameMode').addEventListener('change', () => {
